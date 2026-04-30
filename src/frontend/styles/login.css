@@ -55,40 +55,6 @@ input {
   box-shadow: var(--shadow);
 }
 
-.brand-mark {
-  position: absolute;
-  top: 72px;
-  left: -18px;
-  display: grid;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(47, 107, 230, 0.16);
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 8px 20px rgba(20, 32, 50, 0.12);
-  place-items: center;
-}
-
-.brand-mark span {
-  position: relative;
-  width: 14px;
-  height: 20px;
-  border-left: 4px solid var(--primary);
-  border-bottom: 4px solid #68c7ff;
-  border-radius: 0 0 9px 9px;
-}
-
-.brand-mark span::after {
-  position: absolute;
-  right: -8px;
-  bottom: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary);
-  content: "";
-}
-
 .login-icon {
   display: grid;
   width: 54px;
@@ -268,10 +234,5 @@ input {
 @media (max-width: 430px) {
   .login-card {
     padding: 30px 22px 26px;
-  }
-
-  .brand-mark {
-    left: 16px;
-    top: -17px;
   }
 }
