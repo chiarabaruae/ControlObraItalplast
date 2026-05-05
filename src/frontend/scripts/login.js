@@ -3,6 +3,9 @@ const username = document.querySelector("#username");
 const password = document.querySelector("#password");
 const statusMessage = document.querySelector("#form-status");
 const togglePassword = document.querySelector("#toggle-password");
+const loginShell = document.querySelector("#login-shell");
+const appShell = document.querySelector("#app-shell");
+const userChip = document.querySelector("#user-chip");
 
 const setStatus = (message, type = "") => {
   statusMessage.textContent = message;
@@ -17,6 +20,23 @@ togglePassword.addEventListener("click", () => {
     isHidden ? "Ocultar contraseña" : "Mostrar contraseña"
   );
 });
+
+const showMainPage = (user) => {
+  sessionStorage.setItem("controlObraUser", JSON.stringify(user));
+  userChip.textContent = user.displayName;
+  loginShell.hidden = true;
+  appShell.hidden = false;
+};
+
+const storedUser = sessionStorage.getItem("controlObraUser");
+
+if (sessionStorage.getItem("controlObraToken") && storedUser) {
+  try {
+    showMainPage(JSON.parse(storedUser));
+  } catch {
+    sessionStorage.removeItem("controlObraUser");
+  }
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -56,6 +76,7 @@ form.addEventListener("submit", async (event) => {
 
     sessionStorage.setItem("controlObraToken", result.token);
     setStatus(`Bienvenida/o, ${result.user.displayName}.`, "success");
+    showMainPage(result.user);
   } catch {
     setStatus("No se pudo conectar con la API.", "error");
   }

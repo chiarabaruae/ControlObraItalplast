@@ -6,6 +6,7 @@ export function createPostgresPool(env) {
   }
 
   return new pg.Pool({
-    connectionString: env.databaseUrl
+    connectionString: env.databaseUrl,
+    ssl: env.databaseSsl ? { rejectUnauthorized: false } : undefined
   });
 }

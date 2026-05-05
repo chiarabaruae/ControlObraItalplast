@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="./styles/login.css" />
   </head>
   <body>
-    <main class="login-shell">
+    <main class="login-shell" id="login-shell">
       <section class="login-card" aria-labelledby="login-title">
         <div class="login-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" role="img">
@@ -65,8 +65,38 @@
             <span>Iniciar sesión</span>
           </button>
 
+          <p class="password-help">Me olvidé de mi contraseña, cambiar mi contraseña.</p>
+
           <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
         </form>
+      </section>
+    </main>
+
+    <main class="app-shell" id="app-shell" hidden>
+      <aside class="sidebar" aria-label="Menú principal">
+        <div class="sidebar-brand">
+          <span>Italplast</span>
+          <strong>Control Obra</strong>
+        </div>
+
+        <nav class="side-nav" aria-label="Secciones">
+          <button class="side-nav-item is-active" type="button">Dashboard</button>
+          <button class="side-nav-item" type="button">Proyectos</button>
+        </nav>
+      </aside>
+
+      <section class="main-panel" aria-labelledby="main-title">
+        <header class="main-header">
+          <div>
+            <p class="eyebrow">Panel principal</p>
+            <h1 id="main-title">Dashboard</h1>
+          </div>
+          <span class="user-chip" id="user-chip"></span>
+        </header>
+
+        <div class="workspace">
+          <h2>Página principal</h2>
+        </div>
       </section>
     </main>
 
