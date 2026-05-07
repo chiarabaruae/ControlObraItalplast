@@ -10,6 +10,7 @@ export function loadEnv() {
     databaseSsl: process.env.DATABASE_SSL === "true",
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
-    corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000"
+    corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
+    openaiApiKey: process.env.OPENAI_API_KEY
   };
 }
