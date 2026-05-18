@@ -79,6 +79,12 @@ export function renderPersonalizar(container) {
 function applyTheme() {
   const theme = localStorage.getItem("co-theme") || "sistema";
   document.documentElement.removeAttribute("data-theme");
-  if (theme === "oscuro") document.documentElement.setAttribute("data-theme", "dark");
-  else if (theme === "claro") document.documentElement.setAttribute("data-theme", "light");
+  if (theme === "oscuro") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  } else if (theme === "claro") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (isDark) document.documentElement.setAttribute("data-theme", "dark");
+  }
 }

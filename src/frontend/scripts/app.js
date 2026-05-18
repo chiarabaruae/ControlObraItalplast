@@ -16,6 +16,11 @@ const usernameInput = document.getElementById("username");
 const passwordInput = document.getElementById("password");
 const formStatus = document.getElementById("form-status");
 const togglePwd = document.getElementById("toggle-password");
+const submitBtn = document.querySelector(".submit-button");
+const submitBtnText = submitBtn?.querySelector("span");
+const submitBtnIcon = submitBtn?.querySelector("svg");
+
+const spinnerSvg = '<svg viewBox="0 0 24 24" class="spinner" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="32" stroke-dashoffset="32"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg>';
 
 let currentUser = null;
 
@@ -42,6 +47,7 @@ loginForm?.addEventListener("submit", async (e) => {
   }
 
   setStatus("Validando acceso...");
+  setLoading(true);
 
   try {
     const res = await fetch("/api/auth/login", {
@@ -53,6 +59,7 @@ loginForm?.addEventListener("submit", async (e) => {
 
     if (!res.ok || !data.success) {
       setStatus(data.error ?? "No se pudo iniciar sesión.", "error");
+      setLoading(false);
       return;
     }
 
@@ -61,8 +68,25 @@ loginForm?.addEventListener("submit", async (e) => {
     enterApp(data.user);
   } catch {
     setStatus("No se pudo conectar con la API.", "error");
+    setLoading(false);
   }
 });
+
+function setLoading(isLoading) {
+  if (!submitBtn) return;
+  submitBtn.disabled = isLoading;
+  if (isLoading) {
+    submitBtnText.textContent = "Validando...";
+    submitBtn.innerHTML = spinnerSvg + "<span>Validando...</span>";
+    submitBtn.style.opacity = "0.7";
+    submitBtn.style.cursor = "not-allowed";
+  } else {
+    submitBtnText.textContent = "Iniciar sesión";
+    submitBtn.innerHTML = submitBtnIcon.outerHTML + "<span>Iniciar sesión</span>";
+    submitBtn.style.opacity = "1";
+    submitBtn.style.cursor = "pointer";
+  }
+}
 
 function setStatus(msg, type = "") {
   if (formStatus) {
@@ -79,9 +103,17 @@ function enterApp(user) {
 
   renderLayout(appShell, user);
 
-  // Apply saved accent color
+  // Apply saved accent color and theme
   const accent = localStorage.getItem("co-accent");
   if (accent) document.documentElement.style.setProperty("--primario", accent);
+
+  const theme = localStorage.getItem("co-theme") || "sistema";
+  if (theme === "oscuro") document.documentElement.setAttribute("data-theme", "dark");
+  else if (theme === "claro") document.documentElement.setAttribute("data-theme", "light");
+  else {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (isDark) document.documentElement.setAttribute("data-theme", "dark");
+  }
 
   // Load sidebar clients
   apiGet("/clientes").then(c => setSidebarClients(c)).catch(() => {});

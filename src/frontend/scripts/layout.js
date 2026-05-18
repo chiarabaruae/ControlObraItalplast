@@ -25,7 +25,6 @@ export function renderLayout(container, user) {
         <div class="logo-icon">CO</div>
         <div class="logo-text">
           <strong>Control Obras</strong>
-          <small>Suite Operativa</small>
         </div>
       </div>
       <nav class="side-nav" id="side-nav"></nav>

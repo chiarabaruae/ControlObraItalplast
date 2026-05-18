@@ -14,10 +14,21 @@ export async function renderDashboard(container, user) {
     const greeting = hour < 12 ? "Buenos días" : hour < 18 ? "Buenas tardes" : "Buenas noches";
 
     container.innerHTML = `
-      <div class="page-header">
-        <div class="eyebrow">INICIO</div>
-        <h1>${greeting}, ${esc(user.displayName)}</h1>
-        <p class="subtitle">Resumen operativo de Control Obras</p>
+      <div class="page-header page-header-row" style="align-items:center">
+        <div>
+          <div class="eyebrow">INICIO</div>
+          <h1>${greeting}, ${esc(user.displayName)}</h1>
+          <p class="subtitle">Resumen operativo de Control Obras</p>
+        </div>
+        <div id="dash-date-widget" style="display:flex; gap:12px; align-items:center; background:var(--panel); border:1px solid var(--borde); padding:10px 16px; border-radius:14px; box-shadow:var(--sombra)">
+          <div style="color:var(--primario); display:grid; place-items:center; padding:6px; border-radius:8px; background:var(--primario-claro)">
+            <svg viewBox="0 0 24 24" style="width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div style="text-align:right">
+            <div id="dash-date" style="font-size:13px; font-weight:700; color:var(--texto); text-transform:capitalize"></div>
+            <div id="dash-time" style="font-size:12px; color:var(--muted); font-weight:600"></div>
+          </div>
+        </div>
       </div>
 
       <div class="kpi-grid">
@@ -91,6 +102,22 @@ export async function renderDashboard(container, user) {
         }
       }
     } catch { /* silent */ }
+    
+    // Update Date/Time Widget
+    const dateEl = document.getElementById("dash-date");
+    const timeEl = document.getElementById("dash-time");
+    
+    function updateClock() {
+      if (!dateEl || !timeEl) return;
+      const now = new Date();
+      dateEl.textContent = now.toLocaleDateString('es-PY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      timeEl.textContent = now.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    updateClock();
+    const clockInterval = setInterval(updateClock, 30000); // update every 30s
+
+    return () => clearInterval(clockInterval);
   } catch (err) {
     container.innerHTML = `<div class="empty-state"><h3>Error al cargar dashboard</h3><p>${esc(err.message)}</p></div>`;
   }
