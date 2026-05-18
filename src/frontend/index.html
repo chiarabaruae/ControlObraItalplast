@@ -76,29 +76,54 @@
       <aside class="sidebar" aria-label="Menú principal">
         <div class="sidebar-brand">
           <span>Italplast</span>
-          <strong>Control Obra</strong>
+          <strong>Control Obras</strong>
         </div>
 
         <nav class="side-nav" aria-label="Secciones">
-          <button class="side-nav-item is-active" type="button">Dashboard</button>
-          <button class="side-nav-item" type="button">Proyectos</button>
+          <button class="side-nav-item is-active" type="button" data-view="dashboard">Dashboard</button>
+          <button class="side-nav-item" type="button" data-view="clientes">Clientes</button>
+          <button class="side-nav-item" type="button" data-view="obras">Obras</button>
+          <button class="side-nav-item" type="button" data-view="tareas">Tareas</button>
+          <button class="side-nav-item" type="button" data-view="gantt">Gantt</button>
         </nav>
       </aside>
 
       <section class="main-panel" aria-labelledby="main-title">
         <header class="main-header">
           <div>
-            <p class="eyebrow">Panel principal</p>
+            <p class="eyebrow" id="main-eyebrow">Panel operativo</p>
             <h1 id="main-title">Dashboard</h1>
           </div>
-          <span class="user-chip" id="user-chip"></span>
+          <div class="header-actions">
+            <button class="ghost-button" type="button" id="refresh-view">Actualizar</button>
+            <button class="primary-button" type="button" id="new-record" hidden>Nuevo</button>
+            <span class="user-chip" id="user-chip"></span>
+          </div>
         </header>
 
-        <div class="workspace">
-          <h2>Página principal</h2>
+        <div class="workspace" id="workspace">
+          <div class="loading-card">Cargando panel...</div>
         </div>
       </section>
     </main>
+
+    <dialog class="record-modal" id="record-modal">
+      <form class="modal-card" id="record-form" method="dialog">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow" id="modal-eyebrow">Registro</p>
+            <h2 id="modal-title">Nuevo registro</h2>
+          </div>
+          <button class="icon-close" type="button" id="close-modal" aria-label="Cerrar">×</button>
+        </header>
+        <div class="modal-grid" id="modal-fields"></div>
+        <p class="form-status" id="modal-status" role="status" aria-live="polite"></p>
+        <footer class="modal-actions">
+          <button class="ghost-button" type="button" id="cancel-modal">Cancelar</button>
+          <button class="primary-button" type="submit">Guardar</button>
+        </footer>
+      </form>
+    </dialog>
 
     <script src="./scripts/login.js"></script>
   </body>

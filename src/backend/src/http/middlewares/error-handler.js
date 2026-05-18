@@ -1,8 +1,8 @@
 export function errorHandler(error, _request, response, _next) {
   console.error(error);
 
-  response.status(500).json({
+  response.status(error.status ?? 500).json({
     success: false,
-    error: "Ocurrio un error inesperado."
+    error: error.status ? error.message : "Ocurrio un error inesperado."
   });
 }

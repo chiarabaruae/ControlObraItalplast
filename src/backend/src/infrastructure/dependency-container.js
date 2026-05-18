@@ -16,6 +16,8 @@ export function createContainer(env) {
   const aiService = new OpenAiAdapter(env.openaiApiKey);
 
   return {
+    env,
+    pool,
     loginUseCase: new LoginUseCase({
       userRepository,
       passwordVerifier,

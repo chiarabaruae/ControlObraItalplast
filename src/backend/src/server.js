@@ -7,6 +7,7 @@ import { createContainer } from "./infrastructure/dependency-container.js";
 import { registerAuthRoutes } from "./http/routes/auth-routes.js";
 import { registerHealthRoutes } from "./http/routes/health-routes.js";
 import { createAiRoutes } from "./http/routes/ai-routes.js";
+import { createAdminRoutes } from "./http/routes/admin-routes.js";
 import { errorHandler } from "./http/middlewares/error-handler.js";
 
 const env = loadEnv();
@@ -23,6 +24,7 @@ app.use(express.json());
 registerHealthRoutes(app);
 registerAuthRoutes(app, container);
 app.use("/api/ai", createAiRoutes(container.aiService));
+app.use("/api/admin", createAdminRoutes(container));
 
 app.use(express.static(frontendPath));
 app.get("/", (_request, response) => {
