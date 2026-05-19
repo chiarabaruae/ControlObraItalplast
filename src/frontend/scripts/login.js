@@ -32,6 +32,10 @@ const state = {
   }
 };
 
+function canEdit() {
+  return state.user?.role === "administrator";
+}
+
 const views = {
   dashboard: { title: "Dashboard", eyebrow: "Panel operativo" },
   clientes: { title: "Clientes", eyebrow: "Administracion" },
@@ -184,12 +188,20 @@ workspace.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-delete]");
 
   if (editButton) {
+    if (!canEdit()) {
+      return;
+    }
+
     const collection = configs[state.view]?.endpoint;
     const record = state.collections[collection].find((item) => item.id === editButton.dataset.edit);
     openModal(state.view, record);
   }
 
   if (deleteButton) {
+    if (!canEdit()) {
+      return;
+    }
+
     const config = configs[state.view];
     if (!config || !confirm("Eliminar registro?")) {
       return;
@@ -204,7 +216,7 @@ async function loadView(view) {
   const meta = views[view];
   title.textContent = meta.title;
   eyebrow.textContent = meta.eyebrow;
-  newRecordButton.hidden = !configs[view];
+  newRecordButton.hidden = !configs[view] || !canEdit();
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.view === view));
   workspace.innerHTML = `<div class="loading-card">Cargando ${meta.title.toLowerCase()}...</div>`;
 
@@ -328,7 +340,7 @@ function renderTable(config, rows) {
         <thead>
           <tr>
             ${config.columns.map((column) => `<th>${label(column)}</th>`).join("")}
-            <th></th>
+            ${canEdit() ? "<th></th>" : ""}
           </tr>
         </thead>
         <tbody>
@@ -337,10 +349,12 @@ function renderTable(config, rows) {
               (row) => `
                 <tr>
                   ${config.columns.map((column) => `<td>${cell(row, column)}</td>`).join("")}
-                  <td class="row-actions">
+                  ${canEdit()
+                    ? `<td class="row-actions">
                     <button class="ghost-button compact" type="button" data-edit="${row.id}">Editar</button>
                     <button class="danger-button compact" type="button" data-delete="${row.id}">Eliminar</button>
-                  </td>
+                  </td>`
+                    : ""}
                 </tr>
               `
             )
@@ -352,6 +366,10 @@ function renderTable(config, rows) {
 }
 
 function openModal(view, record = null) {
+  if (!canEdit()) {
+    return;
+  }
+
   const config = configs[view];
   if (!config) {
     return;
@@ -366,6 +384,11 @@ function openModal(view, record = null) {
 }
 
 async function saveRecord() {
+  if (!canEdit()) {
+    modal.close();
+    return;
+  }
+
   const config = configs[state.view];
   const formData = new FormData(recordForm);
   const payload = Object.fromEntries(formData.entries());

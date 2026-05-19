@@ -313,9 +313,9 @@ function bindOfertaUpload(container, proyectoId) {
     btn.disabled = true;
 
     try {
-      const res = await fetch(\`/api/admin/obras/\${proyectoId}/documentos/oferta\`, {
+      const res = await fetch(`/api/admin/obras/${proyectoId}/documentos/oferta`, {
         method: "POST",
-        headers: { Authorization: \`Bearer \${token}\` },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
       const data = await res.json();

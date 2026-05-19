@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import { requireAuth } from "../middlewares/require-auth.js";
 import { requireAdmin } from "../middlewares/require-admin.js";
 
 const estadosObra = ["planificada", "en_progreso", "pausada", "finalizada", "cancelada"];
@@ -9,7 +10,8 @@ const prioridades = ["baja", "media", "alta", "urgente"];
 
 export function createAdminRoutes(container) {
   const router = Router();
-  const auth = requireAdmin(container.env);
+  const auth = requireAuth(container.env);
+  const admin = requireAdmin(container.env);
 
   router.use(auth);
 
@@ -76,14 +78,14 @@ export function createAdminRoutes(container) {
     }
   });
 
-  registerClientes(router, container.pool);
-  registerObras(router, container.pool);
-  registerTareas(router, container.pool);
+  registerClientes(router, container.pool, admin);
+  registerObras(router, container.pool, admin);
+  registerTareas(router, container.pool, admin);
 
   return router;
 }
 
-function registerClientes(router, pool) {
+function registerClientes(router, pool, admin) {
   router.get("/clientes", async (_request, response, next) => {
     try {
       const result = await pool.query("select * from clientes order by created_at desc");
@@ -102,7 +104,7 @@ function registerClientes(router, pool) {
     }
   });
 
-  router.post("/clientes", async (request, response, next) => {
+  router.post("/clientes", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
       const result = await pool.query(
@@ -128,7 +130,7 @@ function registerClientes(router, pool) {
     }
   });
 
-  router.put("/clientes/:id", async (request, response, next) => {
+  router.put("/clientes/:id", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
       const result = await pool.query(
@@ -162,7 +164,7 @@ function registerClientes(router, pool) {
     }
   });
 
-  router.delete("/clientes/:id", async (request, response, next) => {
+  router.delete("/clientes/:id", admin, async (request, response, next) => {
     try {
       const result = await pool.query("delete from clientes where id = $1 returning id", [request.params.id]);
       sendDeleted(response, result.rowCount);
@@ -172,7 +174,7 @@ function registerClientes(router, pool) {
   });
 }
 
-function registerObras(router, pool) {
+function registerObras(router, pool, admin) {
   router.get("/obras", async (_request, response, next) => {
     try {
       const result = await pool.query(`
@@ -196,7 +198,7 @@ function registerObras(router, pool) {
     }
   });
 
-  router.post("/obras", async (request, response, next) => {
+  router.post("/obras", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
       const result = await pool.query(
@@ -216,7 +218,7 @@ function registerObras(router, pool) {
     }
   });
 
-  router.put("/obras/:id", async (request, response, next) => {
+  router.put("/obras/:id", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
       const result = await pool.query(
@@ -244,7 +246,7 @@ function registerObras(router, pool) {
     }
   });
 
-  router.delete("/obras/:id", async (request, response, next) => {
+  router.delete("/obras/:id", admin, async (request, response, next) => {
     try {
       const result = await pool.query("delete from obras where id = $1 returning id", [request.params.id]);
       sendDeleted(response, result.rowCount);
@@ -254,7 +256,7 @@ function registerObras(router, pool) {
   });
 }
 
-function registerTareas(router, pool) {
+function registerTareas(router, pool, admin) {
   router.get("/tareas", async (request, response, next) => {
     try {
       const params = [];
@@ -290,7 +292,7 @@ function registerTareas(router, pool) {
     }
   });
 
-  router.post("/tareas", async (request, response, next) => {
+  router.post("/tareas", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
       const result = await pool.query(
@@ -310,7 +312,7 @@ function registerTareas(router, pool) {
     }
   });
 
-  router.put("/tareas/:id", async (request, response, next) => {
+  router.put("/tareas/:id", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
       const result = await pool.query(
@@ -338,7 +340,7 @@ function registerTareas(router, pool) {
     }
   });
 
-  router.delete("/tareas/:id", async (request, response, next) => {
+  router.delete("/tareas/:id", admin, async (request, response, next) => {
     try {
       const result = await pool.query("delete from tareas_obra where id = $1 returning id", [request.params.id]);
       sendDeleted(response, result.rowCount);
