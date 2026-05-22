@@ -3,8 +3,7 @@ import { addRoute, startRouter, navigate } from "./router.js";
 import { renderLayout, getPageContent, setSidebarClients } from "./layout.js";
 import { renderDashboard } from "./pages/dashboard.js";
 import { renderClientes } from "./pages/clientes.js";
-import { renderObras } from "./pages/obras.js";
-import { renderProyectoDetalle } from "./pages/proyecto-detalle.js";
+import { renderProyectos } from "./pages/proyectos.js";
 import { renderTodo } from "./pages/todo.js";
 import { renderPersonalizar } from "./pages/personalizar.js";
 import { apiGet } from "./api.js";
@@ -130,11 +129,7 @@ function enterApp(user) {
   });
   addRoute("/proyectos", () => {
     const el = getPageContent();
-    if (el) renderObras(el);
-  });
-  addRoute("/proyectos/:id", ({ id }) => {
-    const el = getPageContent();
-    if (el) renderProyectoDetalle(el, id);
+    if (el) renderProyectos(el);
   });
   addRoute("/todo", () => {
     const el = getPageContent();
