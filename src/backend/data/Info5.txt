@@ -1,0 +1,24 @@
+Cliente	Nombre del Proyecto	Líder del Proyecto	N° Oferta	Producto	Total Aberturas	Fecha firma ábaco	Días fábrica	Compromiso producción	Inicio fábrica	Entrada a obra	Fin instalación
+CONSTRUCTORA OK			11264/25	PVC	44	16/9/2026	20	7/10/2026	17/9/2026	10/10/2026	
+ARQ TOMBOLY MARINA			11810/25	PVC	68	Sin compromiso		Sin fecha de compromiso	Sin fecha de compromiso		eliminar
+ARQ. CACERES ANA			11829/25	Aluminio	15	8/6/2026	3	12/6/2026	9/6/2026	15/6/2026	17/6/2026
+BAUMANN HERMANN			11906/25	Aluminio	12	27/6/2026	12	10/7/2026	28/6/2026	13/7/2026	26/7/2026
+CAMERONI RICARDO			11981/25	Aluminio	58	4/6/2026	25	30/6/2026	5/6/2026	3/7/2026	31/8/2026
+ING. EMILIO RICHER			12263/26	PVC	19	23/6/2026	15	9/7/2026	24/6/2026	12/7/2026	10/8/2026
+ARQ. MATHIAS CANTERO			12329/26	Aluminio	1	Sin compromiso		Sin fecha de compromiso	Sin fecha de compromiso		eliminar
+RUOTTI NORA			12409/26	PVC	5	Sin compromiso		Sin fecha de compromiso	Sin fecha de compromiso		eliminar
+			12426/26			Sin compromiso		Sin fecha de compromiso	Sin fecha de compromiso		
+CEPEDE ESTEFANIA			12432/26	PVC	25	14/5/2026	8	23/5/2026	15/5/2026	26/5/2026	14/6/2026
+SARAH OSES WALDE			12439/26	PVC	30	19/7/2026	25	14/8/2026	20/7/2026	17/8/2026	15/9/2026
+ARQ. CANTERO MATHIAS			12440/26	PVC	38	30/4/2026	28	29/5/2026	1/5/2026	1/6/2026	14/6/2026
+ARQ. MATHIAS CANTERO			12443/26	PVC	1	17/6/2026	1	19/6/2026	18/6/2026	22/6/2026	23/6/2026
+			2733/26			Sin compromiso		Sin fecha de compromiso	Sin fecha de compromiso		
+ARQ. MATHIAS CANTERO			2721/26	PVC	1	Sin compromiso		Sin fecha de compromiso	Sin fecha de compromiso		eliminar
+ARQ. TOMBOLY MARINA			2734/26	PVC	23	13/5/2026	15	29/5/2026	14/5/2026	1/6/2026	21/6/2026
+HERNEGARD PATRIK			2731/26	PVC	10	10/6/2026	12	23/6/2026	11/6/2026	26/6/2026	9/7/2026
+RUOTTI NORA			2725/26	PVC	3	30/5/2026	5	5/6/2026	31/5/2026	8/6/2026	12/6/2026
+ARQ. MARGARITA BUEY			2724/26	PVC	3	13/5/2026	10	24/5/2026	14/5/2026	27/5/2026	29/5/2026
+ARQ. CANTERO MATHIAS			2726/26	PVC	12	10/6/2026	10	21/6/2026	11/6/2026	24/6/2026	8/7/2026
+JSN ARQUITECTOS			2012/23	PVC	1	Sin compromiso		Sin fecha de compromiso	Sin fecha de compromiso		
+CONSTRUCTORA BAUEN			2680/26	PVC	4	27/4/2026	1	Sin fecha de compromiso	Sin fecha de compromiso		
+CONSTRUCTORA BAUEN			2712/26	PVC	3	8/5/2026	1	10/5/2026	9/5/2026	13/5/2026	14/5/2026
