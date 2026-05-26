@@ -6,6 +6,7 @@ import { renderClientes } from "./pages/clientes.js";
 import { renderProyectos } from "./pages/proyectos.js";
 import { renderTodo } from "./pages/todo.js";
 import { renderPersonalizar } from "./pages/personalizar.js";
+import { renderAjustesUsuarios } from "./pages/ajustes-usuarios.js";
 import { apiGet } from "./api.js";
 
 // ============ AUTH ============
@@ -138,6 +139,17 @@ function enterApp(user) {
   addRoute("/personalizar", () => {
     const el = getPageContent();
     if (el) renderPersonalizar(el);
+  });
+  addRoute("/ajustes/usuarios", () => {
+    const el = getPageContent();
+    if (currentUser?.role !== "administrator") {
+      navigate("/dashboard");
+      return;
+    }
+    if (el) renderAjustesUsuarios(el, currentUser);
+  });
+  addRoute("/ajustes", () => {
+    navigate("/ajustes/usuarios");
   });
 
   // Start routing

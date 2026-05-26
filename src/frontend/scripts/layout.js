@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { id: "obras", label: "Obras", icon: "obras", path: "/proyectos" },
   { id: "tareas", label: "To-Do", icon: "tareas", path: "/todo" },
   { id: "personalizar", label: "Personalizar", icon: "personalizar", path: "/personalizar" },
+  { id: "ajustes", label: "Ajustes", icon: "personalizar", path: "/ajustes/usuarios", adminOnly: true },
 ];
 
 let sidebarClients = [];
@@ -65,7 +66,8 @@ function renderNav() {
   const nav = document.getElementById("side-nav");
   if (!nav) return;
   const current = getCurrentPath();
-  nav.innerHTML = NAV_ITEMS.map(item => {
+  const isAdmin = nav.dataset.role === "administrator";
+  nav.innerHTML = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map(item => {
     const isActive = current.startsWith(item.path) ? "active" : "";
     return `<button class="nav-item ${isActive}" data-path="${item.path}" type="button">
       ${icons[item.icon]}
@@ -86,6 +88,9 @@ function renderClientList() {
 }
 
 function bindLayoutEvents(user) {
+  document.getElementById("side-nav")?.setAttribute("data-role", user.role ?? "");
+  renderNav();
+
   // Nav clicks
   document.getElementById("side-nav")?.addEventListener("click", e => {
     const btn = e.target.closest("[data-path]");

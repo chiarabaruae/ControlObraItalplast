@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { requireAuth } from "../middlewares/require-auth.js";
 import { requireAdmin } from "../middlewares/require-admin.js";
+import { USER_ROLES } from "../../domain/users/user-role.js";
 
 const estadosObra = ["planificada", "en_progreso", "pausada", "finalizada", "cancelada"];
 const estadosTarea = ["pendiente", "en_progreso", "bloqueada", "finalizada"];
 const estadosCliente = ["activo", "inactivo"];
 const prioridades = ["baja", "media", "alta", "urgente"];
+const rolesUsuario = Object.values(USER_ROLES);
+const SALT_ROUNDS = 10;
 
 export function createAdminRoutes(container) {
   const router = Router();
@@ -81,8 +85,107 @@ export function createAdminRoutes(container) {
   registerClientes(router, container.pool, admin);
   registerObras(router, container.pool, admin);
   registerTareas(router, container.pool, admin);
+  registerUsuarios(router, container.pool, admin);
 
   return router;
+}
+
+function registerUsuarios(router, pool, admin) {
+  router.get("/usuarios", admin, async (_request, response, next) => {
+    try {
+      const result = await pool.query(`
+        select
+          id,
+          username,
+          display_name,
+          role,
+          is_active,
+          created_at,
+          updated_at
+        from app_users
+        order by is_active desc, display_name asc
+      `);
+
+      const activeCount = result.rows.filter((user) => user.is_active).length;
+      response.json({ activeCount, users: result.rows });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/usuarios", admin, async (request, response, next) => {
+    try {
+      const body = request.body ?? {};
+      const username = required(body.username, "usuario").toLowerCase();
+      const password = required(body.password, "contraseña");
+      const firstName = required(body.firstName, "nombre");
+      const lastName = required(body.lastName, "apellido");
+      const role = enumValue(body.role, rolesUsuario, USER_ROLES.VIEWER);
+
+      if (password.length < 8) {
+        const error = new Error("La contraseña debe tener al menos 8 caracteres.");
+        error.status = 400;
+        throw error;
+      }
+
+      const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+      const displayName = `${firstName} ${lastName}`.trim();
+
+      const result = await pool.query(
+        `
+          insert into app_users (id, username, display_name, password_hash, role, is_active)
+          values ($1, $2, $3, $4, $5, true)
+          returning id, username, display_name, role, is_active, created_at, updated_at
+        `,
+        [randomUUID(), username, displayName, passwordHash, role]
+      );
+
+      response.status(201).json(result.rows[0]);
+    } catch (error) {
+      if (error.code === "23505") {
+        error.status = 409;
+        error.message = "Ya existe un usuario con ese nombre de usuario.";
+      }
+      next(error);
+    }
+  });
+
+  router.patch("/usuarios/:id/archive", admin, async (request, response, next) => {
+    try {
+      if (request.params.id === request.user.sub) {
+        response.status(400).json({ error: "No puedes archivar tu propio usuario." });
+        return;
+      }
+
+      const result = await pool.query(
+        `
+          update app_users
+          set is_active = false, updated_at = now()
+          where id = $1
+          returning id, username, display_name, role, is_active, created_at, updated_at
+        `,
+        [request.params.id]
+      );
+
+      sendFound(response, result.rows[0]);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/usuarios/:id", admin, async (request, response, next) => {
+    try {
+      if (request.params.id === request.user.sub) {
+        response.status(400).json({ error: "No puedes eliminar tu propio usuario." });
+        return;
+      }
+
+      const result = await pool.query("delete from app_users where id = $1 returning id", [request.params.id]);
+      sendDeleted(response, result.rowCount);
+    } catch (error) {
+      next(error);
+    }
+  });
 }
 
 function registerClientes(router, pool, admin) {

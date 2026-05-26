@@ -142,6 +142,8 @@ h1,h2,h3,h4,p{margin:0}
 .btn-sm{height:32px;padding:0 10px;font-size:12px;border-radius:8px}
 .btn-icon{width:36px;height:36px;padding:0;justify-content:center;border-radius:10px;background:transparent;color:var(--muted)}
 .btn-icon:hover{background:var(--primario-claro);color:var(--primario)}
+.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.btn:disabled:hover{background:inherit;color:inherit}
 
 /* ========== BADGES ========== */
 .badge{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
@@ -278,6 +280,28 @@ td{font-size:14px;color:var(--texto)}
 .team-info small{font-size:12px;color:var(--muted)}
 .team-bar{width:80px}
 
+/* ========== AJUSTES / USUARIOS ========== */
+.settings-header{margin-bottom:20px}
+.settings-tabs{display:flex;align-items:flex-end}
+.settings-tabs .tab{border:1px solid var(--borde);border-radius:var(--radius-btn);margin:0}
+.settings-grid{display:grid;grid-template-columns:minmax(360px,1fr) minmax(420px,1.1fr);gap:20px;align-items:start}
+.user-form-card{position:sticky;top:calc(var(--topbar-h) + 24px)}
+.user-form-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.user-form-actions .modal-status{margin:0}
+.user-summary{display:grid;gap:16px}
+.user-count-card{margin:0}
+.user-card-list{display:grid;gap:10px}
+.user-access-card{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px;border:1px solid var(--borde);border-radius:12px;background:var(--bg-card-sec)}
+.user-access-card.is-inactive{opacity:.66}
+.user-access-main{display:flex;align-items:center;gap:12px;min-width:0}
+.user-access-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--primario-claro);color:var(--primario);font-size:13px;font-weight:800;flex-shrink:0}
+.user-access-main h3{font-size:14px;font-weight:800;color:var(--texto);margin-bottom:2px}
+.user-access-main p{font-size:12px;color:var(--texto-sec);margin-bottom:8px;word-break:break-word}
+.user-access-meta{display:flex;gap:6px;flex-wrap:wrap}
+.user-access-actions{display:grid;gap:8px;justify-items:end;flex-shrink:0}
+.user-access-actions small{font-size:11px;font-weight:700;color:var(--muted)}
+.user-access-actions>div{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+
 /* ========== PERSONALIZAR ========== */
 .theme-options{display:flex;gap:12px;margin:16px 0}
 .theme-option{flex:1;padding:20px;border:2px solid var(--borde);border-radius:var(--radius-card);text-align:center;cursor:pointer;font-weight:700;font-size:14px;color:var(--texto-sec);transition:all .15s;background:var(--panel)}
@@ -291,6 +315,8 @@ td{font-size:14px;color:var(--texto)}
   .kpi-grid,.pipeline-grid{grid-template-columns:repeat(2,1fr)}
   .cols-65-35{grid-template-columns:1fr}
   .client-grid{grid-template-columns:1fr}
+  .settings-grid{grid-template-columns:1fr}
+  .user-form-card{position:static}
 }
 @media(max-width:768px){
   .app-layout{grid-template-columns:1fr}
@@ -302,6 +328,9 @@ td{font-size:14px;color:var(--texto)}
   .kpi-grid,.pipeline-grid{grid-template-columns:1fr 1fr}
   .form-grid{grid-template-columns:1fr}
   .page-header-row{flex-direction:column}
+  .user-access-card{align-items:flex-start;flex-direction:column}
+  .user-access-actions{justify-items:start}
+  .user-access-actions>div{justify-content:flex-start}
 }
 @media(max-width:480px){
   .kpi-grid,.pipeline-grid{grid-template-columns:1fr}
