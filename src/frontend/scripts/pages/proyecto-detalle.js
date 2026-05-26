@@ -1,5 +1,5 @@
-import { apiGet, apiPost, api } from "../api.js";
-import { icons, esc, renderBadge, renderProgress, renderEmpty } from "../ui.js";
+import { apiGet, apiPost, apiPut, apiDelete, apiPatch } from "../api.js";
+import { icons, esc, renderBadge, renderProgress, renderEmpty, formatDate } from "../ui.js";
 import { setTopbarSection } from "../layout.js";
 
 export async function renderProyectoDetalle(container, id) {
@@ -7,56 +7,24 @@ export async function renderProyectoDetalle(container, id) {
   container.innerHTML = '<div class="loading">Cargando proyecto...</div>';
 
   try {
-    const proyecto = await apiGet(`/obras/${id}`);
-    const cronograma = await apiGet(`/obras/${id}/cronograma`).catch(() => null);
-    const aberturas = await apiGet(`/obras/${id}/aberturas`).catch(() => []);
-    const seguimientoFabrica = await apiGet(`/obras/${id}/seguimiento/fabrica`).catch(() => null);
-    const seguimientoObra = await apiGet(`/obras/${id}/seguimiento/obra`).catch(() => null);
-    renderView(container, proyecto, cronograma, aberturas, seguimientoFabrica, seguimientoObra);
+    const [proyecto, cronograma, aberturas, seguimientoFabrica, seguimientoObra, usuariosActivos, tareas] = await Promise.all([
+      apiGet(`/obras/${id}`),
+      apiGet(`/obras/${id}/cronograma`).catch(() => null),
+      apiGet(`/obras/${id}/aberturas`).catch(() => []),
+      apiGet(`/obras/${id}/seguimiento/fabrica`).catch(() => null),
+      apiGet(`/obras/${id}/seguimiento/obra`).catch(() => null),
+      apiGet("/usuarios/activos").catch(() => []),
+      apiGet(`/tareas?obraId=${encodeURIComponent(id)}`).catch(() => [])
+    ]);
+    renderView(container, proyecto, cronograma, aberturas, seguimientoFabrica, seguimientoObra, usuariosActivos, tareas);
   } catch (err) {
     container.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${esc(err.message)}</p></div>`;
   }
 }
 
-function renderView(container, proyecto, cronograma, aberturas, segFabrica, segObra) {
-  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-  
-  // Agregamos algo de CSS inline temporal para las tabs (se puede mover a app.css luego)
+function renderView(container, proyecto, cronograma, aberturas, segFabrica, segObra, usuariosActivos, tareas) {
+  const liderUsuarioId = proyecto.lider_usuario_id || "";
   container.innerHTML = `
-    <style>
-      .tabs-nav {
-        display: flex;
-        gap: 1.5rem;
-        border-bottom: 1px solid var(--border);
-        margin-bottom: 1.5rem;
-        overflow-x: auto;
-      }
-      .tab-btn {
-        background: none;
-        border: none;
-        color: var(--muted);
-        font-weight: 500;
-        padding: 0.75rem 0;
-        cursor: pointer;
-        border-bottom: 2px solid transparent;
-        transition: all 0.2s;
-        white-space: nowrap;
-      }
-      .tab-btn:hover {
-        color: var(--fg);
-      }
-      .tab-btn.active {
-        color: var(--primario);
-        border-bottom-color: var(--primario);
-      }
-      .tab-content {
-        display: none;
-      }
-      .tab-content.active {
-        display: block;
-      }
-    </style>
-    
     <div class="page-header">
       <div class="page-header-row">
         <div>
@@ -72,13 +40,14 @@ function renderView(container, proyecto, cronograma, aberturas, segFabrica, segO
     </div>
 
     <div class="tabs-container">
-      <div class="tabs-nav">
-        <button class="tab-btn active" data-target="tab-resumen">Resumen</button>
-        <button class="tab-btn" data-target="tab-cronograma">Cronograma</button>
-        <button class="tab-btn" data-target="tab-fabrica">Seguimiento Fábrica</button>
-        <button class="tab-btn" data-target="tab-obra">Seguimiento Obra</button>
-        <button class="tab-btn" data-target="tab-informe">Informe de Avance</button>
-        <button class="tab-btn" data-target="tab-documentos">Documentos</button>
+      <div class="tabs">
+        <button class="tab active" data-target="tab-resumen" type="button">Resumen</button>
+        <button class="tab" data-target="tab-cronograma" type="button">Cronograma</button>
+        <button class="tab" data-target="tab-todo" type="button">To-Do</button>
+        <button class="tab" data-target="tab-fabrica" type="button">Seguimiento Fábrica</button>
+        <button class="tab" data-target="tab-obra" type="button">Seguimiento Obra</button>
+        <button class="tab" data-target="tab-informe" type="button">Informe de Avance</button>
+        <button class="tab" data-target="tab-documentos" type="button">Documentos</button>
       </div>
 
       <div class="tab-content active" id="tab-resumen">
@@ -88,6 +57,17 @@ function renderView(container, proyecto, cronograma, aberturas, segFabrica, segO
             <div>
               <p style="color:var(--muted); font-size:0.875rem">Responsable</p>
               <p><strong>${esc(proyecto.responsable || "-")}</strong></p>
+            </div>
+            <div>
+              <p style="color:var(--muted); font-size:0.875rem">Líder</p>
+              <div class="form-field">
+                <select id="lider-usuario" name="lider_usuario_id">
+                  <option value="">Sin asignar</option>
+                  ${(usuariosActivos || []).map(u => `<option value="${esc(u.id)}" ${u.id === liderUsuarioId ? "selected" : ""}>${esc(u.display_name)}</option>`).join("")}
+                </select>
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-guardar-lider" type="button" style="margin-top:8px">Guardar líder</button>
+              <div class="modal-status" id="status-lider"></div>
             </div>
             <div>
               <p style="color:var(--muted); font-size:0.875rem">Fechas</p>
@@ -102,6 +82,7 @@ function renderView(container, proyecto, cronograma, aberturas, segFabrica, segO
       </div>
 
       <div class="tab-content" id="tab-cronograma">
+        ${renderCronogramaEditor(proyecto, cronograma)}
         ${cronograma ? renderCronogramaActivo(cronograma) : `
         <div class="card" id="oferta-upload-container">
           <div class="card-header"><h2>Cronograma</h2></div>
@@ -169,6 +150,20 @@ function renderView(container, proyecto, cronograma, aberturas, segFabrica, segO
         </div>
       </div>
 
+      <div class="tab-content" id="tab-todo">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>To-Do del proyecto</h2>
+              <p>${(tareas || []).length} tareas</p>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-new-tarea-proyecto" type="button">${icons.plus} Nueva</button>
+          </div>
+          ${(tareas || []).length ? renderTareasProyecto(tareas) : renderEmpty("Sin tareas", "Crea la primera tarea del proyecto.")}
+        </div>
+        ${modalTareaProyecto(proyecto.id)}
+      </div>
+
       <div class="tab-content" id="tab-obra">
         <div class="card">
           <div class="card-header"><h2>Seguimiento de Instalación en Obra</h2></div>
@@ -219,6 +214,213 @@ function renderView(container, proyecto, cronograma, aberturas, segFabrica, segO
   if (cronograma && aberturas.length > 0 && !segFabrica) bindSeguimientoWizard(container, proyecto.id, 'fabrica');
   if (cronograma && aberturas.length > 0 && !segObra) bindSeguimientoWizard(container, proyecto.id, 'obra');
   if (segFabrica || segObra) bindGrillaInteractions(container, proyecto.id);
+  bindProyectoAdmin(container, proyecto.id);
+  bindTareasProyecto(container, proyecto.id);
+}
+
+function renderCronogramaEditor(proyecto, cronograma) {
+  const c = cronograma || {};
+  const fecha = c.fecha_comprometida_inicio_instalacion ? String(c.fecha_comprometida_inicio_instalacion).slice(0, 10) : "";
+  const diasFabrica = c.dias_fabrica ?? "";
+  const diasInstalacion = c.dias_instalacion ?? "";
+  return `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div>
+          <h2>Ajustes de cronograma</h2>
+          <p>Puedes completar estos campos mas adelante.</p>
+        </div>
+      </div>
+      <form id="form-cronograma-editor" class="form-grid">
+        <div class="form-field">
+          <label>Fecha inicio instalacion</label>
+          <input name="fecha_comprometida_inicio_instalacion" type="date" value="${esc(fecha)}">
+        </div>
+        <div class="form-field">
+          <label>Dias de fabrica</label>
+          <input name="dias_fabrica" type="number" min="1" value="${esc(diasFabrica)}">
+        </div>
+        <div class="form-field">
+          <label>Dias de instalacion</label>
+          <input name="dias_instalacion" type="number" min="1" value="${esc(diasInstalacion)}">
+        </div>
+        <div class="form-field full-width">
+          <button class="btn btn-primary" type="submit">Guardar ajustes</button>
+          <div class="modal-status" id="status-cronograma"></div>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function renderTareasProyecto(list) {
+  return `<div class="table-wrap"><table>
+    <thead><tr><th></th><th>Tarea</th><th>Estado</th><th>Prioridad</th><th>Fin</th><th>Validado por</th><th></th></tr></thead>
+    <tbody>${list.map(t => {
+      const done = t.estado === "finalizada";
+      return `<tr>
+        <td><button class="btn-icon" data-toggle-tarea-proy="${t.id}" data-complete="${done}" type="button" title="${done ? "Reabrir" : "Completar"}">
+          ${done ? icons.check : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>'}
+        </button></td>
+        <td style="${done ? "text-decoration:line-through;opacity:.6" : ""}"><strong>${esc(t.titulo)}</strong></td>
+        <td>${renderBadge(t.estado)}</td>
+        <td>${renderBadge(t.prioridad)}</td>
+        <td>${formatDate(t.fecha_fin)}</td>
+        <td>${esc(t.completada_por_name || "-")}</td>
+        <td class="row-actions">
+          <button class="btn btn-ghost btn-sm" data-edit-tarea-proy="${t.id}" type="button">${icons.edit}</button>
+          <button class="btn btn-danger btn-sm" data-delete-tarea-proy="${t.id}" type="button">${icons.trash}</button>
+        </td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table></div>`;
+}
+
+function modalTareaProyecto(obraId) {
+  return `<div class="modal-overlay" id="modal-tarea-proyecto">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-titulo-tarea-proyecto">Nueva tarea</h2>
+        <button class="btn-icon" id="close-modal-tarea-proyecto" type="button">${icons.close}</button>
+      </div>
+      <form id="form-tarea-proyecto">
+        <input type="hidden" name="obra_id" value="${esc(obraId)}">
+        <div class="form-grid">
+          <div class="form-field full-width"><label>Titulo *</label><input name="titulo" required></div>
+          <div class="form-field"><label>Fecha inicio *</label><input name="fecha_inicio" type="date" required></div>
+          <div class="form-field"><label>Fecha fin *</label><input name="fecha_fin" type="date" required></div>
+          <div class="form-field"><label>Estado</label>
+            <select name="estado">
+              <option value="pendiente">Pendiente</option>
+              <option value="en_progreso">En progreso</option>
+              <option value="bloqueada">Bloqueada</option>
+              <option value="finalizada">Finalizada</option>
+            </select>
+          </div>
+          <div class="form-field"><label>Prioridad</label>
+            <select name="prioridad">
+              <option value="baja">Baja</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+              <option value="urgente">Urgente</option>
+            </select>
+          </div>
+          <div class="form-field"><label>Avance %</label><input name="avance" type="number" min="0" max="100" value="0"></div>
+          <div class="form-field full-width"><label>Descripcion</label><textarea name="descripcion" rows="2"></textarea></div>
+        </div>
+        <div class="modal-status" id="modal-status-tarea-proyecto"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="cancel-modal-tarea-proyecto">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+      <input type="hidden" id="editing-tarea-proyecto-id">
+    </div>
+  </div>`;
+}
+
+function bindProyectoAdmin(container, proyectoId) {
+  const statusLider = container.querySelector("#status-lider");
+  container.querySelector("#btn-guardar-lider")?.addEventListener("click", async () => {
+    const select = container.querySelector("#lider-usuario");
+    const liderUsuarioId = select?.value || "";
+    statusLider.textContent = "Guardando...";
+    try {
+      await apiPatch(`/obras/${proyectoId}/lider`, { lider_usuario_id: liderUsuarioId });
+      statusLider.textContent = "Lider actualizado.";
+    } catch (error) {
+      statusLider.textContent = error.message;
+    }
+  });
+
+  container.querySelector("#form-cronograma-editor")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const status = container.querySelector("#status-cronograma");
+    status.textContent = "Guardando...";
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+      await apiPost(`/obras/${proyectoId}/cronograma`, data);
+      status.textContent = "Ajustes guardados.";
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  });
+}
+
+function bindTareasProyecto(container, proyectoId) {
+  const modal = container.querySelector("#modal-tarea-proyecto");
+  const form = container.querySelector("#form-tarea-proyecto");
+  const editingId = container.querySelector("#editing-tarea-proyecto-id");
+  const status = container.querySelector("#modal-status-tarea-proyecto");
+
+  const openModal = (t = null) => {
+    editingId.value = t?.id || "";
+    container.querySelector("#modal-titulo-tarea-proyecto").textContent = t ? "Editar tarea" : "Nueva tarea";
+    if (t) {
+      form.titulo.value = t.titulo || "";
+      form.fecha_inicio.value = t.fecha_inicio?.slice(0, 10) || "";
+      form.fecha_fin.value = t.fecha_fin?.slice(0, 10) || "";
+      form.estado.value = t.estado || "pendiente";
+      form.prioridad.value = t.prioridad || "media";
+      form.avance.value = t.avance || 0;
+      form.descripcion.value = t.descripcion || "";
+    } else {
+      form.reset();
+    }
+    status.textContent = "";
+    modal.classList.add("open");
+  };
+  const closeModal = () => modal.classList.remove("open");
+
+  container.querySelector("#btn-new-tarea-proyecto")?.addEventListener("click", () => openModal());
+  container.querySelector("#close-modal-tarea-proyecto")?.addEventListener("click", closeModal);
+  container.querySelector("#cancel-modal-tarea-proyecto")?.addEventListener("click", closeModal);
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    status.textContent = "Guardando...";
+    try {
+      if (editingId.value) await apiPut(`/tareas/${editingId.value}`, { ...data, obra_id: proyectoId });
+      else await apiPost("/tareas", data);
+      closeModal();
+      renderProyectoDetalle(container, proyectoId);
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  });
+
+  container.addEventListener("click", async (event) => {
+    const editBtn = event.target.closest("[data-edit-tarea-proy]");
+    const deleteBtn = event.target.closest("[data-delete-tarea-proy]");
+    const toggleBtn = event.target.closest("[data-toggle-tarea-proy]");
+
+    if (editBtn) {
+      const tareasActuales = await apiGet(`/tareas?obraId=${encodeURIComponent(proyectoId)}`);
+      const t = (tareasActuales || []).find(x => x.id === editBtn.dataset.editTareaProy);
+      if (t) openModal(t);
+      return;
+    }
+
+    if (deleteBtn) {
+      if (confirm("Eliminar esta tarea?")) {
+        await apiDelete(`/tareas/${deleteBtn.dataset.deleteTareaProy}`);
+        renderProyectoDetalle(container, proyectoId);
+      }
+      return;
+    }
+
+    if (toggleBtn) {
+      const tareasActuales = await apiGet(`/tareas?obraId=${encodeURIComponent(proyectoId)}`);
+      const t = (tareasActuales || []).find(x => x.id === toggleBtn.dataset.toggleTareaProy);
+      if (t) {
+        const newEstado = t.estado === "finalizada" ? "pendiente" : "finalizada";
+        await apiPut(`/tareas/${t.id}`, { ...t, estado: newEstado, avance: newEstado === "finalizada" ? 100 : t.avance });
+        renderProyectoDetalle(container, proyectoId);
+      }
+    }
+  });
 }
 
 function renderGrillaSeguimiento(seg) {
@@ -274,7 +476,7 @@ function renderGrillaSeguimiento(seg) {
 
 function bindTabs(container) {
   // ... (unchanged code inside bindTabs)
-  const tabBtns = container.querySelectorAll(".tab-btn");
+  const tabBtns = container.querySelectorAll(".tab, .tab-btn");
   const tabContents = container.querySelectorAll(".tab-content");
 
   tabBtns.forEach(btn => {

@@ -113,6 +113,23 @@ function registerUsuarios(router, pool, admin) {
     }
   });
 
+  // Listado ligero para asignaciones (solo activos). Admin-only por requerimiento.
+  router.get("/usuarios/activos", admin, async (_request, response, next) => {
+    try {
+      const result = await pool.query(
+        `
+          select id, username, display_name, role
+          from app_users
+          where is_active = true
+          order by display_name asc
+        `
+      );
+      response.json(result.rows);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/usuarios", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
@@ -308,12 +325,12 @@ function registerObras(router, pool, admin) {
         `
           insert into obras (
             id, cliente_id, nombre, ubicacion, responsable, fecha_inicio,
-            fecha_fin_estimada, fecha_fin_real, estado, avance, descripcion
+            fecha_fin_estimada, fecha_fin_real, estado, avance, descripcion, lider_usuario_id
           )
-          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           returning *
         `,
-        obraValues(randomUUID(), body)
+        [...obraValues(randomUUID(), body), clean(body.lider_usuario_id)]
       );
       response.status(201).json(result.rows[0]);
     } catch (error) {
@@ -331,17 +348,49 @@ function registerObras(router, pool, admin) {
             nombre = $3,
             ubicacion = $4,
             responsable = $5,
-            fecha_inicio = $6,
-            fecha_fin_estimada = $7,
-            fecha_fin_real = $8,
-            estado = $9,
-            avance = $10,
-            descripcion = $11,
+            lider_usuario_id = $6,
+            fecha_inicio = $7,
+            fecha_fin_estimada = $8,
+            fecha_fin_real = $9,
+            estado = $10,
+            avance = $11,
+            descripcion = $12,
             updated_at = now()
           where id = $1
           returning *
         `,
-        obraValues(request.params.id, body)
+        [
+          request.params.id,
+          clean(body.cliente_id),
+          required(body.nombre, "nombre"),
+          clean(body.ubicacion),
+          clean(body.responsable),
+          clean(body.lider_usuario_id),
+          required(body.fecha_inicio, "fecha_inicio"),
+          required(body.fecha_fin_estimada, "fecha_fin_estimada"),
+          clean(body.fecha_fin_real),
+          enumValue(body.estado, estadosObra, "planificada"),
+          percent(body.avance),
+          clean(body.descripcion)
+        ]
+      );
+      sendFound(response, result.rows[0]);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.patch("/obras/:id/lider", admin, async (request, response, next) => {
+    try {
+      const body = request.body ?? {};
+      const result = await pool.query(
+        `
+          update obras
+          set lider_usuario_id = $2, updated_at = now()
+          where id = $1
+          returning *
+        `,
+        [request.params.id, clean(body.lider_usuario_id)]
       );
       sendFound(response, result.rows[0]);
     } catch (error) {
@@ -372,9 +421,10 @@ function registerTareas(router, pool, admin) {
 
       const result = await pool.query(
         `
-          select t.*, o.nombre as obra_nombre
+          select t.*, o.nombre as obra_nombre, u.display_name as completada_por_name
           from tareas_obra t
           join obras o on o.id = t.obra_id
+          left join app_users u on u.id = t.completada_por
           ${where}
           order by t.fecha_inicio asc, t.orden asc
         `,
@@ -398,17 +448,39 @@ function registerTareas(router, pool, admin) {
   router.post("/tareas", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
+      const id = randomUUID();
+      const isFinalizada = body.estado === "finalizada";
+      const completadaPor = isFinalizada ? request.user.sub : null;
+      const completadaEn = isFinalizada ? new Date() : null;
+
       const result = await pool.query(
         `
           insert into tareas_obra (
             id, obra_id, titulo, descripcion, responsable, fecha_inicio,
-            fecha_fin, estado, prioridad, avance, orden
+            fecha_fin, estado, prioridad, avance, orden, completada_por, completada_en
           )
-          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
           returning *
         `,
-        tareaValues(randomUUID(), body)
+        [
+          id,
+          required(body.obra_id, "obra_id"),
+          required(body.titulo, "titulo"),
+          clean(body.descripcion),
+          clean(body.responsable),
+          required(body.fecha_inicio, "fecha_inicio"),
+          required(body.fecha_fin, "fecha_fin"),
+          enumValue(body.estado, estadosTarea, "pendiente"),
+          enumValue(body.prioridad, prioridades, "media"),
+          percent(body.avance),
+          Number.parseInt(body.orden ?? 0, 10) || 0,
+          completadaPor,
+          completadaEn
+        ]
       );
+
+      await recalculateObraStatus(pool, body.obra_id, request.user.sub);
+
       response.status(201).json(result.rows[0]);
     } catch (error) {
       next(error);
@@ -418,6 +490,25 @@ function registerTareas(router, pool, admin) {
   router.put("/tareas/:id", admin, async (request, response, next) => {
     try {
       const body = request.body ?? {};
+      
+      const prevTask = await findOne(pool, "tareas_obra", request.params.id);
+      if (!prevTask) {
+        return response.status(404).json({ error: "Tarea no encontrada." });
+      }
+
+      let completadaPor = prevTask.completada_por;
+      let completadaEn = prevTask.completada_en;
+
+      if (body.estado === "finalizada") {
+        if (prevTask.estado !== "finalizada") {
+          completadaPor = request.user.sub;
+          completadaEn = new Date();
+        }
+      } else {
+        completadaPor = null;
+        completadaEn = null;
+      }
+
       const result = await pool.query(
         `
           update tareas_obra set
@@ -431,12 +522,34 @@ function registerTareas(router, pool, admin) {
             prioridad = $9,
             avance = $10,
             orden = $11,
+            completada_por = $12,
+            completada_en = $13,
             updated_at = now()
           where id = $1
           returning *
         `,
-        tareaValues(request.params.id, body)
+        [
+          request.params.id,
+          required(body.obra_id, "obra_id"),
+          required(body.titulo, "titulo"),
+          clean(body.descripcion),
+          clean(body.responsable),
+          required(body.fecha_inicio, "fecha_inicio"),
+          required(body.fecha_fin, "fecha_fin"),
+          enumValue(body.estado, estadosTarea, "pendiente"),
+          enumValue(body.prioridad, prioridades, "media"),
+          percent(body.avance),
+          Number.parseInt(body.orden ?? 0, 10) || 0,
+          completadaPor,
+          completadaEn
+        ]
       );
+
+      await recalculateObraStatus(pool, prevTask.obra_id, request.user.sub);
+      if (body.obra_id && body.obra_id !== prevTask.obra_id) {
+        await recalculateObraStatus(pool, body.obra_id, request.user.sub);
+      }
+
       sendFound(response, result.rows[0]);
     } catch (error) {
       next(error);
@@ -445,12 +558,84 @@ function registerTareas(router, pool, admin) {
 
   router.delete("/tareas/:id", admin, async (request, response, next) => {
     try {
+      const prevTask = await findOne(pool, "tareas_obra", request.params.id);
+      if (!prevTask) {
+        return response.status(404).json({ error: "Tarea no encontrada." });
+      }
+
       const result = await pool.query("delete from tareas_obra where id = $1 returning id", [request.params.id]);
+
+      await recalculateObraStatus(pool, prevTask.obra_id, request.user.sub);
+
       sendDeleted(response, result.rowCount);
     } catch (error) {
       next(error);
     }
   });
+}
+
+async function recalculateObraStatus(pool, obraId, userId) {
+  if (!obraId) return;
+
+  const tasksRes = await pool.query(
+    "select id, estado from tareas_obra where obra_id = $1",
+    [obraId]
+  );
+
+  const totalTasks = tasksRes.rowCount;
+  if (totalTasks === 0) return;
+
+  const completedTasks = tasksRes.rows.filter(t => t.estado === "finalizada").length;
+
+  const projectRes = await pool.query(
+    "select estado from obras where id = $1",
+    [obraId]
+  );
+  if (projectRes.rows.length === 0) return;
+  const currentProjectState = projectRes.rows[0].estado;
+
+  if (completedTasks === totalTasks) {
+    if (currentProjectState !== "finalizada") {
+      await pool.query(
+        "update obras set estado = 'finalizada', updated_at = now() where id = $1",
+        [obraId]
+      );
+      await pool.query(
+        `insert into auditoria_cambios (id, usuario_id, entidad, entidad_id, accion, datos_anteriores, datos_nuevos)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          randomUUID(),
+          userId,
+          "obras",
+          obraId,
+          "finalizacion_automatica",
+          JSON.stringify({ estado: currentProjectState }),
+          JSON.stringify({ estado: "finalizada" })
+        ]
+      );
+    }
+  } else {
+    if (currentProjectState === "finalizada") {
+      await pool.query(
+        "update obras set estado = 'en_progreso', updated_at = now() where id = $1",
+        [obraId]
+      );
+      await pool.query(
+        `insert into auditoria_cambios (id, usuario_id, entidad, entidad_id, accion, datos_anteriores, datos_nuevos)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          randomUUID(),
+          userId,
+          "obras",
+          obraId,
+          "reapertura_proyecto",
+          JSON.stringify({ estado: "finalizada" }),
+          JSON.stringify({ estado: "en_progreso" })
+        ]
+      );
+    }
+  }
+
 }
 
 function obraValues(id, body) {

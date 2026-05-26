@@ -130,59 +130,108 @@ export function createProyectosRoutes(container) {
       const body = request.body || {};
       const proyectoId = request.params.id;
 
-      // Leer campos manuales
-      const fechaInicioInstalacionStr = body.fecha_comprometida_inicio_instalacion;
-      if (!fechaInicioInstalacionStr) {
-        return response.status(400).json({ error: "La Fecha comprometida de inicio de instalación es obligatoria." });
+      // Campos manuales (permitimos guardar aunque se completen despues)
+      const fechaInicioInstalacionStr = body.fecha_comprometida_inicio_instalacion || null;
+      const diasFabrica = Number.isFinite(Number(body.dias_fabrica)) ? parseInt(body.dias_fabrica, 10) : null;
+      const diasInstalacion = Number.isFinite(Number(body.dias_instalacion)) ? parseInt(body.dias_instalacion, 10) : null;
+
+      const fechaBase = fechaInicioInstalacionStr ? new Date(fechaInicioInstalacionStr + "T12:00:00") : null;
+
+      const canCalculate = Boolean(fechaBase && diasFabrica && diasInstalacion);
+      const finProduccion = canCalculate ? addBusinessDays(fechaBase, -3) : null;
+      const inicioFabrica = canCalculate ? addBusinessDays(finProduccion, -diasFabrica) : null;
+      const limiteAbaco = canCalculate ? addBusinessDays(inicioFabrica, -1) : null;
+      const finInstalacion = canCalculate ? addBusinessDays(fechaBase, diasInstalacion - 1) : null;
+
+      // Check if cronograma already exists
+      const existingCronograma = await container.pool.query(
+        "SELECT id FROM cronogramas_proyecto WHERE proyecto_id = $1 LIMIT 1",
+        [proyectoId]
+      );
+
+      let cronogramaId;
+      if (existingCronograma.rows.length > 0) {
+        cronogramaId = existingCronograma.rows[0].id;
+        await container.pool.query(
+          `
+          UPDATE cronogramas_proyecto SET
+            documento_oferta_id = $2,
+            oferta_nro = $3,
+            cliente = $4,
+            nombre_proyecto = $5,
+            lider_proyecto = $6,
+            lider_usuario_id = $7,
+            serie = $8,
+            total_aberturas = $9,
+            dias_fabrica = $10,
+            fecha_limite_firma_abaco = $11,
+            inicio_fabrica = $12,
+            fecha_compromiso_fin_produccion = $13,
+            fecha_comprometida_inicio_instalacion = $14,
+            dias_instalacion = $15,
+            fin_instalacion = $16,
+            actualizado_en = NOW()
+          WHERE id = $1
+          `,
+          [
+            cronogramaId,
+            body.documento_oferta_id || null,
+            body.oferta_nro || null,
+            body.cliente || null,
+            body.nombre_proyecto || null,
+            body.lider_proyecto || null,
+            body.lider_usuario_id || null,
+            body.serie || null,
+            parseInt(body.total_aberturas, 10) || null,
+            diasFabrica,
+            limiteAbaco,
+            inicioFabrica,
+            finProduccion,
+            fechaBase,
+            diasInstalacion,
+            finInstalacion
+          ]
+        );
+      } else {
+        cronogramaId = randomUUID();
+        await container.pool.query(
+          `
+          INSERT INTO cronogramas_proyecto (
+            id, proyecto_id, documento_oferta_id, oferta_nro, cliente, nombre_proyecto, 
+            lider_proyecto, lider_usuario_id, serie, total_aberturas, dias_fabrica, fecha_limite_firma_abaco, 
+            inicio_fabrica, fecha_compromiso_fin_produccion, fecha_comprometida_inicio_instalacion, 
+            dias_instalacion, fin_instalacion
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          `,
+          [
+            cronogramaId,
+            proyectoId,
+            body.documento_oferta_id || null,
+            body.oferta_nro || null,
+            body.cliente || null,
+            body.nombre_proyecto || null,
+            body.lider_proyecto || null,
+            body.lider_usuario_id || null,
+            body.serie || null,
+            parseInt(body.total_aberturas, 10) || null,
+            diasFabrica,
+            limiteAbaco,
+            inicioFabrica,
+            finProduccion,
+            fechaBase,
+            diasInstalacion,
+            finInstalacion
+          ]
+        );
       }
 
-      const fechaBase = new Date(fechaInicioInstalacionStr + "T12:00:00");
-      const diasFabrica = parseInt(body.dias_fabrica, 10) || 15;
-      const diasInstalacion = parseInt(body.dias_instalacion, 10) || 5;
-
-      // 1. Fecha compromiso fin producción = Fecha inicio instalación - 3 hábiles
-      const finProduccion = addBusinessDays(fechaBase, -3);
-
-      // 2. Inicio fábrica = Fin producción - días fábrica hábiles
-      const inicioFabrica = addBusinessDays(finProduccion, -diasFabrica);
-
-      // 3. Límite firma ábaco = Inicio fábrica - 1 hábil
-      const limiteAbaco = addBusinessDays(inicioFabrica, -1);
-
-      // 4. Fin instalación = Fecha inicio instalación + días instalación hábiles - 1
-      const finInstalacion = addBusinessDays(fechaBase, diasInstalacion - 1);
-
-      const cronogramaId = randomUUID();
-
-      await container.pool.query(
-        `
-        INSERT INTO cronogramas_proyecto (
-          id, proyecto_id, documento_oferta_id, oferta_nro, cliente, nombre_proyecto, 
-          lider_proyecto, serie, total_aberturas, dias_fabrica, fecha_limite_firma_abaco, 
-          inicio_fabrica, fecha_compromiso_fin_produccion, fecha_comprometida_inicio_instalacion, 
-          dias_instalacion, fin_instalacion
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        `,
-        [
-          cronogramaId,
-          proyectoId,
-          body.documento_oferta_id || null,
-          body.oferta_nro || null,
-          body.cliente || null,
-          body.nombre_proyecto || null,
-          body.lider_proyecto || null,
-          body.serie || null,
-          parseInt(body.total_aberturas, 10) || null,
-          diasFabrica,
-          limiteAbaco,
-          inicioFabrica,
-          finProduccion,
-          fechaBase,
-          diasInstalacion,
-          finInstalacion
-        ]
-      );
+      if (body.lider_usuario_id) {
+        await container.pool.query(
+          "UPDATE obras SET lider_usuario_id = $1, updated_at = now() WHERE id = $2",
+          [body.lider_usuario_id, proyectoId]
+        );
+      }
 
       response.status(201).json({
         mensaje: "Cronograma generado exitosamente",
