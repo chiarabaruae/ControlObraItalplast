@@ -7,27 +7,34 @@ function getToken() {
 
 export async function api(path, options = {}) {
   const token = getToken();
-  const response = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.headers ?? {})
+  const notifyLoading = options.notifyLoading !== false;
+  if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:start"));
+
+  try {
+    const response = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(options.headers ?? {})
+      }
+    });
+
+    if (response.status === 204) return null;
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        sessionStorage.clear();
+        location.reload();
+      }
+      throw new Error(data.error ?? "Error de API");
     }
-  });
 
-  if (response.status === 204) return null;
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      sessionStorage.clear();
-      location.reload();
-    }
-    throw new Error(data.error ?? "Error de API");
+    return data;
+  } finally {
+    if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:end"));
   }
-
-  return data;
 }
 
 export async function apiGet(path) {

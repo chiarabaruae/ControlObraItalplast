@@ -7,6 +7,13 @@ export const icons = {
   obras: '<svg viewBox="0 0 24 24"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><path d="M9 20v-6h6v6"/></svg>',
   tareas: '<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   gantt: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="12" height="4" rx="1"/><rect x="3" y="16" width="15" height="4" rx="1"/></svg>',
+  list: '<svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>',
+  grid: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>',
+  kanban: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="5" height="14" rx="1"/><rect x="10" y="5" width="5" height="9" rx="1"/><rect x="17" y="5" width="4" height="11" rx="1"/></svg>',
+  gantt_global: '<svg viewBox="0 0 24 24"><line x1="3" y1="4" x2="3" y2="20"/><line x1="3" y1="20" x2="21" y2="20"/><rect x="6" y="7" width="8" height="3" rx="1"/><rect x="10" y="12" width="9" height="3" rx="1"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  file: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  upload: '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
   personalizar: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
@@ -19,6 +26,7 @@ export const icons = {
   clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
   users: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
   menu: '<svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
+  more: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
   back: '<svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
   check: '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
   eye: '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
@@ -43,7 +51,24 @@ export function formatLabel(value) {
 
 export function formatDate(value) {
   if (!value) return "";
-  const d = typeof value === "string" ? new Date(value + "T00:00:00") : value;
+  let d;
+
+  if (value instanceof Date) {
+    d = value;
+  } else if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return "";
+    const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+    d = new Date(normalized);
+
+    if (Number.isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      d = new Date(`${raw}T00:00:00`);
+    }
+  } else {
+    d = new Date(value);
+  }
+
+  if (!d || Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
 }
 
@@ -102,3 +127,93 @@ export function renderEmpty(message, sub = "Carga manual desde el botón Nuevo."
     <p>${esc(sub)}</p>
   </div>`;
 }
+
+let routeLoading = false;
+let requestLoadingCount = 0;
+
+function skeletonTypeFromPath(path = "") {
+  if (path.startsWith("/proyectos/")) return "proyecto-detalle";
+  if (path.startsWith("/proyectos")) return "proyectos";
+  if (path.startsWith("/dashboard")) return "dashboard";
+  if (path.startsWith("/clientes")) return "clientes";
+  if (path.startsWith("/todo")) return "todo";
+  if (path.startsWith("/personalizar")) return "personalizar";
+  if (path.startsWith("/ajustes")) return "ajustes";
+  return "default";
+}
+
+function skeletonBlocks(type) {
+  if (type === "proyecto-detalle") {
+    return `
+      <div class="skeleton-row">
+        <div class="skeleton-block h-28 w-40"></div>
+        <div class="skeleton-block h-28 w-22"></div>
+      </div>
+      <div class="skeleton-grid cols-3">
+        <div class="skeleton-block h-88"></div>
+        <div class="skeleton-block h-88"></div>
+        <div class="skeleton-block h-88"></div>
+      </div>
+      <div class="skeleton-block h-220"></div>
+    `;
+  }
+
+  if (type === "proyectos") {
+    return `
+      <div class="skeleton-row">
+        <div class="skeleton-block h-28 w-28"></div>
+        <div class="skeleton-block h-28 w-18"></div>
+      </div>
+      <div class="skeleton-grid cols-3">
+        <div class="skeleton-block h-96"></div>
+        <div class="skeleton-block h-96"></div>
+        <div class="skeleton-block h-96"></div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="skeleton-row">
+      <div class="skeleton-block h-28 w-32"></div>
+      <div class="skeleton-block h-28 w-20"></div>
+    </div>
+    <div class="skeleton-grid cols-2">
+      <div class="skeleton-block h-140"></div>
+      <div class="skeleton-block h-140"></div>
+    </div>
+    <div class="skeleton-block h-180"></div>
+  `;
+}
+
+export function showRouteSkeleton(path) {
+  routeLoading = true;
+  const root = document.getElementById("page-content");
+  if (!root) return;
+  const type = skeletonTypeFromPath(path);
+  root.dataset.loading = "true";
+  root.innerHTML = `<section class="skeleton-view">${skeletonBlocks(type)}</section>`;
+}
+
+export function hideRouteSkeleton() {
+  routeLoading = false;
+  if (requestLoadingCount > 0) return;
+  const root = document.getElementById("page-content");
+  if (!root) return;
+  delete root.dataset.loading;
+}
+
+function updateRequestLoading(nextCount) {
+  requestLoadingCount = Math.max(0, nextCount);
+  const root = document.getElementById("page-content");
+  if (!root) return;
+  if (requestLoadingCount > 0) root.dataset.loading = "true";
+  if (requestLoadingCount === 0 && !routeLoading) delete root.dataset.loading;
+}
+
+window.addEventListener("co:loading:start", () => {
+  updateRequestLoading(requestLoadingCount + 1);
+});
+
+window.addEventListener("co:loading:end", () => {
+  updateRequestLoading(requestLoadingCount - 1);
+});

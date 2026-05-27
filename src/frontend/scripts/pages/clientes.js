@@ -1,224 +1,862 @@
-// Clientes page - CRUD completo
-import { apiGet, apiPost, apiPut, apiDelete } from "../api.js";
-import { icons, esc, renderBadge, renderEmpty, getInitials, formatLabel } from "../ui.js";
-import { setTopbarSection } from "../layout.js";
-import { setSidebarClients } from "../layout.js";
+import { apiGet, apiPost } from "../api.js";
+import { icons, esc, renderEmpty, formatDate } from "../ui.js";
+import { setTopbarSection, setSidebarClients } from "../layout.js";
+import { navigate } from "../router.js";
 
-let clientes = [];
-let searchTerm = "";
-let filtroEstado = "";
+const PAGE_SIZE = 30;
+const SEARCH_DEBOUNCE_MS = 300;
+const CONTROL_STATUS = {
+  ACTIVO: "activo",
+  SIN_PROYECTO: "sin_proyecto",
+  PENDIENTE: "pendiente_vinculacion",
+  INACTIVO: "inactivo"
+};
+
+let allLeads = [];
+let allObras = [];
+let allRelaciones = [];
+let activeUsers = [];
+let groupedClientes = [];
+let visibleCount = PAGE_SIZE;
+let searchDraft = "";
+let searchApplied = "";
+let filterCrm = "todos";
+let filterControl = "todos";
+let debounceTimer = null;
+let isLoading = true;
+let isFiltering = false;
+let isSavingProject = false;
+let isUploadingOffer = false;
+const loadingAccordionKeys = new Set();
+const openClienteKeys = new Set();
+const tagsDraftByClient = new Map();
 
 export async function renderClientes(container) {
   setTopbarSection("Clientes");
-  container.innerHTML = '<div class="loading">Cargando clientes...</div>';
+  isLoading = true;
+  container.innerHTML = renderPageSkeleton();
 
   try {
-    clientes = await apiGet("/clientes");
-    setSidebarClients(clientes);
+    await loadData();
+    buildGroups();
+    isLoading = false;
+    renderShell(container);
+    renderControls(container);
     renderList(container);
-  } catch (err) {
-    container.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${esc(err.message)}</p></div>`;
+    bindEvents(container);
+  } catch (error) {
+    container.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${esc(error.message)}</p></div>`;
   }
 }
 
-function filtered() {
-  return clientes.filter(c => {
-    if (filtroEstado && c.estado !== filtroEstado) return false;
-    if (searchTerm) {
-      const s = searchTerm.toLowerCase();
-      return (c.nombre || "").toLowerCase().includes(s) ||
-             (c.ruc || "").toLowerCase().includes(s) ||
-             (c.contacto_principal || "").toLowerCase().includes(s);
-    }
-    return true;
-  });
+async function loadData() {
+  const [leads, obras, relaciones, users] = await Promise.all([
+    apiGet("/clientes").catch(() => []),
+    apiGet("/obras").catch(() => []),
+    apiGet("/clientes/relaciones").catch(() => []),
+    apiGet("/usuarios/activos").catch(() => [])
+  ]);
+
+  allLeads = Array.isArray(leads) ? leads : [];
+  allObras = Array.isArray(obras) ? obras : [];
+  allRelaciones = Array.isArray(relaciones) ? relaciones : [];
+  activeUsers = Array.isArray(users) ? users : [];
+
+  setSidebarClients(
+    dedupeByNombre(allLeads).map((lead) => ({
+      nombre: lead.nombre_cliente || "-",
+      estado: "activo"
+    }))
+  );
 }
 
-function renderList(container) {
-  const activos = clientes.filter(c => c.estado === "activo").length;
-  const list = filtered();
+function dedupeByNombre(leads) {
+  const map = new Map();
+  for (const lead of leads) {
+    const key = normalizeName(lead.nombre_cliente) || `LEAD_${String(lead.id_cliente_externo || Math.random())}`;
+    const current = map.get(key);
+    if (!current || toDateValue(lead.creado) > toDateValue(current.creado)) {
+      map.set(key, lead);
+    }
+  }
+  return [...map.values()];
+}
 
+function buildGroups() {
+  const groups = new Map();
+
+  for (const lead of allLeads) {
+    const normalized = normalizeName(lead.nombre_cliente);
+    const key = normalized || `LEAD_${String(lead.id_cliente_externo || Math.random())}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        nombre: lead.nombre_cliente || "Cliente sin nombre",
+        normalizedName: key,
+        leads: [],
+        leadIds: new Set(),
+        principal: null,
+        crmStatus: "-"
+      });
+    }
+
+    const group = groups.get(key);
+    group.leads.push(lead);
+    if (lead.id_cliente_externo) group.leadIds.add(String(lead.id_cliente_externo));
+  }
+
+  groupedClientes = [...groups.values()]
+    .map((group) => {
+      const leadsSorted = [...group.leads].sort((a, b) => toDateValue(b.creado) - toDateValue(a.creado));
+      const principal = leadsSorted[0] || {};
+      const computed = computeControlState(group, principal);
+      const crmStatus = showValue(principal.estado_final || principal.etapa);
+
+      return {
+        ...group,
+        leads: leadsSorted,
+        principal,
+        crmStatus,
+        ...computed
+      };
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function computeControlState(group, principal) {
+  const leadIds = group.leadIds;
+
+  const confirmedByLead = allObras.filter((obra) => {
+    const clientId = String(obra.cliente_externo_id || "");
+    return clientId && leadIds.has(clientId);
+  });
+
+  const confirmedRelationProjectIds = new Set(
+    allRelaciones
+      .filter(
+        (item) =>
+          leadIds.has(String(item.cliente_externo_id || "")) &&
+          String(item.estado_relacion || "").toLowerCase() === "confirmado"
+      )
+      .map((item) => String(item.proyecto_id || ""))
+  );
+
+  const confirmedByRelation = allObras.filter((obra) => confirmedRelationProjectIds.has(String(obra.id || "")));
+  const confirmedProjects = uniqueProjects([...confirmedByLead, ...confirmedByRelation]);
+
+  const rejectedProjectIds = new Set(
+    allRelaciones
+      .filter(
+        (item) =>
+          leadIds.has(String(item.cliente_externo_id || "")) &&
+          String(item.estado_relacion || "").toLowerCase() === "rechazado"
+      )
+      .map((item) => String(item.proyecto_id || ""))
+  );
+
+  const relatedIds = new Set(confirmedProjects.map((project) => String(project.id || "")));
+  const suggestionProjects = allObras.filter((obra) => {
+    const obraId = String(obra.id || "");
+    if (!obraId || relatedIds.has(obraId) || rejectedProjectIds.has(obraId)) return false;
+    const snapshotName = normalizeName(obra.cliente_nombre_snapshot || obra.cliente_nombre || "");
+    return snapshotName && snapshotName === group.normalizedName;
+  });
+
+  const crmEstado = normalizeName(principal.estado_final);
+  const isGanado = ["GANADO", "EXITO", "ÉXITO"].includes(crmEstado);
+  const isPerdido = ["PERDIDO", "CAIDO", "CAÍDO"].includes(crmEstado);
+
+  let controlStatus = CONTROL_STATUS.SIN_PROYECTO;
+  if (confirmedProjects.length > 0) {
+    controlStatus = CONTROL_STATUS.ACTIVO;
+  } else if (suggestionProjects.length > 0 || isGanado) {
+    controlStatus = CONTROL_STATUS.PENDIENTE;
+  } else if (isPerdido) {
+    controlStatus = CONTROL_STATUS.INACTIVO;
+  }
+
+  return {
+    confirmedProjects,
+    suggestionProjects,
+    controlStatus
+  };
+}
+
+function renderShell(container) {
   container.innerHTML = `
     <div class="page-header">
       <div class="page-header-row">
         <div>
-          <div class="eyebrow">INICIO</div>
           <h1>Clientes</h1>
-          <p class="subtitle">Gestiona los clientes y sus obras activas</p>
+          <p class="subtitle">Gestiona los clientes y sus proyectos activos</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span class="badge badge-activo">${activos} activos</span>
-          <span class="badge" style="background:var(--fondo);color:var(--texto-sec)">${clientes.length} total</span>
-          <button class="btn btn-primary" id="btn-new-client" type="button">${icons.plus} Nuevo cliente</button>
-        </div>
+        <div style="display:flex;gap:8px;align-items:center" id="clientes-kpis"></div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-header">
-        <div>
-          <div class="eyebrow" style="margin-bottom:2px">WORKSPACE ACTIVO</div>
-          <h2>Clientes</h2>
+      <div class="clientes-toolbar">
+        <div class="search-input clientes-search">
+          ${icons.search}
+          <input type="text" id="clientes-search-input" placeholder="Buscar cliente..." value="${esc(searchDraft)}">
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div class="search-input">
-            ${icons.search}
-            <input type="text" placeholder="Buscar cliente..." id="search-clientes" value="${esc(searchTerm)}">
-          </div>
-          <select id="filtro-estado-cliente" class="btn btn-ghost" style="height:40px;font-size:13px">
-            <option value="">Todos</option>
-            <option value="activo" ${filtroEstado === "activo" ? "selected" : ""}>Activos</option>
-            <option value="inactivo" ${filtroEstado === "inactivo" ? "selected" : ""}>Inactivos</option>
-          </select>
-        </div>
+        <select id="filtro-crm" class="clientes-select"></select>
+        <select id="filtro-control" class="clientes-select"></select>
       </div>
-      ${list.length > 0 ? `<div class="client-grid">${list.map(renderClientCard).join("")}</div>` : renderEmpty("Sin clientes cargados")}
+      <div id="clientes-meta" class="clientes-meta"></div>
+      <div id="clientes-list" class="clientes-list"></div>
+      <div id="clientes-loadmore-wrap" class="clientes-loadmore-wrap"></div>
     </div>
 
-    ${modalHtml()}
+    ${renderCreateProjectModal()}
   `;
-
-  bindEvents(container);
 }
 
-function renderClientCard(c) {
-  const obrasCount = 0; // Will be populated when we have the relation
-  return `<div class="client-card" data-id="${c.id}">
-    <div class="client-card-header">
-      <h3>${esc(c.nombre)}</h3>
-      <div style="display:flex;gap:6px;align-items:center">
-        ${renderBadge(c.estado)}
-        <button class="btn btn-ghost btn-sm" data-edit="${c.id}" type="button">${icons.edit}</button>
-        <button class="btn btn-danger btn-sm" data-delete="${c.id}" type="button">${icons.trash}</button>
-      </div>
-    </div>
-    ${c.industria ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(c.industria)}</div>` : ""}
-    <div class="client-mini-cards">
-      <div class="client-mini">
-        <div class="mini-label">RUC</div>
-        <div class="mini-value">${esc(c.ruc || "-")}</div>
-      </div>
-      <div class="client-mini">
-        <div class="mini-label">Contacto</div>
-        <div class="mini-value">${esc(c.contacto_principal || "-")}</div>
-      </div>
-      <div class="client-mini">
-        <div class="mini-label">Teléfono</div>
-        <div class="mini-value">${esc(c.telefono || "-")}</div>
-      </div>
-    </div>
-  </div>`;
+function renderControls(container) {
+  const activos = groupedClientes.filter((item) => item.controlStatus === CONTROL_STATUS.ACTIVO).length;
+  const total = groupedClientes.length;
+
+  const kpiEl = container.querySelector("#clientes-kpis");
+  if (kpiEl) {
+    kpiEl.innerHTML = `
+      <span class="badge badge-control-activo">${activos} activos</span>
+      <span class="badge" style="background:var(--fondo);color:var(--texto-sec)">${total} total</span>
+    `;
+  }
+
+  const crmSelect = container.querySelector("#filtro-crm");
+  if (crmSelect) {
+    const options = buildCrmFilterOptions();
+    crmSelect.innerHTML = options
+      .map((option) => `<option value="${esc(option.value)}" ${option.value === filterCrm ? "selected" : ""}>${esc(option.label)}</option>`)
+      .join("");
+  }
+
+  const controlSelect = container.querySelector("#filtro-control");
+  if (controlSelect) {
+    const controlOptions = [
+      { value: "todos", label: "Todos" },
+      { value: CONTROL_STATUS.ACTIVO, label: "Activos" },
+      { value: CONTROL_STATUS.SIN_PROYECTO, label: "Sin proyecto" },
+      { value: CONTROL_STATUS.PENDIENTE, label: "Pendiente de vinculación" },
+      { value: CONTROL_STATUS.INACTIVO, label: "Inactivos" }
+    ];
+    controlSelect.innerHTML = controlOptions
+      .map((option) => `<option value="${esc(option.value)}" ${option.value === filterControl ? "selected" : ""}>${esc(option.label)}</option>`)
+      .join("");
+  }
 }
 
-function modalHtml() {
-  return `<div class="modal-overlay" id="modal-cliente">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2 id="modal-titulo-cliente">Nuevo Cliente</h2>
-        <button class="btn-icon" id="close-modal-cliente" type="button">${icons.close}</button>
+function buildCrmFilterOptions() {
+  const values = new Set();
+  for (const item of groupedClientes) {
+    if (item.crmStatus && item.crmStatus !== "-") values.add(item.crmStatus);
+  }
+  const dynamic = [...values].sort((a, b) => a.localeCompare(b, "es"));
+  return [{ value: "todos", label: "Todos" }, ...dynamic.map((value) => ({ value, label: value }))];
+}
+
+function getFilteredGroups() {
+  const search = normalizeName(searchApplied);
+  return groupedClientes.filter((item) => {
+    if (filterCrm !== "todos" && item.crmStatus !== filterCrm) return false;
+    if (filterControl !== "todos" && item.controlStatus !== filterControl) return false;
+    if (!search) return true;
+
+    const haystack = [
+      item.nombre,
+      item.principal.telefono,
+      item.principal.propietario,
+      item.principal.embudo,
+      item.principal.etapa,
+      item.principal.productos,
+      item.principal.producto,
+      item.principal.estado_final
+    ]
+      .map((value) => normalizeName(value))
+      .join(" ");
+
+    return haystack.includes(search);
+  });
+}
+
+function renderList(container) {
+  const filtered = getFilteredGroups();
+  const list = filtered.slice(0, visibleCount);
+  const listEl = container.querySelector("#clientes-list");
+  const meta = container.querySelector("#clientes-meta");
+  const loadMoreWrap = container.querySelector("#clientes-loadmore-wrap");
+
+  if (!listEl || !meta || !loadMoreWrap) return;
+
+  meta.textContent = `Mostrando ${list.length} de ${filtered.length} clientes`;
+
+  if (isLoading || isFiltering) {
+    listEl.innerHTML = renderListSkeleton(6);
+    loadMoreWrap.innerHTML = "";
+    return;
+  }
+
+  if (!list.length) {
+    listEl.innerHTML = renderEmpty("Sin clientes para los filtros seleccionados", "Ajusta filtros o búsqueda.");
+    loadMoreWrap.innerHTML = "";
+    return;
+  }
+
+  listEl.innerHTML = list.map((item) => renderClienteRow(item)).join("");
+  if (visibleCount < filtered.length) {
+    loadMoreWrap.innerHTML = `<button class="btn btn-ghost" id="btn-clientes-load-more" type="button">Cargar más</button>`;
+  } else {
+    loadMoreWrap.innerHTML = "";
+  }
+}
+
+function renderClienteRow(item) {
+  const p = item.principal || {};
+  const isOpen = openClienteKeys.has(item.key);
+  const isOpening = loadingAccordionKeys.has(item.key);
+
+  return `
+    <article class="cliente-row-card ${isOpen ? "is-open" : ""}" data-cliente-key="${esc(item.key)}">
+      <div class="cliente-row-main">
+        <div class="cliente-row-left">
+          <h3>${esc(showValue(item.nombre))}</h3>
+          <p><strong>Teléfono:</strong> ${esc(formatPhone(p.telefono))}</p>
+          <p><strong>Propietario:</strong> ${esc(showValue(p.propietario))}</p>
+          <p><strong>Embudo / etapa:</strong> ${esc(showValue(p.embudo))} · ${esc(showValue(p.etapa))}</p>
+        </div>
+        <div class="cliente-row-center">
+          <p><strong>Producto(s):</strong> ${esc(showValue(p.productos || p.producto))}</p>
+          <p><strong>Valor:</strong> ${esc(formatMoney(p.valor, p.moneda))}</p>
+          <p><strong>Estado final:</strong> ${esc(showValue(p.estado_final))}</p>
+        </div>
+        <div class="cliente-row-right">
+          ${renderControlBadge(item.controlStatus)}
+          <small>Creado: ${esc(formatDate(p.creado) || "-")}</small>
+          <button class="btn btn-ghost btn-sm" type="button" data-action="toggle" data-key="${esc(item.key)}">
+            ${isOpen ? "Ocultar proyectos" : "Ver proyectos"}
+          </button>
+        </div>
       </div>
-      <form id="form-cliente">
-        <div class="form-grid">
-          <div class="form-field"><label>Nombre *</label><input name="nombre" required></div>
-          <div class="form-field"><label>RUC</label><input name="ruc"></div>
-          <div class="form-field"><label>Industria</label><input name="industria"></div>
-          <div class="form-field"><label>Estado</label>
-            <select name="estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select>
+      <div class="cliente-row-accordion ${isOpen ? "is-open" : ""}">
+        <div class="cliente-row-accordion-inner">
+          ${isOpening ? renderListSkeleton(2) : renderAccordionContent(item)}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderAccordionContent(item) {
+  const related = item.confirmedProjects || [];
+  const suggestions = item.suggestionProjects || [];
+  const principal = item.principal || {};
+  const primaryLeadId = String(principal.id_cliente_externo || "");
+
+  if (!primaryLeadId) {
+    return `<p class="modal-status">No se pudo identificar el cliente externo.</p>`;
+  }
+
+  const suggestionsHtml = suggestions.length
+    ? `
+      <div class="cliente-suggestions">
+        ${suggestions
+          .map(
+            (project) => `
+          <div class="cliente-suggestion-item">
+            <span>Posible relación encontrada: <strong>${esc(project.nombre || "-")}</strong></span>
+            <div>
+              <button class="btn btn-ghost btn-sm" type="button" data-action="relacionar" data-lead-id="${esc(primaryLeadId)}" data-project-id="${esc(project.id)}">
+                Relacionar
+              </button>
+              <button class="btn btn-ghost btn-sm" type="button" data-action="rechazar" data-lead-id="${esc(primaryLeadId)}" data-project-id="${esc(project.id)}">
+                No relacionar
+              </button>
+            </div>
           </div>
-          <div class="form-field"><label>Contacto principal</label><input name="contacto_principal"></div>
-          <div class="form-field"><label>Teléfono</label><input name="telefono"></div>
-          <div class="form-field"><label>Email</label><input name="email" type="email"></div>
-          <div class="form-field"><label>Calificación</label><input name="calificacion" type="number" min="0" max="5" step="0.5"></div>
-          <div class="form-field full-width"><label>Dirección</label><textarea name="direccion" rows="2"></textarea></div>
-          <div class="form-field full-width"><label>Observaciones</label><textarea name="observaciones" rows="2"></textarea></div>
-        </div>
-        <div class="modal-status" id="modal-status-cliente"></div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" id="cancel-modal-cliente">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar</button>
-        </div>
-      </form>
-      <input type="hidden" id="editing-cliente-id">
+        `
+          )
+          .join("")}
+      </div>
+    `
+    : "";
+
+  if (!related.length) {
+    return `
+      ${suggestionsHtml}
+      <div class="cliente-empty-projects">
+        <p>Sin proyectos creados</p>
+        <button class="btn btn-primary btn-sm" type="button" data-action="crear-proyecto" data-key="${esc(item.key)}">
+          ${icons.plus} Crear proyecto
+        </button>
+      </div>
+    `;
+  }
+
+  return `
+    ${suggestionsHtml}
+    <div class="cliente-projects-head">
+      <strong>Proyectos relacionados</strong>
     </div>
-  </div>`;
+    <div class="cliente-projects-list">
+      ${related
+        .map(
+          (project) => `
+        <article class="cliente-project-row">
+          <div>
+            <strong>${esc(showValue(project.nombre))}</strong>
+            <p>${esc(showValue(project.responsable || "Sin líder"))} · ${esc(formatDate(project.fecha_fin_estimada) || "-")}</p>
+          </div>
+          <div class="cliente-project-actions">
+            <span class="badge badge-control-neutral">${esc(formatProjectEstado(project.estado || "pendiente_de_planificacion"))}</span>
+            <button class="btn btn-ghost btn-sm" type="button" data-action="ver-proyecto" data-project-id="${esc(project.id)}">
+              Ver proyecto
+            </button>
+          </div>
+        </article>
+      `
+        )
+        .join("")}
+      <div class="cliente-project-create-inline">
+        <button class="btn btn-primary btn-sm" type="button" data-action="crear-proyecto" data-key="${esc(item.key)}">
+          ${icons.plus} Crear proyecto
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCreateProjectModal() {
+  return `
+    <div class="modal-overlay" id="modal-proyecto-cliente">
+      <div class="modal-card" style="max-width:760px">
+        <div class="modal-header">
+          <h2>Crear proyecto</h2>
+          <button class="btn-icon" id="close-modal-proyecto-cliente" type="button">${icons.close}</button>
+        </div>
+        <form id="form-proyecto-cliente">
+          <input type="hidden" name="cliente_externo_id" id="cliente-external-id">
+          <input type="hidden" name="cliente_nombre_snapshot" id="cliente-nombre-snapshot">
+          <input type="hidden" name="cliente_telefono_snapshot" id="cliente-telefono-snapshot">
+          <input type="hidden" name="etiquetas" id="cliente-etiquetas-json">
+          <div class="form-grid">
+            <div class="form-field full-width">
+              <label>Nombre del proyecto *</label>
+              <input name="nombre" id="proyecto-nombre-input" required>
+            </div>
+            <div class="form-field">
+              <label>Líder del proyecto</label>
+              <select name="lider_usuario_id" id="proyecto-lider-select"></select>
+            </div>
+            <div class="form-field">
+              <label>Subir oferta *</label>
+              <input type="file" id="proyecto-oferta-input" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.doc,.docx" required>
+            </div>
+            <div class="form-field">
+              <label>Fecha de firma de ábaco</label>
+              <input type="date" name="fecha_firma_abaco">
+            </div>
+            <div class="form-field full-width">
+              <label>Observaciones</label>
+              <textarea name="observaciones" rows="3"></textarea>
+            </div>
+            <div class="form-field full-width">
+              <label>Etiquetas</label>
+              <div class="tags-editor">
+                <input type="text" id="tag-name-input" placeholder="Nombre de etiqueta">
+                <input type="color" id="tag-color-input" value="#8a0fa8">
+                <button class="btn btn-ghost btn-sm" type="button" id="btn-add-tag">Agregar</button>
+              </div>
+              <div id="tags-preview" class="tags-preview"></div>
+            </div>
+          </div>
+          <div class="modal-status" id="modal-status-proyecto-cliente"></div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" type="button" id="cancel-modal-proyecto-cliente">Cancelar</button>
+            <button class="btn btn-primary" type="submit" id="btn-submit-proyecto">Crear proyecto</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
 }
 
 function bindEvents(container) {
-  const modal = document.getElementById("modal-cliente");
-  const form = document.getElementById("form-cliente");
-  const editingId = document.getElementById("editing-cliente-id");
-  const status = document.getElementById("modal-status-cliente");
+  const searchInput = container.querySelector("#clientes-search-input");
+  const crmSelect = container.querySelector("#filtro-crm");
+  const controlSelect = container.querySelector("#filtro-control");
+  const listEl = container.querySelector("#clientes-list");
+  const loadMoreWrap = container.querySelector("#clientes-loadmore-wrap");
+  const modal = container.querySelector("#modal-proyecto-cliente");
+  const form = container.querySelector("#form-proyecto-cliente");
+  const status = container.querySelector("#modal-status-proyecto-cliente");
+  const submitBtn = container.querySelector("#btn-submit-proyecto");
+  let currentModalClientKey = "";
 
-  const openModal = (cliente = null) => {
-    editingId.value = cliente?.id || "";
-    document.getElementById("modal-titulo-cliente").textContent = cliente ? "Editar Cliente" : "Nuevo Cliente";
-    if (cliente) {
-      form.nombre.value = cliente.nombre || "";
-      form.ruc.value = cliente.ruc || "";
-      form.industria.value = cliente.industria || "";
-      form.estado.value = cliente.estado || "activo";
-      form.contacto_principal.value = cliente.contacto_principal || "";
-      form.telefono.value = cliente.telefono || "";
-      form.email.value = cliente.email || "";
-      form.calificacion.value = cliente.calificacion || "";
-      form.direccion.value = cliente.direccion || "";
-      form.observaciones.value = cliente.observaciones || "";
-    } else {
-      form.reset();
+  searchInput?.addEventListener("input", (event) => {
+    searchDraft = event.target.value;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    isFiltering = true;
+    renderList(container);
+    debounceTimer = setTimeout(() => {
+      searchApplied = searchDraft;
+      visibleCount = PAGE_SIZE;
+      isFiltering = false;
+      renderList(container);
+    }, SEARCH_DEBOUNCE_MS);
+  });
+
+  crmSelect?.addEventListener("change", (event) => {
+    filterCrm = event.target.value;
+    visibleCount = PAGE_SIZE;
+    isFiltering = true;
+    renderList(container);
+    setTimeout(() => {
+      isFiltering = false;
+      renderList(container);
+    }, 180);
+  });
+
+  controlSelect?.addEventListener("change", (event) => {
+    filterControl = event.target.value;
+    visibleCount = PAGE_SIZE;
+    isFiltering = true;
+    renderList(container);
+    setTimeout(() => {
+      isFiltering = false;
+      renderList(container);
+    }, 180);
+  });
+
+  listEl?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+
+    if (action === "toggle") {
+      const key = String(button.dataset.key || "");
+      if (openClienteKeys.has(key)) {
+        openClienteKeys.delete(key);
+        renderList(container);
+        return;
+      }
+
+      loadingAccordionKeys.add(key);
+      openClienteKeys.add(key);
+      renderList(container);
+      setTimeout(() => {
+        loadingAccordionKeys.delete(key);
+        renderList(container);
+      }, 200);
+      return;
     }
-    status.textContent = "";
-    modal.classList.add("open");
-  };
 
-  const closeModal = () => modal.classList.remove("open");
+    if (action === "crear-proyecto") {
+      const key = String(button.dataset.key || "");
+      const item = groupedClientes.find((group) => group.key === key);
+      if (!item) return;
+      currentModalClientKey = key;
+      openProjectModal(modal, form, status, item);
+      renderLeaderOptions(form);
+      renderTagsPreview(form, currentModalClientKey);
+      return;
+    }
 
-  document.getElementById("btn-new-client")?.addEventListener("click", () => openModal());
-  document.getElementById("close-modal-cliente")?.addEventListener("click", closeModal);
-  document.getElementById("cancel-modal-cliente")?.addEventListener("click", closeModal);
+    if (action === "ver-proyecto") {
+      navigate("/proyectos");
+      return;
+    }
 
-  form?.addEventListener("submit", async e => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(form));
-    status.textContent = "Guardando...";
+    if (action === "relacionar" || action === "rechazar") {
+      const leadId = String(button.dataset.leadId || "");
+      const projectId = String(button.dataset.projectId || "");
+      if (!leadId || !projectId) return;
+
+      const item = groupedClientes.find((group) => group.leadIds.has(leadId));
+      const payload = {
+        proyecto_id: projectId,
+        estado_relacion: action === "relacionar" ? "confirmado" : "rechazado",
+        cliente_nombre_normalizado: item?.normalizedName || null,
+        cliente_nombre_snapshot: item?.nombre || null,
+        cliente_telefono_snapshot: item?.principal?.telefono || null
+      };
+
+      try {
+        await apiPost(`/clientes/${encodeURIComponent(leadId)}/relaciones`, payload);
+        await refreshData(container);
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+  });
+
+  loadMoreWrap?.addEventListener("click", (event) => {
+    if (!event.target.closest("#btn-clientes-load-more")) return;
+    visibleCount += PAGE_SIZE;
+    renderList(container);
+  });
+
+  container.querySelector("#close-modal-proyecto-cliente")?.addEventListener("click", () => {
+    modal?.classList.remove("open");
+  });
+
+  container.querySelector("#cancel-modal-proyecto-cliente")?.addEventListener("click", () => {
+    modal?.classList.remove("open");
+  });
+
+  form?.querySelector("#btn-add-tag")?.addEventListener("click", () => {
+    const nameInput = form.querySelector("#tag-name-input");
+    const colorInput = form.querySelector("#tag-color-input");
+    const name = String(nameInput?.value || "").trim();
+    const color = String(colorInput?.value || "#8a0fa8");
+    if (!name || !currentModalClientKey) return;
+
+    const current = tagsDraftByClient.get(currentModalClientKey) || [];
+    current.push({ nombre: name, color });
+    tagsDraftByClient.set(currentModalClientKey, current);
+    if (nameInput) nameInput.value = "";
+    renderTagsPreview(form, currentModalClientKey);
+  });
+
+  form?.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("[data-remove-tag]");
+    if (!removeBtn || !currentModalClientKey) return;
+    const idx = Number(removeBtn.dataset.removeTag);
+    const current = tagsDraftByClient.get(currentModalClientKey) || [];
+    current.splice(idx, 1);
+    tagsDraftByClient.set(currentModalClientKey, current);
+    renderTagsPreview(form, currentModalClientKey);
+  });
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const clienteExternoId = String(form.querySelector("#cliente-external-id")?.value || "");
+    const ofertaFile = form.querySelector("#proyecto-oferta-input")?.files?.[0];
+
+    if (!clienteExternoId) return;
+    if (!ofertaFile) {
+      if (status) status.textContent = "Debes subir la oferta para crear el proyecto.";
+      return;
+    }
+
+    const payload = Object.fromEntries(new FormData(form));
+    payload.estado = "pendiente_de_planificacion";
+    payload.etiquetas = JSON.stringify(tagsDraftByClient.get(currentModalClientKey) || []);
+
+    isSavingProject = true;
+    if (submitBtn) {
+      submitBtn.textContent = "Creando proyecto...";
+      submitBtn.disabled = true;
+    }
+    if (status) status.textContent = "Creando proyecto...";
+
     try {
-      if (editingId.value) {
-        await apiPut(`/clientes/${editingId.value}`, data);
-      } else {
-        await apiPost("/clientes", data);
-      }
-      closeModal();
-      renderClientes(container);
-    } catch (err) {
-      status.textContent = err.message;
-    }
-  });
-
-  // Edit / delete
-  container.addEventListener("click", async e => {
-    const editBtn = e.target.closest("[data-edit]");
-    const deleteBtn = e.target.closest("[data-delete]");
-
-    if (editBtn) {
-      const c = clientes.find(x => x.id === editBtn.dataset.edit);
-      if (c) openModal(c);
-    }
-    if (deleteBtn) {
-      if (confirm("¿Eliminar este cliente?")) {
-        await apiDelete(`/clientes/${deleteBtn.dataset.delete}`);
-        renderClientes(container);
+      const created = await apiPost(`/clientes/${encodeURIComponent(clienteExternoId)}/proyectos`, payload);
+      isUploadingOffer = true;
+      if (status) status.textContent = "Subiendo oferta...";
+      await uploadOfertaDocumento(created.id, ofertaFile);
+      isUploadingOffer = false;
+      if (status) status.textContent = "";
+      modal?.classList.remove("open");
+      await refreshData(container);
+    } catch (error) {
+      if (status) status.textContent = error.message;
+    } finally {
+      isSavingProject = false;
+      isUploadingOffer = false;
+      if (submitBtn) {
+        submitBtn.textContent = "Crear proyecto";
+        submitBtn.disabled = false;
       }
     }
   });
+}
 
-  // Search
-  document.getElementById("search-clientes")?.addEventListener("input", e => {
-    searchTerm = e.target.value;
-    renderList(container);
+function openProjectModal(modal, form, status, item) {
+  const lead = item?.principal;
+  if (!lead || !form) return;
+
+  form.reset();
+  if (status) status.textContent = "";
+  form.querySelector("#cliente-external-id").value = String(lead.id_cliente_externo || "");
+  form.querySelector("#cliente-nombre-snapshot").value = String(item.nombre || "");
+  form.querySelector("#cliente-telefono-snapshot").value = String(lead.telefono || "");
+  const suggestedName = `Proyecto - ${showValue(item.nombre)}`;
+  form.querySelector("#proyecto-nombre-input").value = suggestedName === "Proyecto - -" ? "" : suggestedName;
+  modal?.classList.add("open");
+}
+
+function renderLeaderOptions(form) {
+  const select = form?.querySelector("#proyecto-lider-select");
+  if (!select) return;
+  const options = ['<option value="">Sin asignar</option>'].concat(
+    activeUsers.map((user) => `<option value="${esc(user.id)}">${esc(user.display_name || user.username || "-")}</option>`)
+  );
+  select.innerHTML = options.join("");
+}
+
+function renderTagsPreview(form, clientKey) {
+  const tags = tagsDraftByClient.get(clientKey) || [];
+  const preview = form?.querySelector("#tags-preview");
+  const hidden = form?.querySelector("#cliente-etiquetas-json");
+  if (hidden) hidden.value = JSON.stringify(tags);
+  if (!preview) return;
+
+  preview.innerHTML = tags.length
+    ? tags
+        .map(
+          (tag, idx) => `
+      <span class="tag-chip" style="--tag-color:${esc(tag.color || "#8a0fa8")}">
+        ${esc(tag.nombre || "-")}
+        <button type="button" data-remove-tag="${idx}" aria-label="Quitar etiqueta">×</button>
+      </span>
+    `
+        )
+        .join("")
+    : '<span style="font-size:12px;color:var(--muted)">Sin etiquetas</span>';
+}
+
+async function refreshData(container) {
+  isLoading = true;
+  renderList(container);
+  await loadData();
+  buildGroups();
+  isLoading = false;
+  renderControls(container);
+  renderList(container);
+}
+
+function renderControlBadge(status) {
+  if (status === CONTROL_STATUS.ACTIVO) return '<span class="badge badge-control-activo">Activo</span>';
+  if (status === CONTROL_STATUS.PENDIENTE) return '<span class="badge badge-control-pendiente">Pendiente de vinculación</span>';
+  if (status === CONTROL_STATUS.INACTIVO) return '<span class="badge badge-control-inactivo">Inactivo</span>';
+  return '<span class="badge badge-control-sinproyecto">Sin proyecto</span>';
+}
+
+function normalizeName(value) {
+  const text = showValue(value);
+  if (text === "-") return "";
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function showValue(value) {
+  if (value === undefined || value === null) return "-";
+  const text = String(value).trim();
+  if (!text) return "-";
+  const lower = text.toLowerCase();
+  if (lower === "null" || lower === "undefined") return "-";
+  return text;
+}
+
+function toDateValue(value) {
+  if (!value) return 0;
+  const raw = String(value).trim();
+  if (!raw) return 0;
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function uniqueProjects(projects) {
+  const seen = new Set();
+  const unique = [];
+  for (const project of projects) {
+    const id = String(project.id || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    unique.push(project);
+  }
+  return unique;
+}
+
+function formatMoney(value, currency) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return "-";
+  const hasDecimals = Math.abs(number % 1) > 0 && Math.abs(number % 1) !== 0;
+  const formatter = new Intl.NumberFormat("es-PY", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0
+  });
+  const formatted = formatter.format(number).replace(/,/g, ".");
+  const curr = showValue(currency);
+  return curr === "-" ? formatted : `${formatted} ${curr}`;
+}
+
+function formatPhone(value) {
+  const raw = showValue(value);
+  if (raw === "-") return "-";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("595") && digits.length >= 9) {
+    const body = digits.slice(3);
+    if (body.length >= 6) {
+      const prefix = body.slice(0, 3);
+      const rest = body.slice(3);
+      return `+595 ${prefix} ${rest}`;
+    }
+    return `+595 ${body}`;
+  }
+  if (digits.startsWith("54") && digits.length > 6) return `+${digits.slice(0, 2)} ${digits.slice(2)}`;
+  if (digits.startsWith("55") && digits.length > 6) return `+${digits.slice(0, 2)} ${digits.slice(2)}`;
+  return raw;
+}
+
+function formatProjectEstado(value) {
+  const key = normalizeName(value).replace(/\s+/g, "_");
+  if (key === "PENDIENTE_DE_PLANIFICACION") return "Pendiente de planificación";
+  if (key === "EN_PROGRESO") return "En progreso";
+  if (key === "PLANIFICADA") return "Planificada";
+  if (key === "FINALIZADA") return "Finalizada";
+  if (key === "CANCELADA") return "Cancelada";
+  return showValue(value);
+}
+
+function renderPageSkeleton() {
+  return `
+    <section class="skeleton-view">
+      <div class="skeleton-row">
+        <div class="skeleton-block h-28 w-32"></div>
+        <div class="skeleton-block h-28 w-20"></div>
+      </div>
+      <div class="skeleton-block h-88"></div>
+      <div class="skeleton-grid cols-2">
+        <div class="skeleton-block h-140"></div>
+        <div class="skeleton-block h-140"></div>
+      </div>
+    </section>
+  `;
+}
+
+function renderListSkeleton(rows = 4) {
+  return Array.from({ length: rows })
+    .map(
+      () => `
+    <div class="skeleton-block" style="height:110px;border-radius:12px"></div>
+  `
+    )
+    .join("");
+}
+
+async function uploadOfertaDocumento(proyectoId, file) {
+  const token = sessionStorage.getItem("controlObraToken");
+  const form = new FormData();
+  form.append("archivo", file);
+  form.append("tipo_documento", "oferta_pdf");
+  form.append("documento_asociado", "oferta");
+
+  const response = await fetch(`/api/admin/obras/${encodeURIComponent(proyectoId)}/documentos/oferta`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form
   });
 
-  // Filter
-  document.getElementById("filtro-estado-cliente")?.addEventListener("change", e => {
-    filtroEstado = e.target.value;
-    renderList(container);
-  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "No se pudo subir la oferta.");
+  }
+  return data;
 }

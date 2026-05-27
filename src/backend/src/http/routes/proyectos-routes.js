@@ -35,6 +35,133 @@ export function createProyectosRoutes(container) {
   const auth = requireAdmin(container.env);
   router.use(auth);
 
+  // GET /api/admin/obras/:id/documentos
+  router.get("/obras/:id/documentos", async (request, response, next) => {
+    try {
+      const { id: proyectoId } = request.params;
+      const result = await container.pool.query(
+        `
+        SELECT
+          d.id,
+          d.proyecto_id,
+          d.tipo_documento,
+          d.nombre_archivo,
+          d.ruta_archivo,
+          d.mime_type,
+          d.estado_procesamiento,
+          d.datos_extraidos,
+          d.creado_por,
+          d.creado_en,
+          d.actualizado_en,
+          u.display_name AS subido_por,
+          CASE
+            WHEN (d.datos_extraidos->>'size_bytes') ~ '^[0-9]+$' THEN (d.datos_extraidos->>'size_bytes')::bigint
+            ELSE NULL
+          END AS size_bytes,
+          COALESCE(d.datos_extraidos->>'documento_asociado', 'otro') AS documento_asociado,
+          COALESCE((d.datos_extraidos->>'es_carpeta')::boolean, false) AS es_carpeta
+        FROM documentos_proyecto d
+        LEFT JOIN app_users u ON u.id = d.creado_por
+        WHERE d.proyecto_id = $1
+        ORDER BY d.actualizado_en DESC, d.creado_en DESC
+        `,
+        [proyectoId]
+      );
+
+      response.json(result.rows);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/admin/obras/:id/documentos
+  router.post("/obras/:id/documentos", upload.single("archivo"), async (request, response, next) => {
+    try {
+      if (!request.file) {
+        return response.status(400).json({ error: "No se proporcionó archivo." });
+      }
+
+      const { id: proyectoId } = request.params;
+      const fileName = request.file.originalname;
+      const mimeType = request.file.mimetype;
+      const sizeBytes = request.file.size ?? 0;
+      const asociado = String(request.body?.documento_asociado || "otro").trim().toLowerCase() || "otro";
+      const docType = String(request.body?.tipo_documento || "otro").trim().toLowerCase() || "otro";
+      const docId = randomUUID();
+
+      await container.pool.query(
+        `
+        INSERT INTO documentos_proyecto (
+          id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento, datos_extraidos, creado_por
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          docId,
+          proyectoId,
+          docType,
+          fileName,
+          mimeType,
+          "procesado",
+          {
+            size_bytes: sizeBytes,
+            documento_asociado: asociado,
+            nombre_original: fileName
+          },
+          request.user?.sub || null
+        ]
+      );
+
+      response.status(201).json({
+        mensaje: "Documento cargado.",
+        documento_id: docId
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/admin/obras/:id/documentos/carpeta
+  router.post("/obras/:id/documentos/carpeta", async (request, response, next) => {
+    try {
+      const { id: proyectoId } = request.params;
+      const nombre = String(request.body?.nombre || "").trim();
+      if (!nombre) {
+        return response.status(400).json({ error: "Nombre de carpeta requerido." });
+      }
+
+      const carpetaId = randomUUID();
+      await container.pool.query(
+        `
+        INSERT INTO documentos_proyecto (
+          id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento, datos_extraidos, creado_por
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          carpetaId,
+          proyectoId,
+          "carpeta",
+          nombre,
+          null,
+          "procesado",
+          {
+            es_carpeta: true,
+            documento_asociado: "otro"
+          },
+          request.user?.sub || null
+        ]
+      );
+
+      response.status(201).json({
+        mensaje: "Carpeta creada.",
+        documento_id: carpetaId
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // POST /api/admin/obras/:id/documentos/oferta
   router.post("/obras/:id/documentos/oferta", upload.single("archivo"), async (request, response, next) => {
     try {
@@ -50,10 +177,10 @@ export function createProyectosRoutes(container) {
       const docId = randomUUID();
       await container.pool.query(
         `
-        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento, creado_por)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         `,
-        [docId, proyectoId, "oferta_pdf", fileName, request.file.mimetype, "pendiente"]
+        [docId, proyectoId, "oferta_pdf", fileName, request.file.mimetype, "pendiente", request.user?.sub || null]
       );
 
       // 2. Procesar el PDF y extraer texto
@@ -280,10 +407,10 @@ export function createProyectosRoutes(container) {
       const docId = randomUUID();
       await container.pool.query(
         `
-        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento, creado_por)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         `,
-        [docId, proyectoId, "abaco_lista", fileName, request.file.mimetype, "pendiente"]
+        [docId, proyectoId, "abaco_lista", fileName, request.file.mimetype, "pendiente", request.user?.sub || null]
       );
 
       // Procesar archivo Excel

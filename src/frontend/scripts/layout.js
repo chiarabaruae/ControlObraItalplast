@@ -79,10 +79,10 @@ function renderNav() {
 function renderClientList() {
   const el = document.getElementById("sidebar-client-list");
   if (!el) return;
-  el.innerHTML = sidebarClients.filter(c => c.estado === "activo").slice(0, 8).map(c =>
+  el.innerHTML = sidebarClients.filter(c => String(c.estado || "").toLowerCase() === "activo").slice(0, 8).map(c =>
     `<div class="sidebar-client">
-      <div class="avatar-sm">${getInitials(c.nombre)}</div>
-      <span>${esc(c.nombre).toUpperCase()}</span>
+      <div class="avatar-sm">${getInitials(c.nombre || c.nombre_cliente || "")}</div>
+      <span>${esc(c.nombre || c.nombre_cliente || "-").toUpperCase()}</span>
     </div>`
   ).join("") || '<div style="padding:6px 14px;font-size:12px;color:var(--muted)">Sin clientes</div>';
 }

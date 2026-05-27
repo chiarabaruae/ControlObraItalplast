@@ -2,6 +2,7 @@
 
 const routes = [];
 let currentCleanup = null;
+const ROUTE_SKELETON_MIN_MS = 300;
 
 export function addRoute(pattern, handler) {
   // Convert /proyectos/:id to regex
@@ -27,12 +28,15 @@ export function getCurrentPath() {
 }
 
 export function startRouter() {
-  window.addEventListener("hashchange", () => handleRoute());
-  handleRoute();
+  window.addEventListener("hashchange", () => { void handleRoute(); });
+  void handleRoute();
 }
 
-function handleRoute() {
+async function handleRoute() {
   const path = getCurrentPath();
+  const ui = await import("./ui.js");
+  ui.showRouteSkeleton(path);
+  const loadingStartedAt = Date.now();
 
   for (const route of routes) {
     const match = path.match(route.regex);
@@ -48,7 +52,12 @@ function handleRoute() {
         currentCleanup = null;
       }
 
-      const cleanup = route.handler(params);
+      const cleanup = await Promise.resolve(route.handler(params));
+      const elapsed = Date.now() - loadingStartedAt;
+      if (elapsed < ROUTE_SKELETON_MIN_MS) {
+        await new Promise(resolve => setTimeout(resolve, ROUTE_SKELETON_MIN_MS - elapsed));
+      }
+      ui.hideRouteSkeleton();
       if (typeof cleanup === "function") {
         currentCleanup = cleanup;
       }
