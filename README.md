@@ -1,50 +1,115 @@
-# Control de Avances de Obra — Italplast
+# Control Obras — Italplast
 
-Aplicación web interna para la gestión integral de proyectos de carpintería de aluminio:
-desde la creación del proyecto hasta el seguimiento de fabricación e instalación en obra.
+Aplicación web interna para gestionar obras de instalación de aberturas: clientes, proyectos, etapas, documentos, cronogramas y seguimiento operativo.
 
 ---
 
-## Stack Tecnológico
+## ¿De qué trata este proyecto?
+
+Este proyecto centraliza el flujo operativo de obras de Italplast:
+
+1. Se crean y gestionan proyectos locales.
+2. Se hace seguimiento del estado de cada proyecto (tablero, fechas, documentos, etc.).
+
+---
+
+## ¿Para qué es este proyecto?
+
+Para que el equipo pueda:
+
+- convertir oportunidades comerciales en proyectos de ejecución,
+- controlar avance de obras en una sola plataforma,
+- mantener trazabilidad entre CRM (externo) y operación (interna).
+
+---
+
+## ¿Cuál es la estructura del Stack Tecnológico?
 
 | Capa | Tecnología |
-|------|-----------|
-| Frontend | HTML + CSS (Vanilla) + JavaScript (ES Modules) |
-| Backend | Node.js 20+ con Express |
-| Base de datos | PostgreSQL 16 (Railway) |
-| Autenticación | JWT (jsonwebtoken + bcryptjs) |
-| Parsing de archivos | pdf-parse (PDF) + xlsx (Excel) |
+|---|---|
+| Frontend | HTML + CSS + JavaScript (ES Modules, sin build) |
+| Backend API | Node.js + Express |
+| Base local operativa | PostgreSQL (Railway) |
+| Base externa CRM | MySQL/MariaDB (vista `leads`) |
+| Auth | JWT + bcryptjs |
+| Archivos | multer + pdf-parse + xlsx |
 
 ---
 
-## Estructura del Proyecto
+## ¿Cuál es la estructura del proyecto?
 
 ```text
-src/
-  backend/
-    src/
-      domain/            # Entidades y reglas del negocio
-      application/       # Casos de uso y puertos
-      infrastructure/    # Adaptadores: PostgreSQL, JWT, servicios externos
-      http/              # Rutas y middlewares Express
-    migrations/          # SQL versionado para PostgreSQL
-    scripts/             # Migraciones y seed de usuarios
-  frontend/
-    index.html           # Shell principal (login + app)
-    styles/              # CSS global y componentes
-    scripts/
-      app.js             # Entry point: auth + router
-      router.js          # SPA router sin recarga
-      layout.js          # Sidebar, topbar y contenedor de página
-      api.js             # Wrapper fetch con JWT
-      ui.js              # Íconos, helpers, componentes reutilizables
-      pages/
-        dashboard.js     # KPIs y resumen general
-        proyectos.js     # Módulo principal de gestión de proyectos
-        clientes.js      # ABM de clientes
-        todo.js          # Tareas internas
-        personalizar.js  # Tema y preferencias del usuario
-tools/
-  python/                # Utilidades de soporte
-docs/
-  architecture.md        # Decisiones y convenciones de arquitectura
+ControlAvancesObra/
+  docs/
+  src/
+    backend/
+      migrations/
+      scripts/
+      src/
+        application/
+        domain/
+        http/
+        infrastructure/
+        shared/
+    frontend/
+      index.html
+      scripts/
+        pages/
+      styles/
+  tools/
+```
+
+---
+
+## ¿Para qué sirve cada carpeta? (breve)
+
+- `docs/`: documentación técnica y decisiones de arquitectura.
+- `src/backend/`: API, lógica de negocio, acceso a datos y migraciones.
+- `src/backend/migrations/`: cambios versionados de esquema SQL.
+- `src/backend/scripts/`: utilidades (migrar DB, seeds, etc.).
+- `src/backend/src/application/`: casos de uso.
+- `src/backend/src/domain/`: reglas de negocio y modelos.
+- `src/backend/src/http/`: rutas y middlewares Express.
+- `src/backend/src/infrastructure/`: adaptadores (PostgreSQL, MySQL, seguridad, servicios).
+- `src/backend/src/shared/`: configuración compartida (env, utilidades).
+- `src/frontend/`: SPA (login + app) en JS vanilla.
+- `src/frontend/scripts/pages/`: pantallas (Dashboard, Clientes, Proyectos, etc.).
+- `src/frontend/styles/`: estilos globales y componentes visuales.
+- `tools/`: utilidades de soporte del repo.
+
+---
+
+## ¿Cómo funciona este proyecto?
+
+Resumen de flujo funcional:
+
+1. Usuario inicia sesión.
+2. Frontend consume API backend (`/api/...`) con JWT.
+3. Módulo Clientes lee datos de CRM externo (`leads`) en modo solo lectura.
+4. Desde Clientes se crean proyectos en DB local y se vinculan al cliente externo.
+5. Módulo Proyectos/Obras opera sobre datos locales (estados, tablero, seguimiento, documentos).
+
+Arquitectura general:
+
+```text
+Frontend (JS) -> Backend Express -> PostgreSQL (local)
+
+---
+
+## Overview de pantallas principales
+
+Incluye una maqueta fija en HTML que imita la interfaz principal del Dashboard:
+
+- [overview-dashboard.html](docs/overview-dashboard.html)
+
+Resumen funcional de pantallas:
+
+- `Login`: acceso con usuario/contraseña y sesión JWT.
+- `Dashboard`: resumen operativo general (estado de obras y métricas rápidas).
+- `Clientes`: clientes del CRM , vinculación con proyectos y creación de proyecto.
+- `Proyectos / Obras`: tablero de gestión de proyectos (lista, matriz, kanban, gantt y módulos internos).
+- `To-Do`: tareas internas de seguimiento.
+- `Personalizar`: ajustes visuales (tema y color de acento).
+- `Ajustes / Usuarios` (admin): gestión básica de usuarios y roles.
+
+---
