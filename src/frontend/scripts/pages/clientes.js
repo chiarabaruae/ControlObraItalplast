@@ -30,6 +30,7 @@ let isUploadingOffer = false;
 const loadingAccordionKeys = new Set();
 const openClienteKeys = new Set();
 const tagsDraftByClient = new Map();
+let editingTagIndex = null;
 
 export async function renderClientes(container) {
   setTopbarSection("Clientes");
@@ -325,17 +326,21 @@ function renderClienteRow(item) {
           <p><strong>Propietario:</strong> ${esc(showValue(p.propietario))}</p>
           <p><strong>Embudo / etapa:</strong> ${esc(showValue(p.embudo))} · ${esc(showValue(p.etapa))}</p>
         </div>
-        <div class="cliente-row-center">
-          <p><strong>Producto(s):</strong> ${esc(showValue(p.productos || p.producto))}</p>
-          <p><strong>Valor:</strong> ${esc(formatMoney(p.valor, p.moneda))}</p>
-          <p><strong>Estado final:</strong> ${esc(showValue(p.estado_final))}</p>
-        </div>
         <div class="cliente-row-right">
-          ${renderControlBadge(item.controlStatus)}
-          <small>Creado: ${esc(formatDate(p.creado) || "-")}</small>
-          <button class="btn btn-ghost btn-sm" type="button" data-action="toggle" data-key="${esc(item.key)}">
-            ${isOpen ? "Ocultar proyectos" : "Ver proyectos"}
-          </button>
+          <div class="cliente-row-commercial">
+            <p><strong>Producto(s):</strong> ${esc(showValue(p.productos || p.producto))}</p>
+            <p><strong>Valor:</strong> ${esc(formatMoney(p.valor, p.moneda))}</p>
+            <p><strong>Estado final:</strong> ${esc(showValue(p.estado_final))}</p>
+          </div>
+          <div class="cliente-row-meta">
+            <div class="cliente-row-meta-text">
+              ${renderControlBadge(item.controlStatus)}
+              <small>Creado: ${esc(formatDate(p.creado) || "-")}</small>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" data-action="toggle" data-key="${esc(item.key)}">
+              ${isOpen ? "Ocultar proyectos" : "Ver proyectos"}
+            </button>
+          </div>
         </div>
       </div>
       <div class="cliente-row-accordion ${isOpen ? "is-open" : ""}">
@@ -450,7 +455,13 @@ function renderCreateProjectModal() {
             </div>
             <div class="form-field">
               <label>Subir oferta *</label>
-              <input type="file" id="proyecto-oferta-input" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.doc,.docx" required>
+              <div class="file-upload-control">
+                <input type="file" id="proyecto-oferta-input" class="file-upload-native" accept=".pdf,application/pdf" required>
+                <label for="proyecto-oferta-input" class="file-upload-trigger">
+                  <span id="proyecto-oferta-filename">Adjuntar oferta en PDF</span>
+                  <span class="file-upload-icon" aria-hidden="true">${icons.upload}</span>
+                </label>
+              </div>
             </div>
             <div class="form-field">
               <label>Fecha de firma de ábaco</label>
@@ -464,7 +475,10 @@ function renderCreateProjectModal() {
               <label>Etiquetas</label>
               <div class="tags-editor">
                 <input type="text" id="tag-name-input" placeholder="Nombre de etiqueta">
-                <input type="color" id="tag-color-input" value="#8a0fa8">
+                <input type="color" id="tag-color-input" class="tag-color-input-native" value="#8a0fa8" aria-label="Color de etiqueta">
+                <button class="tag-color-trigger" type="button" id="btn-tag-color-trigger" aria-label="Seleccionar color">
+                  <span class="tag-color-trigger-dot" id="tag-color-trigger-dot" style="--tag-selected-color:#8a0fa8"></span>
+                </button>
                 <button class="btn btn-ghost btn-sm" type="button" id="btn-add-tag">Agregar</button>
               </div>
               <div id="tags-preview" class="tags-preview"></div>
@@ -491,6 +505,8 @@ function bindEvents(container) {
   const form = container.querySelector("#form-proyecto-cliente");
   const status = container.querySelector("#modal-status-proyecto-cliente");
   const submitBtn = container.querySelector("#btn-submit-proyecto");
+  const ofertaInput = form?.querySelector("#proyecto-oferta-input");
+  const tagColorInput = form?.querySelector("#tag-color-input");
   let currentModalClientKey = "";
 
   searchInput?.addEventListener("input", (event) => {
@@ -598,10 +614,24 @@ function bindEvents(container) {
 
   container.querySelector("#close-modal-proyecto-cliente")?.addEventListener("click", () => {
     modal?.classList.remove("open");
+    editingTagIndex = null;
   });
 
   container.querySelector("#cancel-modal-proyecto-cliente")?.addEventListener("click", () => {
     modal?.classList.remove("open");
+    editingTagIndex = null;
+  });
+
+  ofertaInput?.addEventListener("change", () => {
+    updateOfferFileLabel(form);
+  });
+
+  form?.querySelector("#btn-tag-color-trigger")?.addEventListener("click", () => {
+    tagColorInput?.click();
+  });
+
+  tagColorInput?.addEventListener("input", () => {
+    syncTagColorTrigger(form);
   });
 
   form?.querySelector("#btn-add-tag")?.addEventListener("click", () => {
@@ -614,18 +644,80 @@ function bindEvents(container) {
     const current = tagsDraftByClient.get(currentModalClientKey) || [];
     current.push({ nombre: name, color });
     tagsDraftByClient.set(currentModalClientKey, current);
+    editingTagIndex = null;
     if (nameInput) nameInput.value = "";
     renderTagsPreview(form, currentModalClientKey);
   });
 
   form?.addEventListener("click", (event) => {
+    const target = event.target;
+    const actionBtn = target.closest(
+      "[data-remove-tag],[data-edit-tag-open],[data-edit-tag-cancel],[data-edit-tag-save],[data-tag-edit-color-open]"
+    );
+
+    if (!actionBtn) {
+      if (
+        editingTagIndex !== null &&
+        !target.closest("[data-tag-edit-popover]")
+      ) {
+        editingTagIndex = null;
+        renderTagsPreview(form, currentModalClientKey);
+      }
+      return;
+    }
+
+    const openBtn = actionBtn.closest("[data-edit-tag-open]");
+    if (openBtn && currentModalClientKey) {
+      editingTagIndex = Number(openBtn.dataset.editTagOpen);
+      renderTagsPreview(form, currentModalClientKey);
+      return;
+    }
+
+    const cancelBtn = actionBtn.closest("[data-edit-tag-cancel]");
+    if (cancelBtn && currentModalClientKey) {
+      editingTagIndex = null;
+      renderTagsPreview(form, currentModalClientKey);
+      return;
+    }
+
+    const editColorBtn = actionBtn.closest("[data-tag-edit-color-open]");
+    if (editColorBtn) {
+      const popover = editColorBtn.closest("[data-tag-edit-popover]");
+      popover?.querySelector("[data-tag-edit-color-input]")?.click();
+      return;
+    }
+
+    const saveBtn = actionBtn.closest("[data-edit-tag-save]");
+    if (saveBtn && currentModalClientKey) {
+      const idx = Number(saveBtn.dataset.editTagSave);
+      const popover = saveBtn.closest("[data-tag-edit-popover]");
+      const name = String(popover?.querySelector("[data-tag-edit-name]")?.value || "").trim();
+      const color = String(popover?.querySelector("[data-tag-edit-color-input]")?.value || "#8a0fa8");
+      if (!name) return;
+      const current = tagsDraftByClient.get(currentModalClientKey) || [];
+      if (!current[idx]) return;
+      current[idx] = { nombre: name, color };
+      tagsDraftByClient.set(currentModalClientKey, current);
+      editingTagIndex = null;
+      renderTagsPreview(form, currentModalClientKey);
+      return;
+    }
+
     const removeBtn = event.target.closest("[data-remove-tag]");
     if (!removeBtn || !currentModalClientKey) return;
     const idx = Number(removeBtn.dataset.removeTag);
     const current = tagsDraftByClient.get(currentModalClientKey) || [];
     current.splice(idx, 1);
     tagsDraftByClient.set(currentModalClientKey, current);
+    editingTagIndex = null;
     renderTagsPreview(form, currentModalClientKey);
+  });
+
+  form?.addEventListener("input", (event) => {
+    if (!event.target.matches("[data-tag-edit-color-input]")) return;
+    const popover = event.target.closest("[data-tag-edit-popover]");
+    const dot = popover?.querySelector("[data-tag-edit-color-dot]");
+    if (dot) dot.style.setProperty("--tag-selected-color", event.target.value || "#8a0fa8");
   });
 
   form?.addEventListener("submit", async (event) => {
@@ -677,12 +769,15 @@ function openProjectModal(modal, form, status, item) {
   if (!lead || !form) return;
 
   form.reset();
+  editingTagIndex = null;
   if (status) status.textContent = "";
   form.querySelector("#cliente-external-id").value = String(lead.id_cliente_externo || "");
   form.querySelector("#cliente-nombre-snapshot").value = String(item.nombre || "");
   form.querySelector("#cliente-telefono-snapshot").value = String(lead.telefono || "");
   const suggestedName = `Proyecto - ${showValue(item.nombre)}`;
   form.querySelector("#proyecto-nombre-input").value = suggestedName === "Proyecto - -" ? "" : suggestedName;
+  updateOfferFileLabel(form);
+  syncTagColorTrigger(form);
   modal?.classList.add("open");
 }
 
@@ -706,14 +801,54 @@ function renderTagsPreview(form, clientKey) {
     ? tags
         .map(
           (tag, idx) => `
-      <span class="tag-chip" style="--tag-color:${esc(tag.color || "#8a0fa8")}">
-        ${esc(tag.nombre || "-")}
-        <button type="button" data-remove-tag="${idx}" aria-label="Quitar etiqueta">×</button>
-      </span>
+      <div class="tag-chip-wrap">
+        <span class="tag-chip" style="--tag-color:${esc(tag.color || "#8a0fa8")}">
+          <span class="tag-chip-label">${esc(tag.nombre || "-")}</span>
+          <button type="button" class="tag-chip-btn" data-edit-tag-open="${idx}" aria-label="Editar etiqueta">${icons.edit}</button>
+          <button type="button" class="tag-chip-btn" data-remove-tag="${idx}" aria-label="Quitar etiqueta">×</button>
+        </span>
+        ${
+          editingTagIndex === idx
+            ? `
+          <div class="tag-edit-popover" data-tag-edit-popover="${idx}">
+            <label class="tag-edit-label">
+              Nombre
+              <input type="text" data-tag-edit-name value="${esc(tag.nombre || "")}">
+            </label>
+            <div class="tag-edit-color-row">
+              <span>Color</span>
+              <input type="color" data-tag-edit-color-input value="${esc(tag.color || "#8a0fa8")}">
+              <button type="button" class="tag-color-trigger tag-color-trigger-sm" data-tag-edit-color-open aria-label="Seleccionar color">
+                <span class="tag-color-trigger-dot" data-tag-edit-color-dot style="--tag-selected-color:${esc(tag.color || "#8a0fa8")}"></span>
+              </button>
+            </div>
+            <div class="tag-edit-actions">
+              <button class="btn btn-ghost btn-sm" type="button" data-edit-tag-cancel>Cancelar</button>
+              <button class="btn btn-primary btn-sm" type="button" data-edit-tag-save="${idx}">Guardar</button>
+            </div>
+          </div>
+        `
+            : ""
+        }
+      </div>
     `
         )
         .join("")
     : '<span style="font-size:12px;color:var(--muted)">Sin etiquetas</span>';
+}
+
+function updateOfferFileLabel(form) {
+  const label = form?.querySelector("#proyecto-oferta-filename");
+  const file = form?.querySelector("#proyecto-oferta-input")?.files?.[0];
+  if (!label) return;
+  label.textContent = file?.name ? file.name : "Adjuntar oferta en PDF";
+}
+
+function syncTagColorTrigger(form) {
+  const input = form?.querySelector("#tag-color-input");
+  const dot = form?.querySelector("#tag-color-trigger-dot");
+  if (!dot) return;
+  dot.style.setProperty("--tag-selected-color", input?.value || "#8a0fa8");
 }
 
 async function refreshData(container) {

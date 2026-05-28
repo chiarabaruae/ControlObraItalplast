@@ -17,13 +17,21 @@ const documentosByProyecto = new Map();
 const documentosLoadingByProyecto = new Map();
 const documentosErrorByProyecto = new Map();
 const documentosUiByProyecto = new Map();
+const documentosParentByProyecto = new Map();
+const documentosCategoryByProyecto = new Map();
 const DOCUMENT_QUICK_BUCKETS = [
   { key: "oferta", label: "Oferta", tipo: "oferta_pdf" },
   { key: "abaco", label: "Ábaco", tipo: "abaco_lista" },
-  { key: "lista_produccion", label: "Lista de producción", tipo: "lista_produccion", asociado: "lista_produccion" },
   { key: "seguimiento_fabrica", label: "Seguimiento fábrica", asociado: "seguimiento_fabrica" },
   { key: "seguimiento_obra", label: "Seguimiento obra", asociado: "seguimiento_obra" },
   { key: "otros", label: "Otros documentos", fallback: true }
+];
+const DOC_CATEGORY_OPTIONS = [
+  { value: "oferta", label: "Oferta" },
+  { value: "abaco", label: "Ábaco" },
+  { value: "seguimiento_fabrica", label: "Seguimiento fábrica" },
+  { value: "seguimiento_obra", label: "Seguimiento obra" },
+  { value: "otro", label: "Otros documentos" }
 ];
 
 export async function renderProyectos(container) {
@@ -334,21 +342,28 @@ function renderFuncionalidadEspecifica(container) {
     cronogramas: "Cronogramas de Producción e Instalación",
     seguimientos: "Seguimiento de Fábrica y Obra"
   };
+  const isDocsTab = activeTab === "documentos";
 
   container.innerHTML = `
-    <div class="page-header" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+    <div class="page-header docs-page-header">
+      <button class="btn btn-ghost btn-sm docs-back-btn" id="btn-volver" type="button">
+        ${icons.back} Volver al Listado
+      </button>
       <div class="page-header-row">
         <div>
-          <button class="btn btn-ghost btn-sm" id="btn-volver" style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; padding: 0;">
-            ${icons.back} Volver al Listado
-          </button>
           <div class="eyebrow">${esc(o.nombre)}</div>
           <h1>${titleMap[activeTab]}</h1>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button class="btn btn-secondary" id="btn-modificar-modulo">${icons.edit} Modificar</button>
-          <button class="btn btn-danger" id="btn-eliminar-modulo">${icons.trash} Eliminar</button>
-        </div>
+        ${
+          isDocsTab
+            ? ""
+            : `
+          <div style="display:flex;gap:.5rem;">
+            <button class="btn btn-secondary" id="btn-modificar-modulo">${icons.edit} Modificar</button>
+            <button class="btn btn-danger" id="btn-eliminar-modulo">${icons.trash} Eliminar</button>
+          </div>
+        `
+        }
       </div>
     </div>
     
@@ -364,13 +379,15 @@ function renderFuncionalidadEspecifica(container) {
     renderMain(container);
   });
 
-  container.querySelector("#btn-modificar-modulo").addEventListener("click", () => {
-    alert("Modal: ¿Seguro que deseas modificar los datos de este módulo?");
-  });
+  if (!isDocsTab) {
+    container.querySelector("#btn-modificar-modulo")?.addEventListener("click", () => {
+      alert("Modal: ¿Seguro que deseas modificar los datos de este módulo?");
+    });
 
-  container.querySelector("#btn-eliminar-modulo").addEventListener("click", () => {
-    alert("Modal ROJO: ¿Seguro que deseas ELIMINAR este módulo? Acción irreversible.");
-  });
+    container.querySelector("#btn-eliminar-modulo")?.addEventListener("click", () => {
+      alert("Modal ROJO: ¿Seguro que deseas ELIMINAR este módulo? Acción irreversible.");
+    });
+  }
 
   if (activeTab === "documentos") {
     bindDocumentosEvents(container, o);
@@ -427,6 +444,7 @@ async function ensureDocumentosLoaded(container, proyectoId, force = false) {
   renderFuncionalidadEspecifica(container);
   try {
     const docs = await apiGet(`/obras/${proyectoId}/documentos`).catch(() => []);
+    hydrateDocumentMeta(proyectoId, docs);
     documentosByProyecto.set(proyectoId, docs);
     documentosErrorByProyecto.delete(proyectoId);
   } catch (error) {
@@ -445,7 +463,13 @@ function getDocumentosUiState(proyectoId) {
       selectedItemId: null,
       isPreviewPaneOpen: false,
       activePreviewTab: "info",
-      quickFilter: "todos"
+      quickFilter: "todos",
+      currentFolderId: null,
+      isFolderModalOpen: false,
+      folderNameDraft: "",
+      folderError: "",
+      folderSubmitting: false,
+      docsActionError: ""
     });
   }
   return documentosUiByProyecto.get(proyectoId);
@@ -455,9 +479,12 @@ function renderDocumentosModulo(proyecto) {
   const state = getDocumentosUiState(proyecto.id);
   const isLoading = documentosLoadingByProyecto.get(proyecto.id);
   const error = documentosErrorByProyecto.get(proyecto.id);
-  const docs = documentosByProyecto.get(proyecto.id) || [];
-  const selectedDoc = docs.find(d => d.id === state.selectedItemId) || null;
-  const visibleDocs = filterDocumentos(docs, state);
+  const docs = getProyectoDocs(proyecto.id);
+  const docsInFolder = getDocsInCurrentFolder(proyecto.id, docs, state.currentFolderId);
+  const hasDocs = docs.length > 0;
+  const selectedDoc = docs.find(d => String(d.id) === String(state.selectedItemId)) || null;
+  const visibleDocs = filterDocumentos(docsInFolder, state, proyecto.id);
+  const breadcrumbs = getDocumentBreadcrumbs(proyecto.id, docs, state.currentFolderId, selectedDoc);
 
   if (state.selectedItemId && !selectedDoc) {
     state.selectedItemId = null;
@@ -466,44 +493,58 @@ function renderDocumentosModulo(proyecto) {
 
   return `
     <section class="docs-shell" id="docs-shell" data-proyecto-id="${esc(proyecto.id)}">
-      <div class="docs-header">
-        <div>
-          <h2>Documentos del Proyecto</h2>
-          <p>Gestiona ofertas, ábacos, listas de producción y archivos adjuntos.</p>
+      <nav class="docs-breadcrumbs" aria-label="Ruta de documentos">
+        ${breadcrumbs
+          .map((crumb, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+            return `
+              ${index > 0 ? '<span class="docs-crumb-sep">&gt;</span>' : ""}
+              ${isLast
+                ? `<span class="docs-crumb-current">${esc(crumb.label)}</span>`
+                : `<button type="button" class="docs-crumb" data-docs-nav="${esc(crumb.id || "root")}">${esc(crumb.label)}</button>`}
+            `;
+          })
+          .join("")}
+      </nav>
+      <div class="docs-toolbar docs-toolbar-standalone">
+        <label class="search-input docs-search">
+          ${icons.search}
+          <input id="docs-search-input" type="text" placeholder="Buscar documento..." value="${esc(state.currentSearchQuery)}">
+        </label>
+        <div class="docs-view-toggle" role="tablist" aria-label="Modo de vista">
+          <button class="btn-icon ${state.currentView === "list" ? "is-active" : ""}" type="button" data-docs-view="list" title="Vista lista" aria-label="Vista lista">${renderDocsViewIcon("list")}</button>
+          <button class="btn-icon ${state.currentView === "grid" ? "is-active" : ""}" type="button" data-docs-view="grid" title="Vista grilla" aria-label="Vista grilla">${renderDocsViewIcon("grid")}</button>
         </div>
-        <div class="docs-toolbar">
-          <label class="search-input docs-search">
-            ${icons.search}
-            <input id="docs-search-input" type="text" placeholder="Buscar documento..." value="${esc(state.currentSearchQuery)}">
-          </label>
-          <div class="docs-view-toggle">
-            <button class="btn-icon ${state.currentView === "list" ? "is-active" : ""}" type="button" data-docs-view="list" title="Vista lista">${icons.list}</button>
-            <button class="btn-icon ${state.currentView === "grid" ? "is-active" : ""}" type="button" data-docs-view="grid" title="Vista grilla">${icons.grid}</button>
-          </div>
-          <button class="btn btn-ghost" type="button" id="btn-docs-folder">${icons.folder} Nueva carpeta</button>
-          <button class="btn btn-primary" type="button" id="btn-docs-upload">${icons.upload} Subir documento</button>
-          <input id="docs-upload-input" type="file" hidden />
-        </div>
+        <button class="btn btn-ghost" type="button" id="btn-docs-folder">${icons.folder} Nueva carpeta</button>
+        <button class="btn btn-primary" type="button" id="btn-docs-upload">${icons.upload} Subir documento</button>
+        <input id="docs-upload-input" type="file" hidden />
       </div>
 
-      <div class="docs-quick-access">
-        ${renderQuickAccessCards(docs, state.quickFilter)}
-      </div>
+      ${hasDocs ? `
+        <div class="docs-quick-access">
+          ${renderQuickAccessCards(docs, state.quickFilter)}
+        </div>
+      ` : ""}
 
       ${error ? `<div class="card"><p class="modal-status">${esc(error)}</p></div>` : ""}
+      ${state.docsActionError ? `<div class="card"><p class="modal-status">${esc(state.docsActionError)}</p></div>` : ""}
       ${isLoading ? '<div class="loading">Cargando documentos...</div>' : `
         <div class="docs-content">
           <div class="docs-file-area" id="docs-file-area">
             ${state.currentView === "list"
-              ? renderDocumentosTabla(visibleDocs, state.selectedItemId)
-              : renderDocumentosGrid(visibleDocs, state.selectedItemId)}
+              ? renderDocumentosTabla(visibleDocs, state.selectedItemId, docs.length, state.currentSearchQuery, state.quickFilter, state.currentFolderId, proyecto.id)
+              : renderDocumentosGrid(visibleDocs, state.selectedItemId, docs.length, state.currentSearchQuery, state.quickFilter, state.currentFolderId)}
           </div>
-          <div class="docs-preview-overlay ${state.isPreviewPaneOpen ? "open" : ""}" id="docs-preview-overlay"></div>
-          <aside class="docs-preview-pane ${state.isPreviewPaneOpen ? "open" : ""}" id="docs-preview-pane">
-            ${renderDocumentPreviewPane(selectedDoc, proyecto, state)}
-          </aside>
+          ${hasDocs ? `
+            <div class="docs-preview-overlay ${state.isPreviewPaneOpen ? "open" : ""}" id="docs-preview-overlay"></div>
+            <aside class="docs-preview-pane ${state.isPreviewPaneOpen ? "open" : ""}" id="docs-preview-pane">
+              ${renderDocumentPreviewPane(selectedDoc, proyecto, state)}
+            </aside>
+          ` : ""}
         </div>
       `}
+
+      ${renderFolderModal(state)}
     </section>
   `;
 }
@@ -514,54 +555,62 @@ function renderQuickAccessCards(docs, quickFilter) {
     const last = matching[0];
     const active = quickFilter === bucket.key ? "is-active" : "";
     const updated = last ? formatDocDate(last.actualizado_en || last.creado_en) : "-";
-    const status = last ? formatEstadoDocumento(last.estado_procesamiento) : "Sin documentos";
+    const icon = getDocKindIcon(bucketIconKind(bucket.key), "sm");
     return `
       <button class="docs-quick-card ${active}" type="button" data-docs-quick="${bucket.key}">
-        <div class="docs-quick-icon">${icons.file}</div>
+        <div class="docs-quick-icon ${bucketIconKind(bucket.key)}">${icon}</div>
         <div class="docs-quick-main">
           <strong>${bucket.label}</strong>
           <small>Última: ${updated}</small>
         </div>
         <div class="docs-quick-meta">
           <span class="badge">${matching.length}</span>
-          <small>${status}</small>
+          <small>${matching.length === 1 ? "archivo" : "archivos"}</small>
         </div>
       </button>
     `;
   }).join("");
 }
 
-function renderDocumentosTabla(docs, selectedId) {
+function renderDocumentosTabla(docs, selectedId, totalDocsCount = 0, searchQuery = "", quickFilter = "todos", currentFolderId = null, proyectoId = "") {
   if (!docs.length) {
-    return renderEmpty("Sin documentos en esta vista", "Carga un documento o crea una carpeta para comenzar.");
+    return renderDocsEmptyState(totalDocsCount, searchQuery, quickFilter, currentFolderId);
   }
 
   return `
     <div class="card docs-table-card">
       <div class="table-wrap">
-        <table>
+        <table class="docs-table">
           <thead>
             <tr>
               <th>Nombre</th>
               <th>Tipo</th>
-              <th>Fecha modificada</th>
+              <th>Categoría</th>
+              <th>Fecha de carga</th>
               <th>Tamaño</th>
               <th>Subido por</th>
-              <th>Estado</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             ${docs.map(doc => `
-              <tr class="docs-row ${selectedId === doc.id ? "is-selected" : ""}" data-doc-select="${esc(doc.id)}">
-                <td><div class="docs-name-cell">${icons.file}${esc(doc.nombre_archivo || "Sin nombre")}</div></td>
+              <tr class="docs-row ${String(selectedId) === String(doc.id) ? "is-selected" : ""}" data-doc-select="${esc(doc.id)}">
+                <td>
+                  <div class="docs-name-cell">
+                    <span class="docs-kind-icon ${getDocKind(doc)}">${getDocKindIcon(getDocKind(doc), "sm")}</span>
+                    <div class="docs-name-block">
+                      <strong>${esc(doc.nombre_archivo || "Sin nombre")}</strong>
+                      <small>${esc(doc.mime_type || "Archivo")}</small>
+                    </div>
+                  </div>
+                </td>
                 <td>${esc(formatTipoDocumento(doc))}</td>
+                <td>${renderCategorySelect(doc, proyectoId)}</td>
                 <td>${esc(formatDocDate(doc.actualizado_en || doc.creado_en) || "-")}</td>
                 <td>${esc(formatFileSize(doc))}</td>
                 <td>${esc(doc.subido_por || "Sistema")}</td>
-                <td>${renderBadge(doc.estado_procesamiento || "pendiente")}</td>
                 <td>
-                  <button class="btn-icon" type="button" title="Ver detalle" data-doc-action="ver" data-doc-id="${esc(doc.id)}">${icons.eye}</button>
+                  <button class="btn-icon docs-open-action" type="button" title="Abrir detalle" data-doc-action="ver" data-doc-id="${esc(doc.id)}">${icons.panelRightOpen || icons.eye}</button>
                 </td>
               </tr>
             `).join("")}
@@ -572,19 +621,25 @@ function renderDocumentosTabla(docs, selectedId) {
   `;
 }
 
-function renderDocumentosGrid(docs, selectedId) {
+function renderDocumentosGrid(docs, selectedId, totalDocsCount = 0, searchQuery = "", quickFilter = "todos", currentFolderId = null) {
   if (!docs.length) {
-    return renderEmpty("Sin documentos en esta vista", "Carga un documento o crea una carpeta para comenzar.");
+    return renderDocsEmptyState(totalDocsCount, searchQuery, quickFilter, currentFolderId);
   }
   return `
     <div class="docs-grid">
       ${docs.map(doc => `
-        <article class="docs-grid-item ${selectedId === doc.id ? "is-selected" : ""}" data-doc-select="${esc(doc.id)}">
-          <div class="docs-grid-icon">${icons.file}</div>
-          <h4>${esc(doc.nombre_archivo || "Sin nombre")}</h4>
+        <article class="docs-grid-item ${String(selectedId) === String(doc.id) ? "is-selected" : ""}" data-doc-select="${esc(doc.id)}">
+          <header class="docs-grid-head">
+            <div class="docs-grid-icon ${getDocKind(doc)}">${getDocKindIcon(getDocKind(doc), "md")}</div>
+            <button class="btn-icon docs-grid-action" type="button" title="Ver detalle" data-doc-action="ver" data-doc-id="${esc(doc.id)}">${icons.eye}</button>
+          </header>
+          <h4 title="${esc(doc.nombre_archivo || "Sin nombre")}">${esc(doc.nombre_archivo || "Sin nombre")}</h4>
           <p>${esc(formatTipoDocumento(doc))}</p>
-          <small>${esc(formatDocDate(doc.actualizado_en || doc.creado_en) || "-")}</small>
-          <div>${renderBadge(doc.estado_procesamiento || "pendiente")}</div>
+          <small>${esc(formatDocumentoAsociado(doc, null))}</small>
+          <footer class="docs-grid-foot">
+            <small>${esc(formatDocDate(doc.actualizado_en || doc.creado_en) || "-")}</small>
+            <small>${esc(formatFileSize(doc))}</small>
+          </footer>
         </article>
       `).join("")}
     </div>
@@ -607,13 +662,16 @@ function renderDocumentPreviewPane(doc, proyecto, state) {
 
   return `
     <div class="docs-preview-header">
-      <h3>Detalle de archivo</h3>
+      <div class="docs-preview-title">
+        <span class="docs-kind-icon ${getDocKind(doc)}">${getDocKindIcon(getDocKind(doc), "sm")}</span>
+        <h3>Detalle de archivo</h3>
+      </div>
       <button class="btn-icon" type="button" id="btn-doc-preview-close">${icons.close}</button>
     </div>
     <div class="docs-preview-tabs">
-      <button class="tab ${state.activePreviewTab === "info" ? "active" : ""}" data-doc-preview-tab="info" type="button">Info</button>
-      <button class="tab ${state.activePreviewTab === "preview" ? "active" : ""}" data-doc-preview-tab="preview" type="button">Vista previa</button>
-      <button class="tab ${state.activePreviewTab === "datos" ? "active" : ""}" data-doc-preview-tab="datos" type="button">Datos</button>
+      <button class="docs-preview-tab ${state.activePreviewTab === "info" ? "active" : ""}" data-doc-preview-tab="info" type="button">Info</button>
+      <button class="docs-preview-tab ${state.activePreviewTab === "preview" ? "active" : ""}" data-doc-preview-tab="preview" type="button">Vista previa</button>
+      <button class="docs-preview-tab ${state.activePreviewTab === "datos" ? "active" : ""}" data-doc-preview-tab="datos" type="button">Datos</button>
     </div>
     <div class="docs-preview-content">
       ${state.activePreviewTab === "info" ? renderDocInfoTab(doc, proyecto) : ""}
@@ -624,36 +682,55 @@ function renderDocumentPreviewPane(doc, proyecto, state) {
 }
 
 function renderDocInfoTab(doc, proyecto) {
+  const isFolder = isDocumentFolder(doc);
   return `
     <div class="docs-info-head">
-      <div class="docs-info-icon">${icons.file}</div>
+      <div class="docs-info-icon ${getDocKind(doc)}">${getDocKindIcon(getDocKind(doc), "lg")}</div>
       <div>
         <strong>${esc(doc.nombre_archivo || "Sin nombre")}</strong>
         <p>${esc(formatTipoDocumento(doc))}</p>
       </div>
     </div>
     <ul class="docs-info-list">
-      <li><span>Tipo</span><strong>${esc(formatTipoDocumento(doc))}</strong></li>
+      <li><span>Tipo</span><strong>${esc(isFolder ? "Carpeta" : formatTipoDocumento(doc))}</strong></li>
       <li><span>Tamaño</span><strong>${esc(formatFileSize(doc))}</strong></li>
       <li><span>Proyecto</span><strong>${esc(proyecto.nombre)}</strong></li>
-      <li><span>Asociado a</span><strong>${esc(formatDocumentoAsociado(doc))}</strong></li>
+      <li><span>Categoría</span><strong>${esc(formatDocumentoAsociado(doc, proyecto.id))}</strong></li>
       <li><span>Subido por</span><strong>${esc(doc.subido_por || "Sistema")}</strong></li>
       <li><span>Fecha creación</span><strong>${esc(formatDocDate(doc.creado_en) || "-")}</strong></li>
       <li><span>Fecha modificación</span><strong>${esc(formatDocDate(doc.actualizado_en || doc.creado_en) || "-")}</strong></li>
-      <li><span>Estado</span><strong>${esc(formatEstadoDocumento(doc.estado_procesamiento))}</strong></li>
     </ul>
   `;
 }
 
 function renderDocPreviewTab(doc) {
+  if (isDocumentFolder(doc)) {
+    return `<p>Las carpetas no tienen vista previa.</p>`;
+  }
   const mime = String(doc.mime_type || "").toLowerCase();
-  if (mime.startsWith("image/")) {
-    return `<p>No hay URL de imagen persistida en el servidor para esta vista previa.</p>`;
+  const fileName = String(doc.nombre_archivo || "").toLowerCase();
+  const fileUrl = getDocFileUrl(doc);
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/i.test(fileName)) {
+    if (!fileUrl) {
+      return `<p>No hay vista previa disponible para este archivo.</p>`;
+    }
+    return `<img src="${esc(fileUrl)}" alt="${esc(doc.nombre_archivo || "Vista previa")}" class="docs-preview-image">`;
   }
-  if (mime.includes("pdf")) {
-    return `<p>Vista previa PDF disponible.</p>`;
+  if (mime.includes("pdf") || /\.pdf$/i.test(fileName)) {
+    if (fileUrl) {
+      return `
+        <div class="docs-preview-embed-wrap">
+          <iframe class="docs-preview-embed" src="${esc(fileUrl)}" title="Vista previa PDF"></iframe>
+          <a class="btn btn-ghost btn-sm" href="${esc(fileUrl)}" target="_blank" rel="noopener noreferrer">${icons.eye} Abrir archivo</a>
+        </div>
+      `;
+    }
+    return `
+      <p>Vista previa PDF disponible.</p>
+      <p style="color:var(--muted);font-size:12px">No se encontró URL de descarga para este documento.</p>
+    `;
   }
-  if (mime.includes("sheet") || mime.includes("excel") || mime.includes("csv")) {
+  if (mime.includes("sheet") || mime.includes("excel") || mime.includes("csv") || /\.(xlsx?|csv)$/i.test(fileName)) {
     return `<p>Archivo Excel cargado.</p>`;
   }
   return `<p>No hay vista previa disponible para este tipo de archivo.</p>`;
@@ -661,7 +738,39 @@ function renderDocPreviewTab(doc) {
 
 function renderDocDatosTab(doc) {
   const data = doc.datos_extraidos || {};
-  return `<pre class="docs-json">${esc(JSON.stringify(data, null, 2) || "{}")}</pre>`;
+  if (!data || !Object.keys(data).length) {
+    return `<p>Sin datos extraídos.</p>`;
+  }
+  return `<pre class="docs-json">${esc(JSON.stringify(data, null, 2))}</pre>`;
+}
+
+function renderFolderModal(state) {
+  if (!state.isFolderModalOpen) return "";
+  const name = String(state.folderNameDraft || "");
+  const trimmed = name.trim();
+  const disabled = state.folderSubmitting || !trimmed;
+  return `
+    <div class="modal-overlay open" id="docs-folder-modal-overlay">
+      <div class="modal-card docs-folder-modal-card" role="dialog" aria-modal="true" aria-labelledby="docs-folder-modal-title">
+        <div class="modal-header">
+          <h2 id="docs-folder-modal-title">Crear nueva carpeta</h2>
+          <button class="btn-icon" type="button" id="btn-docs-folder-modal-close" aria-label="Cerrar">${icons.close}</button>
+        </div>
+        <p class="docs-folder-modal-text">Ingresá el nombre de la carpeta que querés crear para organizar los documentos del proyecto.</p>
+        <div class="form-field">
+          <label for="docs-folder-name-input">Nombre de la carpeta</label>
+          <input id="docs-folder-name-input" type="text" placeholder="Ej: Ofertas, Ábacos, Seguimiento obra" value="${esc(name)}" maxlength="120">
+        </div>
+        ${state.folderError ? `<p class="modal-status">${esc(state.folderError)}</p>` : '<p class="modal-status"></p>'}
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" id="btn-docs-folder-cancel">Cancelar</button>
+          <button class="btn btn-primary" type="button" id="btn-docs-folder-create" ${disabled ? "disabled" : ""}>
+            ${state.folderSubmitting ? "Creando carpeta..." : "Crear carpeta"}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function bindDocumentosEvents(container, proyecto) {
@@ -671,7 +780,7 @@ function bindDocumentosEvents(container, proyecto) {
 
   shell.querySelector("#docs-search-input")?.addEventListener("input", event => {
     state.currentSearchQuery = event.target.value || "";
-    renderFuncionalidadEspecifica(container);
+    refreshDocumentosShell(shell, proyecto, state);
   });
 
   shell.querySelectorAll("[data-docs-view]").forEach(btn => {
@@ -691,10 +800,20 @@ function bindDocumentosEvents(container, proyecto) {
 
   const uploadInput = shell.querySelector("#docs-upload-input");
   shell.querySelector("#btn-docs-upload")?.addEventListener("click", () => uploadInput?.click());
+  shell.querySelectorAll("[data-docs-nav]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const targetId = String(btn.dataset.docsNav || "root");
+      state.currentFolderId = targetId === "root" ? null : targetId;
+      state.selectedItemId = null;
+      state.isPreviewPaneOpen = false;
+      renderFuncionalidadEspecifica(container);
+    });
+  });
 
   uploadInput?.addEventListener("change", async event => {
     const file = event.target.files?.[0];
     if (!file) return;
+    state.docsActionError = "";
     const token = sessionStorage.getItem("controlObraToken");
     const form = new FormData();
     form.append("archivo", file);
@@ -708,29 +827,115 @@ function bindDocumentosEvents(container, proyecto) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "No se pudo subir el documento.");
+      const uploadedId = data.documento_id ? String(data.documento_id) : "";
+      if (uploadedId) {
+        setDocParent(proyecto.id, uploadedId, state.currentFolderId || null);
+        setDocCategory(proyecto.id, uploadedId, normalizeCategoryValue(inferDocumentoAsociado(file, state.quickFilter)));
+      }
       await ensureDocumentosLoaded(container, proyecto.id, true);
     } catch (error) {
-      alert(error.message);
+      state.docsActionError = error.message || "No se pudo subir el documento.";
+      renderFuncionalidadEspecifica(container);
     } finally {
       uploadInput.value = "";
     }
   });
 
-  shell.querySelector("#btn-docs-folder")?.addEventListener("click", async () => {
-    const nombre = window.prompt("Nombre de la carpeta");
+  shell.querySelector("#btn-docs-folder")?.addEventListener("click", () => {
+    state.docsActionError = "";
+    state.folderNameDraft = "";
+    state.folderError = "";
+    state.folderSubmitting = false;
+    state.isFolderModalOpen = true;
+    renderFuncionalidadEspecifica(container);
+  });
+
+  const folderOverlay = shell.querySelector("#docs-folder-modal-overlay");
+  const folderInput = shell.querySelector("#docs-folder-name-input");
+  const closeFolderModal = () => {
+    state.isFolderModalOpen = false;
+    state.folderError = "";
+    state.folderSubmitting = false;
+    renderFuncionalidadEspecifica(container);
+  };
+
+  folderOverlay?.addEventListener("click", event => {
+    if (event.target === folderOverlay && !state.folderSubmitting) closeFolderModal();
+  });
+
+  shell.querySelector("#btn-docs-folder-modal-close")?.addEventListener("click", closeFolderModal);
+  shell.querySelector("#btn-docs-folder-cancel")?.addEventListener("click", closeFolderModal);
+
+  folderInput?.addEventListener("input", event => {
+    state.folderNameDraft = event.target.value || "";
+    state.folderError = "";
+    const createBtn = shell.querySelector("#btn-docs-folder-create");
+    if (createBtn) createBtn.disabled = !state.folderNameDraft.trim() || state.folderSubmitting;
+  });
+
+  folderInput?.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !state.folderSubmitting) {
+      event.preventDefault();
+      closeFolderModal();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      shell.querySelector("#btn-docs-folder-create")?.click();
+    }
+  });
+
+  shell.addEventListener("keydown", event => {
+    if (event.key === "Escape" && state.isFolderModalOpen && !state.folderSubmitting) {
+      event.preventDefault();
+      closeFolderModal();
+    }
+  });
+
+  shell.querySelector("#btn-docs-folder-create")?.addEventListener("click", async () => {
+    const nombre = String(state.folderNameDraft || "").trim();
     if (!nombre) return;
+
+    const docs = getProyectoDocs(proyecto.id);
+    const exists = docs.some(doc => {
+      const tipo = String(doc.tipo_documento || "").toLowerCase();
+      const folderName = String(doc.nombre_archivo || doc.nombre || "").trim().toLowerCase();
+      return tipo === "carpeta" && folderName === nombre.toLowerCase();
+    });
+
+    if (exists) {
+      state.folderError = "Ya existe una carpeta con ese nombre en este proyecto.";
+      renderFuncionalidadEspecifica(container);
+      return;
+    }
+
+    state.folderSubmitting = true;
+    state.folderError = "";
+    renderFuncionalidadEspecifica(container);
     try {
-      await apiPost(`/obras/${proyecto.id}/documentos/carpeta`, { nombre });
+      const data = await apiPost(`/obras/${proyecto.id}/documentos/carpeta`, { nombre });
+      const folderId = data?.documento_id ? String(data.documento_id) : "";
+      if (folderId) {
+        setDocParent(proyecto.id, folderId, state.currentFolderId || null);
+        setDocCategory(proyecto.id, folderId, "otro");
+      }
+      state.isFolderModalOpen = false;
+      state.folderNameDraft = "";
+      state.folderError = "";
+      state.folderSubmitting = false;
       await ensureDocumentosLoaded(container, proyecto.id, true);
     } catch (error) {
-      alert(error.message);
+      state.folderSubmitting = false;
+      state.folderError = error.message || "No se pudo crear la carpeta.";
+      renderFuncionalidadEspecifica(container);
     }
   });
 
   shell.querySelector("#docs-file-area")?.addEventListener("click", event => {
+    if (event.target.closest(".docs-category-select")) return;
     const targetDoc = event.target.closest("[data-doc-select]");
     if (targetDoc) {
-      state.selectedItemId = targetDoc.dataset.docSelect;
+      state.selectedItemId = String(targetDoc.dataset.docSelect || "");
       state.isPreviewPaneOpen = true;
       renderFuncionalidadEspecifica(container);
       return;
@@ -742,6 +947,39 @@ function bindDocumentosEvents(container, proyecto) {
       state.isPreviewPaneOpen = true;
       renderFuncionalidadEspecifica(container);
     }
+  });
+
+  shell.querySelector("#docs-file-area")?.addEventListener("dblclick", event => {
+    if (event.target.closest(".docs-category-select")) return;
+    const targetDoc = event.target.closest("[data-doc-select]");
+    if (!targetDoc) return;
+    const docId = String(targetDoc.dataset.docSelect || "");
+    const doc = getProyectoDocs(proyecto.id).find(item => String(item.id) === docId);
+    if (!doc) return;
+
+    if (isDocumentFolder(doc)) {
+      state.currentFolderId = docId;
+      state.selectedItemId = docId;
+      state.isPreviewPaneOpen = true;
+      state.activePreviewTab = "info";
+      renderFuncionalidadEspecifica(container);
+      return;
+    }
+
+    state.selectedItemId = docId;
+    state.isPreviewPaneOpen = true;
+    state.activePreviewTab = "preview";
+    renderFuncionalidadEspecifica(container);
+  });
+
+  shell.querySelector("#docs-file-area")?.addEventListener("change", event => {
+    const select = event.target.closest("[data-doc-category]");
+    if (!select) return;
+    const docId = String(select.dataset.docCategory || "");
+    const value = normalizeCategoryValue(select.value);
+    if (!docId) return;
+    setDocCategory(proyecto.id, docId, value);
+    refreshDocumentosShell(shell, proyecto, state);
   });
 
   shell.querySelector("#btn-doc-preview-close")?.addEventListener("click", () => {
@@ -762,13 +1000,52 @@ function bindDocumentosEvents(container, proyecto) {
       renderFuncionalidadEspecifica(container);
     });
   });
+
+  if (state.isFolderModalOpen) {
+    const input = shell.querySelector("#docs-folder-name-input");
+    if (input) {
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }, 0);
+    }
+  }
+}
+
+function refreshDocumentosShell(shell, proyecto, state) {
+  const docs = getProyectoDocs(proyecto.id);
+  const docsInFolder = getDocsInCurrentFolder(proyecto.id, docs, state.currentFolderId);
+  const visibleDocs = filterDocumentos(docsInFolder, state, proyecto.id);
+  const selectedDoc = docs.find(d => String(d.id) === String(state.selectedItemId)) || null;
+
+  if (state.selectedItemId && !selectedDoc) {
+    state.selectedItemId = null;
+    state.isPreviewPaneOpen = false;
+  }
+
+  const fileArea = shell.querySelector("#docs-file-area");
+  if (fileArea) {
+    fileArea.innerHTML = state.currentView === "list"
+      ? renderDocumentosTabla(visibleDocs, state.selectedItemId, docs.length, state.currentSearchQuery, state.quickFilter, state.currentFolderId, proyecto.id)
+      : renderDocumentosGrid(visibleDocs, state.selectedItemId, docs.length, state.currentSearchQuery, state.quickFilter, state.currentFolderId);
+  }
+
+  const hasDocs = docs.length > 0;
+  const overlay = shell.querySelector("#docs-preview-overlay");
+  const pane = shell.querySelector("#docs-preview-pane");
+  if (!hasDocs || !overlay || !pane) return;
+
+  const isOpen = Boolean(state.isPreviewPaneOpen && selectedDoc);
+  overlay.classList.toggle("open", isOpen);
+  pane.classList.toggle("open", isOpen);
+  pane.innerHTML = renderDocumentPreviewPane(selectedDoc, proyecto, state);
 }
 
 function inferTipoDocumento(file) {
   const name = String(file.name || "").toLowerCase();
   if (name.includes("oferta")) return "oferta_pdf";
   if (name.includes("abaco") || name.includes("ábaco")) return "abaco_lista";
-  if (name.includes("produccion") || name.includes("producción")) return "lista_produccion";
+  if (name.includes("produccion") || name.includes("producción")) return "abaco_lista";
   return "otro";
 }
 
@@ -779,23 +1056,23 @@ function inferDocumentoAsociado(file, quickFilter) {
   if (name.includes("abaco") || name.includes("ábaco")) return "abaco";
   if (name.includes("fabrica") || name.includes("fábrica")) return "seguimiento_fabrica";
   if (name.includes("obra")) return "seguimiento_obra";
+  if (name.includes("produccion") || name.includes("producción")) return "abaco";
   return "otro";
 }
 
 function matchesQuickBucket(doc, bucket) {
   if (bucket.tipo && doc.tipo_documento === bucket.tipo) return true;
-  const asociado = (doc.documento_asociado || doc.datos_extraidos?.documento_asociado || "otro").toLowerCase();
+  const asociado = normalizeCategoryValue(doc.documento_asociado || doc.datos_extraidos?.documento_asociado || "otro");
   if (bucket.asociado && asociado === bucket.asociado) return true;
   if (bucket.key === "abaco" && asociado === "abaco") return true;
   if (bucket.key === "oferta" && asociado === "oferta") return true;
-  if (bucket.key === "lista_produccion" && asociado === "lista_produccion") return true;
   if (bucket.fallback) {
-    return !["oferta", "abaco", "lista_produccion", "seguimiento_fabrica", "seguimiento_obra"].includes(asociado);
+    return !["oferta", "abaco", "seguimiento_fabrica", "seguimiento_obra"].includes(asociado);
   }
   return false;
 }
 
-function filterDocumentos(docs, state) {
+function filterDocumentos(docs, state, proyectoId = null) {
   return docs.filter(doc => {
     if (state.quickFilter !== "todos") {
       const bucket = DOCUMENT_QUICK_BUCKETS.find(item => item.key === state.quickFilter) || { key: state.quickFilter };
@@ -808,9 +1085,191 @@ function filterDocumentos(docs, state) {
       doc.tipo_documento,
       doc.mime_type,
       doc.subido_por,
-      doc.documento_asociado
+      doc.documento_asociado,
+      proyectoId ? formatDocumentoAsociado(doc, proyectoId) : ""
     ].some(v => String(v || "").toLowerCase().includes(query));
   });
+}
+
+function renderDocsEmptyState(totalDocsCount, searchQuery, quickFilter, currentFolderId = null) {
+  if (!totalDocsCount) {
+    return renderEmpty("Sin documentos en esta vista", "Carga un documento o crea una carpeta para comenzar.");
+  }
+
+  if ((searchQuery || "").trim()) {
+    return renderEmpty("No se encontraron documentos.", "Prueba con otro término de búsqueda.");
+  }
+
+  if (currentFolderId) {
+    return renderEmpty("Esta carpeta está vacía", "Carga un documento o crea una carpeta para comenzar.");
+  }
+
+  if (quickFilter && quickFilter !== "todos") {
+    return renderEmpty("Sin documentos en esta vista", "No hay documentos para la categoría seleccionada.");
+  }
+
+  return renderEmpty("Sin documentos en esta vista", "Carga un documento o crea una carpeta para comenzar.");
+}
+
+function getDocsInCurrentFolder(proyectoId, docs, folderId) {
+  const parentMap = getDocParentMap(proyectoId);
+  return docs.filter(doc => {
+    const id = String(doc.id || "");
+    const parentId = parentMap.get(id) ?? null;
+    if (!folderId) return !parentId;
+    return String(parentId || "") === String(folderId);
+  });
+}
+
+function getDocumentBreadcrumbs(proyectoId, docs, currentFolderId, selectedDoc) {
+  const parentMap = getDocParentMap(proyectoId);
+  const byId = new Map(docs.map(doc => [String(doc.id || ""), doc]));
+  const crumbs = [{ id: "root", label: "Documentos" }];
+
+  let cursor = currentFolderId ? String(currentFolderId) : "";
+  const seen = new Set();
+  const chain = [];
+  while (cursor && byId.has(cursor) && !seen.has(cursor)) {
+    seen.add(cursor);
+    const current = byId.get(cursor);
+    chain.push({ id: cursor, label: current?.nombre_archivo || "Carpeta" });
+    cursor = String(parentMap.get(cursor) || "");
+  }
+  chain.reverse().forEach(item => crumbs.push(item));
+
+  if (selectedDoc && !isDocumentFolder(selectedDoc)) {
+    crumbs.push({ id: null, label: selectedDoc.nombre_archivo || "Archivo" });
+  }
+  return crumbs;
+}
+
+function getProyectoDocs(proyectoId) {
+  const docs = documentosByProyecto.get(proyectoId);
+  if (!Array.isArray(docs)) return [];
+  return docs;
+}
+
+function getDocParentMap(proyectoId) {
+  if (!documentosParentByProyecto.has(proyectoId)) {
+    documentosParentByProyecto.set(proyectoId, new Map());
+  }
+  return documentosParentByProyecto.get(proyectoId);
+}
+
+function getDocCategoryMap(proyectoId) {
+  if (!documentosCategoryByProyecto.has(proyectoId)) {
+    documentosCategoryByProyecto.set(proyectoId, new Map());
+  }
+  return documentosCategoryByProyecto.get(proyectoId);
+}
+
+function hydrateDocumentMeta(proyectoId, docs) {
+  const parentMap = getDocParentMap(proyectoId);
+  const categoryMap = getDocCategoryMap(proyectoId);
+  for (const doc of docs) {
+    const id = String(doc.id || "");
+    if (!id) continue;
+    if (!parentMap.has(id)) {
+      const parent = doc.parent_id || doc.carpeta_padre_id || doc.datos_extraidos?.parent_id || null;
+      parentMap.set(id, parent ? String(parent) : null);
+    }
+    if (!categoryMap.has(id)) {
+      const raw = doc.documento_asociado || doc.datos_extraidos?.documento_asociado || "otro";
+      categoryMap.set(id, normalizeCategoryValue(raw));
+    }
+  }
+}
+
+function setDocParent(proyectoId, docId, parentId) {
+  const map = getDocParentMap(proyectoId);
+  map.set(String(docId), parentId ? String(parentId) : null);
+}
+
+function getDocCategory(doc, proyectoId) {
+  const map = getDocCategoryMap(proyectoId);
+  const id = String(doc.id || "");
+  const persisted = map.get(id);
+  if (persisted) return normalizeCategoryValue(persisted);
+  return normalizeCategoryValue(doc.documento_asociado || doc.datos_extraidos?.documento_asociado || "otro");
+}
+
+function setDocCategory(proyectoId, docId, value) {
+  const map = getDocCategoryMap(proyectoId);
+  map.set(String(docId), normalizeCategoryValue(value));
+}
+
+function normalizeCategoryValue(value) {
+  const v = String(value || "otro").trim().toLowerCase();
+  if (v === "lista_produccion") return "abaco";
+  if (DOC_CATEGORY_OPTIONS.some(option => option.value === v)) return v;
+  return "otro";
+}
+
+function renderCategorySelect(doc, proyectoId) {
+  const selected = getDocCategory(doc, proyectoId);
+  const options = DOC_CATEGORY_OPTIONS.map(option => (
+    `<option value="${esc(option.value)}" ${option.value === selected ? "selected" : ""}>${esc(option.label)}</option>`
+  )).join("");
+  return `<select class="docs-category-select" data-doc-category="${esc(doc.id)}">${options}</select>`;
+}
+
+function getDocFileUrl(doc) {
+  const direct = doc.url_archivo || doc.archivo_url || doc.file_url || doc.download_url || doc.url || null;
+  if (!direct) return null;
+  const raw = String(direct).trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("/")) return raw;
+  return `/${raw}`;
+}
+
+function getQuickFilterLabel(key) {
+  const bucket = DOCUMENT_QUICK_BUCKETS.find(item => item.key === key);
+  return bucket?.label || "Filtro";
+}
+
+function getDocKind(doc) {
+  const tipo = String(doc?.tipo_documento || "").toLowerCase();
+  const mime = String(doc?.mime_type || "").toLowerCase();
+  const file = String(doc?.nombre_archivo || "").toLowerCase();
+  if (isDocumentFolder(doc)) return "folder";
+  if (mime.includes("pdf") || file.endsWith(".pdf") || tipo === "oferta_pdf") return "pdf";
+  if (mime.includes("sheet") || mime.includes("excel") || /\.(xlsx?|csv)$/i.test(file) || tipo === "abaco_lista" || tipo === "lista_produccion") return "excel";
+  if (mime.includes("word") || /\.(docx?)$/i.test(file)) return "word";
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file)) return "image";
+  return "file";
+}
+
+function isDocumentFolder(doc) {
+  const tipo = String(doc?.tipo_documento || "").toLowerCase();
+  return tipo === "carpeta" || Boolean(doc?.es_carpeta) || Boolean(doc?.datos_extraidos?.es_carpeta);
+}
+
+function bucketIconKind(key) {
+  if (key === "oferta") return "pdf";
+  if (key === "abaco") return "excel";
+  if (key === "seguimiento_fabrica" || key === "seguimiento_obra") return "file";
+  if (key === "otros") return "folder";
+  return "file";
+}
+
+function getDocKindIcon(kind, size = "sm") {
+  const cls = `docs-svg docs-svg-${size}`;
+  const base = {
+    folder: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3V7z"/><path d="M3 10h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7z"/></svg>`,
+    pdf: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><path d="M8 15h2.2a1.8 1.8 0 0 0 0-3.6H8V17"/><path d="M12 17v-5.6h1.6a2.8 2.8 0 1 1 0 5.6H12z"/><path d="M17 11.4h-2V17"/></svg>`,
+    excel: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><path d="M8 11l3 6"/><path d="M11 11l-3 6"/><path d="M13.5 13h3.5"/><path d="M13.5 16h3.5"/></svg>`,
+    word: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><path d="M8 11l1.2 6L11 13l1.8 4 1.2-6"/></svg>`,
+    image: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.4"/><path d="M20 16l-4.2-4.2a1.3 1.3 0 0 0-1.8 0L7 19"/></svg>`,
+    file: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/></svg>`
+  };
+  return base[kind] || base.file;
+}
+
+function renderDocsViewIcon(mode) {
+  if (mode === "list") {
+    return '<svg class="docs-svg docs-svg-md" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="7" x2="20" y2="7"/><line x1="6" y1="12" x2="20" y2="12"/><line x1="6" y1="17" x2="20" y2="17"/><circle cx="3.5" cy="7" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="17" r="1"/></svg>';
+  }
+  return '<svg class="docs-svg docs-svg-md" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>';
 }
 
 function formatTipoDocumento(doc) {
@@ -818,7 +1277,7 @@ function formatTipoDocumento(doc) {
     carpeta: "Carpeta",
     oferta_pdf: "Oferta PDF",
     abaco_lista: "Ábaco",
-    lista_produccion: "Lista producción",
+    lista_produccion: "Ábaco",
     seguimiento_fabrica: "Seguimiento fábrica",
     seguimiento_obra: "Seguimiento obra",
     otro: "Otro"
@@ -826,12 +1285,12 @@ function formatTipoDocumento(doc) {
   return map[String(doc.tipo_documento || "").toLowerCase()] || "Documento";
 }
 
-function formatDocumentoAsociado(doc) {
-  const value = String(doc.documento_asociado || doc.datos_extraidos?.documento_asociado || "otro").toLowerCase();
+function formatDocumentoAsociado(doc, proyectoId = null) {
+  const base = proyectoId ? getDocCategory(doc, proyectoId) : (doc.documento_asociado || doc.datos_extraidos?.documento_asociado || "otro");
+  const value = normalizeCategoryValue(base);
   const map = {
     oferta: "Oferta",
     abaco: "Ábaco",
-    lista_produccion: "Lista de producción",
     seguimiento_fabrica: "Seguimiento fábrica",
     seguimiento_obra: "Seguimiento obra",
     otro: "Otro"
