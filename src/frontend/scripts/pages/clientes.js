@@ -979,14 +979,22 @@ function renderListSkeleton(rows = 4) {
 async function uploadOfertaDocumento(proyectoId, file) {
   const token = sessionStorage.getItem("controlObraToken");
   const form = new FormData();
+  const loadingDetail = {
+    source: "request",
+    method: "POST",
+    path: `/obras/${encodeURIComponent(proyectoId)}/documentos/oferta`
+  };
   form.append("archivo", file);
   form.append("tipo_documento", "oferta_pdf");
   form.append("documento_asociado", "oferta");
 
+  window.dispatchEvent(new CustomEvent("co:loading:start", { detail: loadingDetail }));
   const response = await fetch(`/api/admin/obras/${encodeURIComponent(proyectoId)}/documentos/oferta`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form
+  }).finally(() => {
+    window.dispatchEvent(new CustomEvent("co:loading:end", { detail: loadingDetail }));
   });
 
   const data = await response.json().catch(() => ({}));

@@ -8,7 +8,12 @@ function getToken() {
 export async function api(path, options = {}) {
   const token = getToken();
   const notifyLoading = options.notifyLoading !== false;
-  if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:start"));
+  const loadingDetail = {
+    source: "request",
+    method: String(options.method ?? "GET").toUpperCase(),
+    path
+  };
+  if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:start", { detail: loadingDetail }));
 
   try {
     const response = await fetch(`${BASE}${path}`, {
@@ -33,7 +38,7 @@ export async function api(path, options = {}) {
 
     return data;
   } finally {
-    if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:end"));
+    if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:end", { detail: loadingDetail }));
   }
 }
 

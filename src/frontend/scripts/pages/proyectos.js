@@ -78,7 +78,7 @@ function renderMain(container) {
           <p class="subtitle">Gestión integral de obras y seguimiento</p>
         </div>
         <div style="display: flex; gap: 1rem;">
-          <div class="view-toggles" style="display: flex; background: var(--bg-alt); padding: 4px; border-radius: 8px;">
+          <div class="view-toggles">
             <button class="btn btn-ghost btn-sm ${currentView === 'list' ? 'active' : ''}" data-view="list" title="Vista Lista (Popover)">${icons.list}</button>
             <button class="btn btn-ghost btn-sm ${currentView === 'grid' ? 'active' : ''}" data-view="grid" title="Vista Tarjetas (Acordeón)">${icons.grid}</button>
             <button class="btn btn-ghost btn-sm ${currentView === 'kanban' ? 'active' : ''}" data-view="kanban" title="Vista Kanban">${icons.kanban}</button>
@@ -121,57 +121,56 @@ function renderMain(container) {
 function renderGridView() {
   const filtered = filterObras();
   return `
-    <style>
-      .accordion-card { border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); overflow: hidden; }
-      .btn-module:hover { border-color: var(--primario) !important; background: var(--bg-alt) !important; transform: translateY(-2px); }
-    </style>
-    <div style="display: grid; gap: 1.5rem; grid-template-columns: 1fr;">
+    <div class="accordion-list">
       ${filtered.map(o => `
         <div class="accordion-card" data-id="${o.id}">
-          <div class="accordion-header" style="padding: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 1.5rem; flex: 1; flex-wrap: wrap;">
-              <div style="min-width: 200px;">
-                <h3 style="margin:0; font-size: 1.1rem; color: var(--fg)">${esc(o.nombre)}</h3>
-                <p style="margin:0; font-size: 0.85rem; color: var(--muted)">Cliente: ${esc(o.cliente_nombre || "Sin cliente")}</p>
+          <div class="accordion-header">
+            <div class="accordion-summary">
+              <div class="accordion-project-meta">
+                <h3>${esc(o.nombre)}</h3>
+                <p>Cliente: ${esc(o.cliente_nombre || "Sin cliente")}</p>
               </div>
-              <div style="display:flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
-                <div>
-                  <span style="font-size: 0.75rem; color: var(--muted); display: block;">Líder</span>
-                  <span style="font-size: 0.85rem; font-weight: 500;">${esc(o.responsable || "No asignado")}</span>
+              <div class="accordion-facts">
+                <div class="accordion-fact">
+                  <span>Líder</span>
+                  <strong>${esc(o.responsable || "No asignado")}</strong>
                 </div>
-                <div>
-                  <span style="font-size: 0.75rem; color: var(--muted); display: block;">Fin Instalación</span>
-                  <span style="font-size: 0.85rem; font-weight: 500;">${formatDate(o.fecha_fin_instalacion) || "-"}</span>
+                <div class="accordion-fact">
+                  <span>Fin Instalación</span>
+                  <strong>${formatDate(o.fecha_fin_instalacion) || "-"}</strong>
                 </div>
                 <div>${renderBadge(o.estado || "planificada")}</div>
-                <div style="display:flex; align-items: center; gap: 0.5rem;" title="Semáforo del Proyecto">
-                  <div style="width: 16px; height: 16px; border-radius: 50%; background: #6b7280; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);"></div>
+                <div class="accordion-signal" title="Semáforo del Proyecto">
+                  <span class="accordion-dot"></span>
+                  <small>Semáforo</small>
                 </div>
               </div>
             </div>
-            <div class="accordion-icon" style="transition: transform 0.3s; color: var(--muted); margin-left: 1rem;">
+            <div class="accordion-icon">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
           </div>
-          <div class="accordion-body" style="display: none; padding: 1.5rem; border-top: 1px solid var(--border); background: var(--bg-alt);">
-            <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; margin-top: 0;">Módulos del Proyecto</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-              <button class="btn-module" data-module="resumen" data-id="${o.id}" style="padding: 1.25rem; text-align: left; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); transition: all 0.2s;">
-                <h4 style="margin: 0; color: var(--primario);">Resumen</h4>
-                <p style="margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--muted);">Dashboard y avance general</p>
-              </button>
-              <button class="btn-module" data-module="documentos" data-id="${o.id}" style="padding: 1.25rem; text-align: left; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); transition: all 0.2s;">
-                <h4 style="margin: 0; color: var(--primario);">Documentos</h4>
-                <p style="margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--muted);">Archivos y adjuntos</p>
-              </button>
-              <button class="btn-module" data-module="cronogramas" data-id="${o.id}" style="padding: 1.25rem; text-align: left; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); transition: all 0.2s;">
-                <h4 style="margin: 0; color: var(--primario);">Cronogramas</h4>
-                <p style="margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--muted);">Oferta, fechas e ítems</p>
-              </button>
-              <button class="btn-module" data-module="seguimientos" data-id="${o.id}" style="padding: 1.25rem; text-align: left; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); transition: all 0.2s;">
-                <h4 style="margin: 0; color: var(--primario);">Seguimientos</h4>
-                <p style="margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--muted);">Fábrica e instalación (Ábaco)</p>
-              </button>
+          <div class="accordion-body">
+            <div class="accordion-body-inner">
+              <p class="accordion-body-intro">Módulos del proyecto</p>
+              <div class="accordion-module-grid">
+                <button class="accordion-module-btn btn-module" data-module="resumen" data-id="${o.id}" type="button">
+                  <h4>Resumen</h4>
+                  <p>Dashboard y avance general</p>
+                </button>
+                <button class="accordion-module-btn btn-module" data-module="documentos" data-id="${o.id}" type="button">
+                  <h4>Documentos</h4>
+                  <p>Archivos y adjuntos</p>
+                </button>
+                <button class="accordion-module-btn btn-module" data-module="cronogramas" data-id="${o.id}" type="button">
+                  <h4>Cronogramas</h4>
+                  <p>Oferta, fechas e ítems</p>
+                </button>
+                <button class="accordion-module-btn btn-module" data-module="seguimientos" data-id="${o.id}" type="button">
+                  <h4>Seguimientos</h4>
+                  <p>Fábrica e instalación (Ábaco)</p>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -815,15 +814,23 @@ function bindDocumentosEvents(container, proyecto) {
     if (!file) return;
     state.docsActionError = "";
     const token = sessionStorage.getItem("controlObraToken");
+    const loadingDetail = {
+      source: "request",
+      method: "POST",
+      path: `/obras/${proyecto.id}/documentos`
+    };
     const form = new FormData();
     form.append("archivo", file);
     form.append("tipo_documento", inferTipoDocumento(file));
     form.append("documento_asociado", inferDocumentoAsociado(file, state.quickFilter));
     try {
+      window.dispatchEvent(new CustomEvent("co:loading:start", { detail: loadingDetail }));
       const res = await fetch(`/api/admin/obras/${proyecto.id}/documentos`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form
+      }).finally(() => {
+        window.dispatchEvent(new CustomEvent("co:loading:end", { detail: loadingDetail }));
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "No se pudo subir el documento.");
@@ -1630,19 +1637,16 @@ function bindMainEvents(container) {
       const header = e.target.closest(".accordion-header");
       if (header) {
         const card = header.closest(".accordion-card");
-        const body = card.querySelector(".accordion-body");
-        const icon = card.querySelector(".accordion-icon");
-        
-        const isExpanded = body.style.display === "block";
-        
-        // Cerrar todos los demás
-        viewContainer.querySelectorAll(".accordion-body").forEach(b => b.style.display = "none");
-        viewContainer.querySelectorAll(".accordion-icon").forEach(i => i.style.transform = "rotate(0deg)");
+        const isExpanded = card.classList.contains("is-open");
+
+        viewContainer.querySelectorAll(".accordion-card.is-open").forEach(openCard => {
+          openCard.classList.remove("is-open");
+        });
 
         if (!isExpanded) {
-          body.style.display = "block";
-          icon.style.transform = "rotate(180deg)";
+          card.classList.add("is-open");
         }
+        return;
       }
       
       const btnModule = e.target.closest(".btn-module");

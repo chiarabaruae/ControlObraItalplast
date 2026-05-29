@@ -130,6 +130,66 @@ export function renderEmpty(message, sub = "Carga manual desde el botón Nuevo."
 
 let routeLoading = false;
 let requestLoadingCount = 0;
+let overlayVisible = false;
+let overlayTimer = null;
+
+const ROUTE_OVERLAY_DELAY_MS = 110;
+const REQUEST_OVERLAY_DELAY_MS = 180;
+
+function getOverlayMode() {
+  if (routeLoading) return "route";
+  if (requestLoadingCount > 0) return "request";
+  return "";
+}
+
+function showLoadingOverlay() {
+  const mode = getOverlayMode();
+  if (!mode) return;
+  const overlay = document.getElementById("app-loading-overlay");
+  if (!overlay) return;
+
+  overlay.dataset.mode = mode;
+  overlay.classList.add("is-visible");
+  overlay.setAttribute("aria-hidden", "false");
+  overlayVisible = true;
+}
+
+function hideLoadingOverlay() {
+  if (overlayTimer) {
+    clearTimeout(overlayTimer);
+    overlayTimer = null;
+  }
+
+  const overlay = document.getElementById("app-loading-overlay");
+  if (!overlay) {
+    overlayVisible = false;
+    return;
+  }
+
+  overlay.classList.remove("is-visible");
+  overlay.setAttribute("aria-hidden", "true");
+  delete overlay.dataset.mode;
+  overlayVisible = false;
+}
+
+function syncLoadingOverlay() {
+  const mode = getOverlayMode();
+
+  if (!mode) {
+    hideLoadingOverlay();
+    return;
+  }
+
+  if (overlayVisible) return;
+  if (overlayTimer) return;
+
+  const delay = mode === "route" ? ROUTE_OVERLAY_DELAY_MS : REQUEST_OVERLAY_DELAY_MS;
+  overlayTimer = window.setTimeout(() => {
+    overlayTimer = null;
+    if (!getOverlayMode()) return;
+    showLoadingOverlay();
+  }, delay);
+}
 
 function skeletonTypeFromPath(path = "") {
   if (path.startsWith("/proyectos/")) return "proyecto-detalle";
@@ -192,22 +252,26 @@ export function showRouteSkeleton(path) {
   const type = skeletonTypeFromPath(path);
   root.dataset.loading = "true";
   root.innerHTML = `<section class="skeleton-view">${skeletonBlocks(type)}</section>`;
+  syncLoadingOverlay();
 }
 
 export function hideRouteSkeleton() {
   routeLoading = false;
-  if (requestLoadingCount > 0) return;
   const root = document.getElementById("page-content");
-  if (!root) return;
-  delete root.dataset.loading;
+  if (root && requestLoadingCount === 0) {
+    delete root.dataset.loading;
+  }
+  syncLoadingOverlay();
 }
 
 function updateRequestLoading(nextCount) {
   requestLoadingCount = Math.max(0, nextCount);
   const root = document.getElementById("page-content");
-  if (!root) return;
-  if (requestLoadingCount > 0) root.dataset.loading = "true";
-  if (requestLoadingCount === 0 && !routeLoading) delete root.dataset.loading;
+  if (root) {
+    if (requestLoadingCount > 0) root.dataset.loading = "true";
+    if (requestLoadingCount === 0 && !routeLoading) delete root.dataset.loading;
+  }
+  syncLoadingOverlay();
 }
 
 window.addEventListener("co:loading:start", () => {

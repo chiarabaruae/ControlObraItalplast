@@ -52,6 +52,9 @@ export function renderLayout(container, user) {
           </div>
         </div>
       </header>
+      <div class="app-loading-overlay" id="app-loading-overlay" aria-hidden="true">
+        <div class="app-loading-spinner" role="status" aria-live="polite" aria-label="Cargando"></div>
+      </div>
       <div class="page-content" id="page-content">
         <div class="loading">Cargando...</div>
       </div>
