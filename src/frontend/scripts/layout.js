@@ -1,11 +1,12 @@
 // Layout: Sidebar + Topbar rendering
 import { icons, getInitials } from "./ui.js";
 import { navigate, getCurrentPath } from "./router.js";
+import { canAccessProjectWorkspace } from "./authz.js";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard", path: "/dashboard" },
   { id: "clientes", label: "Clientes", icon: "clientes", path: "/clientes" },
-  { id: "obras", label: "Obras", icon: "obras", path: "/proyectos" },
+  { id: "obras", label: "Obras", icon: "obras", path: "/proyectos", projectWorkspaceOnly: true },
   { id: "tareas", label: "To-Do", icon: "tareas", path: "/todo" },
   { id: "personalizar", label: "Personalizar", icon: "personalizar", path: "/personalizar" },
   { id: "ajustes", label: "Ajustes", icon: "personalizar", path: "/ajustes/usuarios", adminOnly: true },
@@ -69,8 +70,12 @@ function renderNav() {
   const nav = document.getElementById("side-nav");
   if (!nav) return;
   const current = getCurrentPath();
-  const isAdmin = nav.dataset.role === "administrator";
-  nav.innerHTML = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map(item => {
+  const role = nav.dataset.role || "";
+  nav.innerHTML = NAV_ITEMS.filter(item => {
+    if (item.adminOnly && role !== "administrator") return false;
+    if (item.projectWorkspaceOnly && !canAccessProjectWorkspace(role)) return false;
+    return true;
+  }).map(item => {
     const isActive = current.startsWith(item.path) ? "active" : "";
     return `<button class="nav-item ${isActive}" data-path="${item.path}" type="button">
       ${icons[item.icon]}

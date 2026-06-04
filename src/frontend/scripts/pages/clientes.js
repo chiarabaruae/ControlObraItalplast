@@ -2,6 +2,7 @@ import { apiGet, apiPost } from "../api.js";
 import { icons, esc, renderEmpty, formatDate } from "../ui.js";
 import { setTopbarSection, setSidebarClients } from "../layout.js";
 import { navigate } from "../router.js";
+import { canAccessProjectWorkspace } from "../authz.js";
 
 const PAGE_SIZE = 30;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -31,9 +32,11 @@ const loadingAccordionKeys = new Set();
 const openClienteKeys = new Set();
 const tagsDraftByClient = new Map();
 let editingTagIndex = null;
+let currentUserRole = "";
 
-export async function renderClientes(container) {
+export async function renderClientes(container, currentUser = null) {
   setTopbarSection("Clientes");
+  currentUserRole = currentUser?.role || "";
   isLoading = true;
   container.innerHTML = renderPageSkeleton();
 
@@ -414,9 +417,10 @@ function renderAccordionContent(item) {
           </div>
           <div class="cliente-project-actions">
             <span class="badge badge-control-neutral">${esc(formatProjectEstado(project.estado || "pendiente_de_planificacion"))}</span>
-            <button class="btn btn-ghost btn-sm" type="button" data-action="ver-proyecto" data-project-id="${esc(project.id)}">
-              Ver proyecto
-            </button>
+            ${canAccessProjectWorkspace(currentUserRole)
+              ? `<button class="btn btn-ghost btn-sm" type="button" data-action="ver-proyecto" data-project-id="${esc(project.id)}">Ver proyecto</button>`
+              : `<span class="modal-status">Acceso restringido</span>`
+            }
           </div>
         </article>
       `
@@ -579,7 +583,11 @@ function bindEvents(container) {
     }
 
     if (action === "ver-proyecto") {
-      navigate("/proyectos");
+      if (canAccessProjectWorkspace(currentUserRole)) {
+        navigate(`/proyectos/${button.dataset.projectId}`);
+      } else {
+        navigate("/todo");
+      }
       return;
     }
 

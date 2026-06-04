@@ -1,6 +1,9 @@
 import { Router } from "express";
 import multer from "multer";
 import { createRequire } from "node:module";
+import { mkdir, writeFile, access } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 import * as xlsx from "xlsx";
@@ -29,6 +32,17 @@ function addBusinessDays(startDate, daysToAdd) {
 }
 
 const upload = multer({ storage: multer.memoryStorage() });
+const DOCUMENTS_STORAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../storage/documentos");
+
+async function persistUploadedDocument(file, documentId) {
+  await mkdir(DOCUMENTS_STORAGE_DIR, { recursive: true });
+  const originalExt = path.extname(file.originalname || "").toLowerCase();
+  const safeExt = originalExt && originalExt.length <= 8 ? originalExt : "";
+  const fileName = `${documentId}${safeExt}`;
+  const filePath = path.join(DOCUMENTS_STORAGE_DIR, fileName);
+  await writeFile(filePath, file.buffer);
+  return filePath;
+}
 
 export function createProyectosRoutes(container) {
   const router = Router();
@@ -74,6 +88,43 @@ export function createProyectosRoutes(container) {
     }
   });
 
+  router.get("/obras/:id/documentos/:documentoId/archivo", async (request, response, next) => {
+    try {
+      const { id: proyectoId, documentoId } = request.params;
+      const result = await container.pool.query(
+        `
+          select id, nombre_archivo, ruta_archivo, mime_type
+          from documentos_proyecto
+          where id = $1 and proyecto_id = $2
+          limit 1
+        `,
+        [documentoId, proyectoId]
+      );
+
+      if (!result.rows.length) {
+        response.status(404).json({ error: "Documento no encontrado." });
+        return;
+      }
+
+      const doc = result.rows[0];
+      if (!doc.ruta_archivo) {
+        response.status(404).json({ error: "El documento no tiene archivo asociado." });
+        return;
+      }
+
+      await access(doc.ruta_archivo);
+      response.setHeader("Content-Disposition", `inline; filename="${doc.nombre_archivo || "documento"}"`);
+      response.type(doc.mime_type || "application/octet-stream");
+      response.sendFile(doc.ruta_archivo);
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        response.status(404).json({ error: "El archivo ya no existe en el servidor." });
+        return;
+      }
+      next(error);
+    }
+  });
+
   // POST /api/admin/obras/:id/documentos
   router.post("/obras/:id/documentos", upload.single("archivo"), async (request, response, next) => {
     try {
@@ -85,27 +136,27 @@ export function createProyectosRoutes(container) {
       const fileName = request.file.originalname;
       const mimeType = request.file.mimetype;
       const sizeBytes = request.file.size ?? 0;
-      const asociado = String(request.body?.documento_asociado || "otro").trim().toLowerCase() || "otro";
       const docType = String(request.body?.tipo_documento || "otro").trim().toLowerCase() || "otro";
       const docId = randomUUID();
+      const rutaArchivo = await persistUploadedDocument(request.file, docId);
 
       await container.pool.query(
         `
         INSERT INTO documentos_proyecto (
-          id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento, datos_extraidos, creado_por
+          id, proyecto_id, tipo_documento, nombre_archivo, ruta_archivo, mime_type, estado_procesamiento, datos_extraidos, creado_por
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         `,
         [
           docId,
           proyectoId,
           docType,
           fileName,
+          rutaArchivo,
           mimeType,
           "procesado",
           {
             size_bytes: sizeBytes,
-            documento_asociado: asociado,
             nombre_original: fileName
           },
           request.user?.sub || null
@@ -175,12 +226,13 @@ export function createProyectosRoutes(container) {
 
       // 1. Guardar registro del documento
       const docId = randomUUID();
+      const rutaArchivo = await persistUploadedDocument(request.file, docId);
       await container.pool.query(
         `
-        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento, creado_por)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, ruta_archivo, mime_type, estado_procesamiento, creado_por)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
-        [docId, proyectoId, "oferta_pdf", fileName, request.file.mimetype, "pendiente", request.user?.sub || null]
+        [docId, proyectoId, "oferta_pdf", fileName, rutaArchivo, request.file.mimetype, "pendiente", request.user?.sub || null]
       );
 
       // 2. Procesar el PDF y extraer texto
@@ -405,12 +457,13 @@ export function createProyectosRoutes(container) {
 
       // Guardar documento
       const docId = randomUUID();
+      const rutaArchivo = await persistUploadedDocument(request.file, docId);
       await container.pool.query(
         `
-        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, mime_type, estado_procesamiento, creado_por)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO documentos_proyecto (id, proyecto_id, tipo_documento, nombre_archivo, ruta_archivo, mime_type, estado_procesamiento, creado_por)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
-        [docId, proyectoId, "abaco_lista", fileName, request.file.mimetype, "pendiente", request.user?.sub || null]
+        [docId, proyectoId, "abaco_lista", fileName, rutaArchivo, request.file.mimetype, "pendiente", request.user?.sub || null]
       );
 
       // Procesar archivo Excel

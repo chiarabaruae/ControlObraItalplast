@@ -86,12 +86,12 @@ export function createAdminRoutes(container) {
   registerClientes(router, container, admin);
   registerObras(router, container.pool, admin);
   registerTareas(router, container.pool, admin);
-  registerUsuarios(router, container.pool, admin);
+  registerUsuarios(router, container.pool, admin, auth);
 
   return router;
 }
 
-function registerUsuarios(router, pool, admin) {
+function registerUsuarios(router, pool, admin, auth) {
   router.get("/usuarios", admin, async (_request, response, next) => {
     try {
       const result = await pool.query(`
@@ -114,9 +114,14 @@ function registerUsuarios(router, pool, admin) {
     }
   });
 
-  // Listado ligero para asignaciones (solo activos). Admin-only por requerimiento.
-  router.get("/usuarios/activos", admin, async (_request, response, next) => {
+  // Listado ligero para asignaciones dentro del espacio de proyecto.
+  router.get("/usuarios/activos", auth, async (request, response, next) => {
     try {
+      if (!["administrator", "supervisor"].includes(request.user.role)) {
+        response.status(403).json({ error: "Acceso denegado." });
+        return;
+      }
+
       const result = await pool.query(
         `
           select id, username, display_name, role
@@ -541,8 +546,24 @@ function registerObras(router, pool, admin) {
 
   router.get("/obras/:id", async (request, response, next) => {
     try {
-      const row = await findOne(pool, "obras", request.params.id);
-      sendFound(response, row);
+      const result = await pool.query(
+        `
+          select
+            o.*,
+            coalesce(o.cliente_nombre_snapshot, c.nombre) as cliente_nombre,
+            e.nombre as etapa_kanban_nombre,
+            e.orden as etapa_kanban_orden,
+            u.display_name as lider_nombre
+          from obras o
+          left join clientes c on c.id = o.cliente_id
+          left join etapas_kanban_obra e on e.id = o.etapa_kanban_id
+          left join app_users u on u.id = o.lider_usuario_id
+          where o.id = $1
+          limit 1
+        `,
+        [request.params.id]
+      );
+      sendFound(response, result.rows[0]);
     } catch (error) {
       next(error);
     }

@@ -1,6 +1,7 @@
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from "../api.js";
 import { icons, esc, renderBadge, renderProgress, renderEmpty, formatDate } from "../ui.js";
 import { setTopbarSection } from "../layout.js";
+import { navigate } from "../router.js";
 
 // Estado de la aplicación
 let obras = [];
@@ -1986,23 +1987,14 @@ function bindMainEvents(container) {
       const header = e.target.closest(".accordion-header");
       if (header) {
         const card = header.closest(".accordion-card");
-        const isExpanded = card.classList.contains("is-open");
-
-        viewContainer.querySelectorAll(".accordion-card.is-open").forEach(openCard => {
-          openCard.classList.remove("is-open");
-        });
-
-        if (!isExpanded) {
-          card.classList.add("is-open");
-        }
+        if (card?.dataset?.id) navigate(`/proyectos/${card.dataset.id}`);
         return;
       }
       
       const btnModule = e.target.closest(".btn-module");
       if (btnModule) {
-        activeTab = btnModule.getAttribute("data-module");
-        activeProjectId = btnModule.getAttribute("data-id");
-        renderMain(container); // Re-renderizamos para montar la Vista 2
+        const projectId = btnModule.getAttribute("data-id");
+        if (projectId) navigate(`/proyectos/${projectId}`);
       }
     });
   }
