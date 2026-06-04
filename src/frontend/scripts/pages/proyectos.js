@@ -78,19 +78,11 @@ function renderMain(container) {
           <p class="subtitle">Gestión integral de obras y seguimiento</p>
         </div>
         <div style="display: flex; gap: 1rem;">
-<<<<<<< HEAD
-          <div class="view-toggles">
-            <button class="btn btn-ghost btn-sm ${currentView === 'list' ? 'active' : ''}" data-view="list" title="Vista Lista (Popover)">${icons.list}</button>
-            <button class="btn btn-ghost btn-sm ${currentView === 'grid' ? 'active' : ''}" data-view="grid" title="Vista Tarjetas (Acordeón)">${icons.grid}</button>
-            <button class="btn btn-ghost btn-sm ${currentView === 'kanban' ? 'active' : ''}" data-view="kanban" title="Vista Kanban">${icons.kanban}</button>
-            <button class="btn btn-ghost btn-sm ${currentView === 'gantt' ? 'active' : ''}" data-view="gantt" title="Vista Gantt Global">${icons.gantt_global}</button>
-=======
           <div class="view-toggles" style="display: flex; background: var(--bg-alt); padding: 4px; border-radius: 8px;">
             <button class="btn btn-ghost btn-sm ${currentView === 'gantt' ? 'active' : ''}" data-view="gantt" title="Vista Gantt / Cronograma">${icons.gantt}</button>
             <button class="btn btn-ghost btn-sm ${currentView === 'grid' ? 'active' : ''}" data-view="grid" title="Vista Tarjetas">${icons.grid}</button>
             <button class="btn btn-ghost btn-sm ${currentView === 'list' ? 'active' : ''}" data-view="list" title="Vista Lista">${icons.list}</button>
             <button class="btn btn-ghost btn-sm ${currentView === 'kanban' ? 'active' : ''}" data-view="kanban" title="Vista Kanban">${icons.kanban}</button>
->>>>>>> 3399dfd (feat: agregar funcionalidad de Gantt y migraciones relacionadas)
           </div>
         </div>
       </div>
@@ -180,6 +172,10 @@ function renderGridView() {
                   <h4>Seguimientos</h4>
                   <p>Fábrica e instalación (Ábaco)</p>
                 </button>
+                <button class="accordion-module-btn btn-module" data-module="todo" data-id="${o.id}" type="button">
+                  <h4>To-Do</h4>
+                  <p>Tareas del proyecto</p>
+                </button>
               </div>
             </div>
           </div>
@@ -229,6 +225,7 @@ function renderListView() {
                       <button class="btn-module" data-module="documentos" data-id="${o.id}" type="button">Documentos</button>
                       <button class="btn-module" data-module="cronogramas" data-id="${o.id}" type="button">Cronogramas</button>
                       <button class="btn-module" data-module="seguimientos" data-id="${o.id}" type="button">Seguimientos</button>
+                      <button class="btn-module" data-module="todo" data-id="${o.id}" type="button">To-Do</button>
                     </div>
                   </details>
                 </td>
@@ -319,6 +316,7 @@ function renderKanbanView() {
                 <div class="kanban-card-actions">
                   <button class="btn btn-ghost btn-sm btn-module" data-module="resumen" data-id="${o.id}" type="button">Resumen</button>
                   <button class="btn btn-ghost btn-sm btn-module" data-module="documentos" data-id="${o.id}" type="button">Documentos</button>
+                  <button class="btn btn-ghost btn-sm btn-module" data-module="todo" data-id="${o.id}" type="button">To-Do</button>
                 </div>
               </article>
             `).join("") : `<div class="kanban-empty">Sin proyectos</div>`}
@@ -612,6 +610,12 @@ function renderModalTareaProyecto(obraId) {
           <input type="hidden" name="obra_id" value="${esc(obraId)}">
           <div class="form-grid">
             <div class="form-field full-width"><label>Título *</label><input name="titulo" required></div>
+            <div class="form-field full-width">
+              <label>Responsable</label>
+              <select name="responsable_id" id="responsable-tarea-proyecto">
+                <option value="">Sin asignar</option>
+              </select>
+            </div>
             <div class="form-field"><label>Fecha inicio *</label><input name="fecha_inicio" type="date" required></div>
             <div class="form-field"><label>Fecha fin *</label><input name="fecha_fin" type="date" required></div>
             <div class="form-field"><label>Estado</label>
@@ -652,6 +656,18 @@ function bindTodoModulo(container, obraId) {
   const editingId = container.querySelector("#editing-tarea-proyecto-id");
   const status = container.querySelector("#modal-status-tarea-proyecto");
   const content = container.querySelector("#funcionalidad-content");
+  const responsableSelect = container.querySelector("#responsable-tarea-proyecto");
+  let usuariosActivos = [];
+
+  const loadUsuarios = async () => {
+    usuariosActivos = await apiGet("/usuarios/activos").catch(() => []);
+    if (responsableSelect) {
+      responsableSelect.innerHTML = `
+        <option value="">Sin asignar</option>
+        ${usuariosActivos.map(u => `<option value="${esc(u.id)}">${esc(u.display_name)} (${esc(u.username)})</option>`).join("")}
+      `;
+    }
+  };
 
   const refresh = async () => {
     const tareas = await apiGet(`/tareas?obraId=${encodeURIComponent(obraId)}`).catch(() => []);
@@ -663,7 +679,7 @@ function bindTodoModulo(container, obraId) {
 
     body.innerHTML = `
       <div class="table-wrap"><table>
-        <thead><tr><th></th><th>Tarea</th><th>Estado</th><th>Prioridad</th><th>Fin</th><th>Validado por</th><th></th></tr></thead>
+        <thead><tr><th></th><th>Tarea</th><th>Responsable</th><th>Estado</th><th>Prioridad</th><th>Fin</th><th>Validado por</th><th></th></tr></thead>
         <tbody>
           ${tareas.map(t => {
             const done = t.estado === "finalizada";
@@ -672,6 +688,7 @@ function bindTodoModulo(container, obraId) {
                 ${done ? icons.check : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>'}
               </button></td>
               <td style="${done ? "text-decoration:line-through;opacity:.6" : ""}"><strong>${esc(t.titulo)}</strong></td>
+              <td>${esc(t.responsable_name || t.responsable || "-")}</td>
               <td>${renderBadge(t.estado)}</td>
               <td>${renderBadge(t.prioridad)}</td>
               <td>${formatDate(t.fecha_fin)}</td>
@@ -692,6 +709,7 @@ function bindTodoModulo(container, obraId) {
     container.querySelector("#modal-titulo-tarea-proyecto").textContent = t ? "Editar tarea" : "Nueva tarea";
     if (t) {
       form.titulo.value = t.titulo || "";
+      form.responsable_id.value = t.responsable_id || "";
       form.fecha_inicio.value = t.fecha_inicio?.slice(0, 10) || "";
       form.fecha_fin.value = t.fecha_fin?.slice(0, 10) || "";
       form.estado.value = t.estado || "pendiente";
@@ -762,6 +780,7 @@ function bindTodoModulo(container, obraId) {
     content.addEventListener("click", handleClick);
   }
 
+  void loadUsuarios();
   void refresh();
 }
 
@@ -1988,8 +2007,6 @@ function bindMainEvents(container) {
     });
   }
 
-<<<<<<< HEAD
-=======
   // Modal de Nuevo Proyecto
   const modal = container.querySelector("#modal-proyecto");
   const form = container.querySelector("#form-proyecto");
@@ -2090,5 +2107,4 @@ function bindMainEvents(container) {
       }
     });
   }
->>>>>>> 3399dfd (feat: agregar funcionalidad de Gantt y migraciones relacionadas)
 }

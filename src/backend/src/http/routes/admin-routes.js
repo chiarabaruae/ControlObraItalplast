@@ -61,7 +61,8 @@ export function createAdminRoutes(container) {
             t.obra_id,
             o.nombre as obra_nombre,
             t.titulo,
-            t.responsable,
+            coalesce(r.display_name, t.responsable) as responsable,
+            t.responsable_id,
             t.fecha_inicio,
             t.fecha_fin,
             t.estado,
@@ -69,6 +70,7 @@ export function createAdminRoutes(container) {
             t.avance
           from tareas_obra t
           join obras o on o.id = t.obra_id
+          left join app_users r on r.id = t.responsable_id
           ${where}
           order by t.fecha_inicio asc, t.orden asc, t.created_at asc
         `,
@@ -674,10 +676,15 @@ function registerTareas(router, pool, admin) {
 
       const result = await pool.query(
         `
-          select t.*, o.nombre as obra_nombre, u.display_name as completada_por_name
+          select
+            t.*,
+            o.nombre as obra_nombre,
+            u.display_name as completada_por_name,
+            r.display_name as responsable_name
           from tareas_obra t
           join obras o on o.id = t.obra_id
           left join app_users u on u.id = t.completada_por
+          left join app_users r on r.id = t.responsable_id
           ${where}
           order by t.fecha_inicio asc, t.orden asc
         `,
@@ -705,14 +712,16 @@ function registerTareas(router, pool, admin) {
       const isFinalizada = body.estado === "finalizada";
       const completadaPor = isFinalizada ? request.user.sub : null;
       const completadaEn = isFinalizada ? new Date() : null;
+      const responsableId = clean(body.responsable_id);
+      const responsable = clean(body.responsable);
 
       const result = await pool.query(
         `
           insert into tareas_obra (
-            id, obra_id, titulo, descripcion, responsable, fecha_inicio,
+            id, obra_id, titulo, descripcion, responsable, responsable_id, fecha_inicio,
             fecha_fin, estado, prioridad, avance, orden, completada_por, completada_en
           )
-          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
           returning *
         `,
         [
@@ -720,7 +729,8 @@ function registerTareas(router, pool, admin) {
           required(body.obra_id, "obra_id"),
           required(body.titulo, "titulo"),
           clean(body.descripcion),
-          clean(body.responsable),
+          responsable,
+          responsableId,
           required(body.fecha_inicio, "fecha_inicio"),
           required(body.fecha_fin, "fecha_fin"),
           enumValue(body.estado, estadosTarea, "pendiente"),
@@ -751,6 +761,8 @@ function registerTareas(router, pool, admin) {
 
       let completadaPor = prevTask.completada_por;
       let completadaEn = prevTask.completada_en;
+      const responsableId = clean(body.responsable_id);
+      const responsable = clean(body.responsable);
 
       if (body.estado === "finalizada") {
         if (prevTask.estado !== "finalizada") {
@@ -769,14 +781,15 @@ function registerTareas(router, pool, admin) {
             titulo = $3,
             descripcion = $4,
             responsable = $5,
-            fecha_inicio = $6,
-            fecha_fin = $7,
-            estado = $8,
-            prioridad = $9,
-            avance = $10,
-            orden = $11,
-            completada_por = $12,
-            completada_en = $13,
+            responsable_id = $6,
+            fecha_inicio = $7,
+            fecha_fin = $8,
+            estado = $9,
+            prioridad = $10,
+            avance = $11,
+            orden = $12,
+            completada_por = $13,
+            completada_en = $14,
             updated_at = now()
           where id = $1
           returning *
@@ -786,7 +799,8 @@ function registerTareas(router, pool, admin) {
           required(body.obra_id, "obra_id"),
           required(body.titulo, "titulo"),
           clean(body.descripcion),
-          clean(body.responsable),
+          responsable,
+          responsableId,
           required(body.fecha_inicio, "fecha_inicio"),
           required(body.fecha_fin, "fecha_fin"),
           enumValue(body.estado, estadosTarea, "pendiente"),
@@ -923,6 +937,7 @@ function tareaValues(id, body) {
     required(body.titulo, "titulo"),
     clean(body.descripcion),
     clean(body.responsable),
+    clean(body.responsable_id),
     required(body.fecha_inicio, "fecha_inicio"),
     required(body.fecha_fin, "fecha_fin"),
     enumValue(body.estado, estadosTarea, "pendiente"),

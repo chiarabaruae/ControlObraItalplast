@@ -5,6 +5,7 @@ import { setTopbarSection } from "../layout.js";
 
 let tareas = [];
 let obras = [];
+let usuariosActivos = [];
 let obraSeleccionada = "";
 let filtro = "todas";
 let searchTerm = "";
@@ -14,7 +15,7 @@ export async function renderTodo(container) {
   container.innerHTML = '<div class="loading">Cargando tareas...</div>';
 
   try {
-    [tareas, obras] = await Promise.all([apiGet("/tareas"), apiGet("/obras")]);
+    [tareas, obras, usuariosActivos] = await Promise.all([apiGet("/tareas"), apiGet("/obras"), apiGet("/usuarios/activos").catch(() => [])]);
     renderPage(container);
   } catch (err) {
     container.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${esc(err.message)}</p></div>`;
@@ -92,7 +93,7 @@ function renderPage(container) {
 
 function renderTareasList(list) {
   return `<div class="table-wrap"><table>
-    <thead><tr><th></th><th>Tarea</th><th>Obra</th><th>Estado</th><th>Prioridad</th><th>Fecha fin</th><th></th></tr></thead>
+    <thead><tr><th></th><th>Tarea</th><th>Responsable</th><th>Obra</th><th>Estado</th><th>Prioridad</th><th>Fecha fin</th><th></th></tr></thead>
     <tbody>${list.map(t => {
       const isComplete = t.estado === "finalizada";
       return `<tr>
@@ -100,6 +101,7 @@ function renderTareasList(list) {
           ${isComplete ? icons.check : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>'}
         </button></td>
         <td style="${isComplete ? "text-decoration:line-through;opacity:.5" : ""}"><strong>${esc(t.titulo)}</strong></td>
+        <td>${esc(t.responsable_name || t.responsable || "-")}</td>
         <td>${esc(t.obra_nombre || "-")}</td>
         <td>${renderBadge(t.estado)}</td>
         <td>${renderBadge(t.prioridad)}</td>
@@ -115,6 +117,7 @@ function renderTareasList(list) {
 
 function modalTarea() {
   const obraOpts = obras.map(o => `<option value="${o.id}">${esc(o.nombre)}</option>`).join("");
+  const responsableOpts = usuariosActivos.map(u => `<option value="${esc(u.id)}">${esc(u.display_name)} (${esc(u.username)})</option>`).join("");
   return `<div class="modal-overlay" id="modal-tarea">
     <div class="modal-card">
       <div class="modal-header">
@@ -125,7 +128,7 @@ function modalTarea() {
         <div class="form-grid">
           <div class="form-field"><label>Obra *</label><select name="obra_id" required><option value="">Seleccionar</option>${obraOpts}</select></div>
           <div class="form-field"><label>Título *</label><input name="titulo" required></div>
-          <div class="form-field"><label>Responsable</label><input name="responsable"></div>
+          <div class="form-field"><label>Responsable</label><select name="responsable_id"><option value="">Sin asignar</option>${responsableOpts}</select></div>
           <div class="form-field"><label>Fecha inicio *</label><input name="fecha_inicio" type="date" required></div>
           <div class="form-field"><label>Fecha fin *</label><input name="fecha_fin" type="date" required></div>
           <div class="form-field"><label>Estado</label>
@@ -160,7 +163,7 @@ function bindTodoEvents(container) {
     if (t) {
       form.obra_id.value = t.obra_id || "";
       form.titulo.value = t.titulo || "";
-      form.responsable.value = t.responsable || "";
+      form.responsable_id.value = t.responsable_id || "";
       form.fecha_inicio.value = t.fecha_inicio?.slice(0, 10) || "";
       form.fecha_fin.value = t.fecha_fin?.slice(0, 10) || "";
       form.estado.value = t.estado || "pendiente";

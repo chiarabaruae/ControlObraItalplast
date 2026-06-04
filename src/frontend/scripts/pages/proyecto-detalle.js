@@ -215,7 +215,7 @@ function renderView(container, proyecto, cronograma, aberturas, segFabrica, segO
   if (cronograma && aberturas.length > 0 && !segObra) bindSeguimientoWizard(container, proyecto.id, 'obra');
   if (segFabrica || segObra) bindGrillaInteractions(container, proyecto.id);
   bindProyectoAdmin(container, proyecto.id);
-  bindTareasProyecto(container, proyecto.id);
+  bindTareasProyecto(container, proyecto.id, usuariosActivos);
 }
 
 function renderCronogramaEditor(proyecto, cronograma) {
@@ -255,7 +255,7 @@ function renderCronogramaEditor(proyecto, cronograma) {
 
 function renderTareasProyecto(list) {
   return `<div class="table-wrap"><table>
-    <thead><tr><th></th><th>Tarea</th><th>Estado</th><th>Prioridad</th><th>Fin</th><th>Validado por</th><th></th></tr></thead>
+    <thead><tr><th></th><th>Tarea</th><th>Responsable</th><th>Estado</th><th>Prioridad</th><th>Fin</th><th>Validado por</th><th></th></tr></thead>
     <tbody>${list.map(t => {
       const done = t.estado === "finalizada";
       return `<tr>
@@ -263,6 +263,7 @@ function renderTareasProyecto(list) {
           ${done ? icons.check : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>'}
         </button></td>
         <td style="${done ? "text-decoration:line-through;opacity:.6" : ""}"><strong>${esc(t.titulo)}</strong></td>
+        <td>${esc(t.responsable_name || t.responsable || "-")}</td>
         <td>${renderBadge(t.estado)}</td>
         <td>${renderBadge(t.prioridad)}</td>
         <td>${formatDate(t.fecha_fin)}</td>
@@ -287,6 +288,12 @@ function modalTareaProyecto(obraId) {
         <input type="hidden" name="obra_id" value="${esc(obraId)}">
         <div class="form-grid">
           <div class="form-field full-width"><label>Titulo *</label><input name="titulo" required></div>
+          <div class="form-field full-width">
+            <label>Responsable</label>
+            <select name="responsable_id" id="responsable-tarea-proyecto">
+              <option value="">Sin asignar</option>
+            </select>
+          </div>
           <div class="form-field"><label>Fecha inicio *</label><input name="fecha_inicio" type="date" required></div>
           <div class="form-field"><label>Fecha fin *</label><input name="fecha_fin" type="date" required></div>
           <div class="form-field"><label>Estado</label>
@@ -348,17 +355,26 @@ function bindProyectoAdmin(container, proyectoId) {
   });
 }
 
-function bindTareasProyecto(container, proyectoId) {
+function bindTareasProyecto(container, proyectoId, usuariosActivos) {
   const modal = container.querySelector("#modal-tarea-proyecto");
   const form = container.querySelector("#form-tarea-proyecto");
   const editingId = container.querySelector("#editing-tarea-proyecto-id");
   const status = container.querySelector("#modal-status-tarea-proyecto");
+  const responsableSelect = container.querySelector("#responsable-tarea-proyecto");
+
+  if (responsableSelect) {
+    responsableSelect.innerHTML = `
+      <option value="">Sin asignar</option>
+      ${(usuariosActivos || []).map(u => `<option value="${esc(u.id)}">${esc(u.display_name)} (${esc(u.username)})</option>`).join("")}
+    `;
+  }
 
   const openModal = (t = null) => {
     editingId.value = t?.id || "";
     container.querySelector("#modal-titulo-tarea-proyecto").textContent = t ? "Editar tarea" : "Nueva tarea";
     if (t) {
       form.titulo.value = t.titulo || "";
+      form.responsable_id.value = t.responsable_id || "";
       form.fecha_inicio.value = t.fecha_inicio?.slice(0, 10) || "";
       form.fecha_fin.value = t.fecha_fin?.slice(0, 10) || "";
       form.estado.value = t.estado || "pendiente";

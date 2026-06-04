@@ -152,6 +152,11 @@ function enterApp(user) {
     navigate("/ajustes/usuarios");
   });
 
+  // Ensure we always land on the dashboard after login.
+  if (!window.location.hash) {
+    navigate("/dashboard");
+  }
+
   // Start routing
   startRouter();
 }
