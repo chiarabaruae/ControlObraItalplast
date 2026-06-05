@@ -4,11 +4,11 @@ import { createRequire } from "node:module";
 import { mkdir, writeFile, access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseAbacoPdfText } from "../../application/projects/abaco-pdf-parser.js";
+import { requireAuth } from "../middlewares/require-auth.js";
 const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
-import * as xlsx from "xlsx";
+const { PDFParse } = require("pdf-parse");
 import { randomUUID } from "node:crypto";
-import { requireAdmin } from "../middlewares/require-admin.js";
 
 // --- Helpers para Días Hábiles ---
 function isBusinessDay(date) {
@@ -33,6 +33,7 @@ function addBusinessDays(startDate, daysToAdd) {
 
 const upload = multer({ storage: multer.memoryStorage() });
 const DOCUMENTS_STORAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../storage/documentos");
+const WORKSPACE_ROLES = new Set(["administrator", "supervisor"]);
 
 async function persistUploadedDocument(file, documentId) {
   await mkdir(DOCUMENTS_STORAGE_DIR, { recursive: true });
@@ -44,13 +45,176 @@ async function persistUploadedDocument(file, documentId) {
   return filePath;
 }
 
+function isAdministrator(user) {
+  return user?.role === "administrator";
+}
+
+function isWorkspaceMember(user) {
+  return WORKSPACE_ROLES.has(user?.role) || isAdministrator(user);
+}
+
+function isSameUser(userId, targetUserId) {
+  return Boolean(userId && targetUserId && String(userId) === String(targetUserId));
+}
+
+function isFolderDocument(row) {
+  return String(row?.tipo_documento || "").toLowerCase() === "carpeta"
+    || Boolean(row?.datos_extraidos?.es_carpeta);
+}
+
+function isPdfUpload(file) {
+  const mime = String(file?.mimetype || "").toLowerCase();
+  const fileName = String(file?.originalname || "").toLowerCase();
+  return mime.includes("pdf") || fileName.endsWith(".pdf");
+}
+
+async function extractPdfText(fileBuffer) {
+  const parser = new PDFParse({ data: fileBuffer });
+  try {
+    const result = await parser.getText();
+    return String(result?.text || "");
+  } finally {
+    if (typeof parser.destroy === "function") {
+      await parser.destroy();
+    }
+  }
+}
+
+async function getProjectRecord(pool, projectId) {
+  const result = await pool.query(
+    "SELECT id, nombre, lider_usuario_id FROM obras WHERE id = $1 LIMIT 1",
+    [projectId]
+  );
+  return result.rows[0] || null;
+}
+
+async function ensureProjectReadAccess(pool, request, response, projectId) {
+  const project = await getProjectRecord(pool, projectId);
+  if (!project) {
+    response.status(404).json({ error: "Proyecto no encontrado." });
+    return null;
+  }
+
+  if (isWorkspaceMember(request.user) || isSameUser(request.user?.sub, project.lider_usuario_id)) {
+    return project;
+  }
+
+  response.status(403).json({ error: "No tienes acceso a este proyecto." });
+  return null;
+}
+
+async function ensureProjectEditAccess(pool, request, response, projectId) {
+  const project = await getProjectRecord(pool, projectId);
+  if (!project) {
+    response.status(404).json({ error: "Proyecto no encontrado." });
+    return null;
+  }
+
+  if (isAdministrator(request.user) || isSameUser(request.user?.sub, project.lider_usuario_id)) {
+    return project;
+  }
+
+  response.status(403).json({ error: "Solo el admin o el líder asignado pueden editar esta información." });
+  return null;
+}
+
+async function ensureAvanceEtapaEditAccess(pool, request, response, avanceEtapaId) {
+  const result = await pool.query(
+    `
+      SELECT o.id, o.lider_usuario_id
+      FROM avance_etapas_abertura aea
+      JOIN avance_aberturas aa ON aa.id = aea.avance_abertura_id
+      JOIN seguimientos_proyecto sp ON sp.id = aa.seguimiento_id
+      JOIN obras o ON o.id = sp.proyecto_id
+      WHERE aea.id = $1
+      LIMIT 1
+    `,
+    [avanceEtapaId]
+  );
+
+  const project = result.rows[0];
+  if (!project) {
+    response.status(404).json({ error: "Avance de etapa no encontrado." });
+    return null;
+  }
+
+  if (isAdministrator(request.user) || isSameUser(request.user?.sub, project.lider_usuario_id)) {
+    return project;
+  }
+
+  response.status(403).json({ error: "Solo el admin o el líder asignado pueden editar esta información." });
+  return null;
+}
+
+async function resolveParentFolder(pool, projectId, parentFolderId) {
+  if (!parentFolderId) return null;
+
+  const result = await pool.query(
+    `
+      SELECT id, tipo_documento, datos_extraidos
+      FROM documentos_proyecto
+      WHERE id = $1 AND proyecto_id = $2
+      LIMIT 1
+    `,
+    [parentFolderId, projectId]
+  );
+
+  const folder = result.rows[0];
+  if (!folder || !isFolderDocument(folder)) {
+    const error = new Error("La carpeta seleccionada no existe o no pertenece a este proyecto.");
+    error.status = 400;
+    throw error;
+  }
+
+  return folder;
+}
+
+function withProjectReadAccess(pool, handler) {
+  return async (request, response, next) => {
+    try {
+      const project = await ensureProjectReadAccess(pool, request, response, request.params.id);
+      if (!project) return;
+      request.projectRecord = project;
+      await handler(request, response, next);
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+function withProjectEditAccess(pool, handler) {
+  return async (request, response, next) => {
+    try {
+      const project = await ensureProjectEditAccess(pool, request, response, request.params.id);
+      if (!project) return;
+      request.projectRecord = project;
+      await handler(request, response, next);
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+function withAvanceEtapaEditAccess(pool, handler) {
+  return async (request, response, next) => {
+    try {
+      const project = await ensureAvanceEtapaEditAccess(pool, request, response, request.params.id);
+      if (!project) return;
+      request.projectRecord = project;
+      await handler(request, response, next);
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
 export function createProyectosRoutes(container) {
   const router = Router();
-  const auth = requireAdmin(container.env);
+  const auth = requireAuth(container.env);
   router.use(auth);
 
   // GET /api/admin/obras/:id/documentos
-  router.get("/obras/:id/documentos", async (request, response, next) => {
+  router.get("/obras/:id/documentos", withProjectReadAccess(container.pool, async (request, response, next) => {
     try {
       const { id: proyectoId } = request.params;
       const result = await container.pool.query(
@@ -72,6 +236,7 @@ export function createProyectosRoutes(container) {
             WHEN (d.datos_extraidos->>'size_bytes') ~ '^[0-9]+$' THEN (d.datos_extraidos->>'size_bytes')::bigint
             ELSE NULL
           END AS size_bytes,
+          NULLIF(d.datos_extraidos->>'parent_folder_id', '') AS parent_folder_id,
           COALESCE(d.datos_extraidos->>'documento_asociado', 'otro') AS documento_asociado,
           COALESCE((d.datos_extraidos->>'es_carpeta')::boolean, false) AS es_carpeta
         FROM documentos_proyecto d
@@ -86,9 +251,9 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
-  router.get("/obras/:id/documentos/:documentoId/archivo", async (request, response, next) => {
+  router.get("/obras/:id/documentos/:documentoId/archivo", withProjectReadAccess(container.pool, async (request, response, next) => {
     try {
       const { id: proyectoId, documentoId } = request.params;
       const result = await container.pool.query(
@@ -123,10 +288,10 @@ export function createProyectosRoutes(container) {
       }
       next(error);
     }
-  });
+  }));
 
   // POST /api/admin/obras/:id/documentos
-  router.post("/obras/:id/documentos", upload.single("archivo"), async (request, response, next) => {
+  router.post("/obras/:id/documentos", upload.single("archivo"), withProjectEditAccess(container.pool, async (request, response, next) => {
     try {
       if (!request.file) {
         return response.status(400).json({ error: "No se proporcionó archivo." });
@@ -137,6 +302,8 @@ export function createProyectosRoutes(container) {
       const mimeType = request.file.mimetype;
       const sizeBytes = request.file.size ?? 0;
       const docType = String(request.body?.tipo_documento || "otro").trim().toLowerCase() || "otro";
+      const parentFolderId = String(request.body?.parent_folder_id || "").trim() || null;
+      await resolveParentFolder(container.pool, proyectoId, parentFolderId);
       const docId = randomUUID();
       const rutaArchivo = await persistUploadedDocument(request.file, docId);
 
@@ -157,7 +324,8 @@ export function createProyectosRoutes(container) {
           "procesado",
           {
             size_bytes: sizeBytes,
-            nombre_original: fileName
+            nombre_original: fileName,
+            parent_folder_id: parentFolderId
           },
           request.user?.sub || null
         ]
@@ -170,16 +338,18 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // POST /api/admin/obras/:id/documentos/carpeta
-  router.post("/obras/:id/documentos/carpeta", async (request, response, next) => {
+  router.post("/obras/:id/documentos/carpeta", withProjectEditAccess(container.pool, async (request, response, next) => {
     try {
       const { id: proyectoId } = request.params;
       const nombre = String(request.body?.nombre || "").trim();
+      const parentFolderId = String(request.body?.parent_folder_id || "").trim() || null;
       if (!nombre) {
         return response.status(400).json({ error: "Nombre de carpeta requerido." });
       }
+      await resolveParentFolder(container.pool, proyectoId, parentFolderId);
 
       const carpetaId = randomUUID();
       await container.pool.query(
@@ -198,7 +368,8 @@ export function createProyectosRoutes(container) {
           "procesado",
           {
             es_carpeta: true,
-            documento_asociado: "otro"
+            documento_asociado: "otro",
+            parent_folder_id: parentFolderId
           },
           request.user?.sub || null
         ]
@@ -211,13 +382,16 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // POST /api/admin/obras/:id/documentos/oferta
-  router.post("/obras/:id/documentos/oferta", upload.single("archivo"), async (request, response, next) => {
+  router.post("/obras/:id/documentos/oferta", upload.single("archivo"), withProjectEditAccess(container.pool, async (request, response, next) => {
     try {
       if (!request.file) {
         return response.status(400).json({ error: "No se proporcionó un archivo PDF." });
+      }
+      if (!isPdfUpload(request.file)) {
+        return response.status(400).json({ error: "La oferta debe cargarse en formato PDF." });
       }
 
       const { id: proyectoId } = request.params;
@@ -236,9 +410,9 @@ export function createProyectosRoutes(container) {
       );
 
       // 2. Procesar el PDF y extraer texto
-      let pdfData;
+      let text = "";
       try {
-        pdfData = await pdfParse(fileBuffer);
+        text = await extractPdfText(fileBuffer);
       } catch (err) {
         await container.pool.query(
           "UPDATE documentos_proyecto SET estado_procesamiento = 'error' WHERE id = $1",
@@ -246,8 +420,6 @@ export function createProyectosRoutes(container) {
         );
         return response.status(500).json({ error: "Error al leer el PDF." });
       }
-
-      const text = pdfData.text;
 
       // 3. Extracción de datos básicos (Reglas simples)
       const datosExtraidos = {
@@ -301,10 +473,10 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // POST /api/admin/obras/:id/cronograma
-  router.post("/obras/:id/cronograma", async (request, response, next) => {
+  router.post("/obras/:id/cronograma", withProjectEditAccess(container.pool, async (request, response, next) => {
     try {
       const body = request.body || {};
       const proyectoId = request.params.id;
@@ -426,10 +598,10 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // GET /api/admin/obras/:id/cronograma
-  router.get("/obras/:id/cronograma", async (request, response, next) => {
+  router.get("/obras/:id/cronograma", withProjectReadAccess(container.pool, async (request, response, next) => {
     try {
       const result = await container.pool.query(
         "SELECT * FROM cronogramas_proyecto WHERE proyecto_id = $1 LIMIT 1",
@@ -442,13 +614,16 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // POST /api/admin/obras/:id/documentos/abaco
-  router.post("/obras/:id/documentos/abaco", upload.single("archivo"), async (request, response, next) => {
+  router.post("/obras/:id/documentos/abaco", upload.single("archivo"), withProjectEditAccess(container.pool, async (request, response, next) => {
     try {
       if (!request.file) {
-        return response.status(400).json({ error: "No se proporcionó un archivo de ábaco (Excel/CSV)." });
+        return response.status(400).json({ error: "No se proporcionó un archivo PDF de ábaco." });
+      }
+      if (!isPdfUpload(request.file)) {
+        return response.status(400).json({ error: "Por ahora el ábaco solo admite archivos PDF." });
       }
 
       const { id: proyectoId } = request.params;
@@ -466,58 +641,20 @@ export function createProyectosRoutes(container) {
         [docId, proyectoId, "abaco_lista", fileName, rutaArchivo, request.file.mimetype, "pendiente", request.user?.sub || null]
       );
 
-      // Procesar archivo Excel
+      // Procesar PDF del ábaco
       let aberturas = [];
+      let metadata = {};
       try {
-        const workbook = xlsx.read(fileBuffer, { type: "buffer" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        
-        // Convertir a JSON
-        const data = xlsx.utils.sheet_to_json(sheet, { defval: "" });
-
-        // Mapear campos. Depende de cómo venga el excel, se buscan palabras clave.
-        for (const row of data) {
-          // Extraer valores con llaves parecidas (ignorar case/espacios si es posible)
-          const getVal = (keys) => {
-            const foundKey = Object.keys(row).find(k => keys.some(kw => k.toLowerCase().includes(kw)));
-            return foundKey ? row[foundKey] : null;
-          };
-
-          const numero = parseInt(getVal(["nro", "numero", "número"]) || 0, 10);
-          const codPosicion = getVal(["cod", "pos", "posición", "posicion"]);
-          const ambiente = getVal(["amb", "ambiente", "ubicación", "ubicacion"]);
-          const cantidad = parseInt(getVal(["cant", "cantidad"]) || 1, 10);
-          const ancho = parseFloat(getVal(["ancho", "anchura"]) || 0);
-          const largo = parseFloat(getVal(["largo", "alto", "altura"]) || 0);
-          const serie = getVal(["serie", "linea", "línea"]);
-          const color = getVal(["color", "terminacion", "terminación"]);
-          const tipoVidrio = getVal(["vidrio", "cristal"]);
-          const obs = getVal(["obs", "comentario"]);
-
-          // Solo agregar si tiene algún identificador (numero o cod)
-          if (numero || codPosicion) {
-            aberturas.push({
-              numero,
-              codPosicion: String(codPosicion || numero),
-              ambiente: String(ambiente || ""),
-              cantidad,
-              ancho,
-              largo,
-              serie: String(serie || ""),
-              color: String(color || ""),
-              tipoVidrio: String(tipoVidrio || ""),
-              observaciones: String(obs || "")
-            });
-          }
-        }
-
+        const text = await extractPdfText(fileBuffer);
+        const parsed = parseAbacoPdfText(text, fileName);
+        aberturas = parsed.rows;
+        metadata = parsed.metadata;
       } catch (err) {
         await container.pool.query(
           "UPDATE documentos_proyecto SET estado_procesamiento = 'error' WHERE id = $1",
           [docId]
         );
-        return response.status(500).json({ error: "Error al procesar el archivo Excel/CSV." });
+        return response.status(500).json({ error: "Error al procesar el PDF del ábaco." });
       }
 
       // Guardar aberturas en la base de datos
@@ -525,6 +662,9 @@ export function createProyectosRoutes(container) {
         const client = await container.pool.connect();
         try {
           await client.query("BEGIN");
+
+          await client.query("DELETE FROM seguimientos_proyecto WHERE proyecto_id = $1", [proyectoId]);
+          await client.query("DELETE FROM aberturas_proyecto WHERE proyecto_id = $1", [proyectoId]);
           
           for (const ab of aberturas) {
             await client.query(
@@ -536,14 +676,26 @@ export function createProyectosRoutes(container) {
               `,
               [
                 randomUUID(), proyectoId, docId, ab.numero, ab.codPosicion, ab.ambiente,
-                ab.cantidad, ab.ancho, ab.largo, ab.serie, ab.color, ab.tipoVidrio, ab.observaciones
+                ab.cantidad, ab.anchoMm, ab.largoMm, ab.serie, ab.color, ab.tipoVidrio, ab.observaciones
               ]
             );
           }
 
           await client.query(
-            "UPDATE documentos_proyecto SET estado_procesamiento = 'procesado' WHERE id = $1",
-            [docId]
+            `
+              UPDATE documentos_proyecto
+              SET estado_procesamiento = 'procesado', datos_extraidos = $2
+              WHERE id = $1
+            `,
+            [
+              docId,
+              {
+                size_bytes: request.file.size ?? 0,
+                nombre_original: fileName,
+                formato: "pdf",
+                ...metadata
+              }
+            ]
           );
 
           await client.query("COMMIT");
@@ -558,7 +710,7 @@ export function createProyectosRoutes(container) {
           "UPDATE documentos_proyecto SET estado_procesamiento = 'error', datos_extraidos = '{\"error\":\"No se encontraron aberturas válidas\"}' WHERE id = $1",
           [docId]
         );
-        return response.status(400).json({ error: "El archivo no contiene filas válidas de aberturas." });
+        return response.status(400).json({ error: "El PDF no contiene filas válidas de aberturas." });
       }
 
       response.status(200).json({ 
@@ -569,10 +721,10 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // GET /api/admin/obras/:id/aberturas
-  router.get("/obras/:id/aberturas", async (request, response, next) => {
+  router.get("/obras/:id/aberturas", withProjectReadAccess(container.pool, async (request, response, next) => {
     try {
       const result = await container.pool.query(
         "SELECT * FROM aberturas_proyecto WHERE proyecto_id = $1 ORDER BY numero, cod_posicion",
@@ -582,7 +734,7 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // GET /api/admin/configuracion-etapas/:tipo
   router.get("/configuracion-etapas/:tipo", async (request, response, next) => {
@@ -598,7 +750,7 @@ export function createProyectosRoutes(container) {
   });
 
   // POST /api/admin/obras/:id/seguimiento/:tipo
-  router.post("/obras/:id/seguimiento/:tipo", async (request, response, next) => {
+  router.post("/obras/:id/seguimiento/:tipo", withProjectEditAccess(container.pool, async (request, response, next) => {
     try {
       const { id: proyectoId, tipo } = request.params;
       const { etapas_seleccionadas } = request.body; // array de IDs de configuracion_etapas
@@ -689,10 +841,10 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // GET /api/admin/obras/:id/seguimiento/:tipo
-  router.get("/obras/:id/seguimiento/:tipo", async (request, response, next) => {
+  router.get("/obras/:id/seguimiento/:tipo", withProjectReadAccess(container.pool, async (request, response, next) => {
     try {
       const { id: proyectoId, tipo } = request.params;
       
@@ -762,10 +914,10 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // PATCH /api/admin/avance-etapas/:id
-  router.patch("/avance-etapas/:id", async (request, response, next) => {
+  router.patch("/avance-etapas/:id", withAvanceEtapaEditAccess(container.pool, async (request, response, next) => {
     try {
       const { estado } = request.body; // 'pendiente', 'en_proceso', 'completada'
       if (!['pendiente', 'en_proceso', 'completada'].includes(estado)) {
@@ -817,7 +969,7 @@ export function createProyectosRoutes(container) {
     } catch (error) {
       next(error);
     }
-  });
+  }));
 
   // GET /api/admin/gantt/global
   router.get("/gantt/global", async (request, response, next) => {

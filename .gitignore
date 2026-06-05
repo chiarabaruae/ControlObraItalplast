@@ -41,6 +41,7 @@ venv/
 *.bacpac
 *.mdf
 *.ldf
+src/backend/storage/
 
 # IDE / OS
 .vs/
@@ -50,4 +51,3 @@ venv/
 .idea/
 Thumbs.db
 Desktop.ini
-
