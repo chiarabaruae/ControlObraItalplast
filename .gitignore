@@ -51,3 +51,9 @@ src/backend/storage/
 .idea/
 Thumbs.db
 Desktop.ini
+
+# Gitleaks local reports and binaries
+gitleaks-report.json
+findings.json
+gitleaks.exe
+gitleaks.zip
