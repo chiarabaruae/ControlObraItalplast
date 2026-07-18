@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BookOpen, Building2, ChevronDown, CircleHelp, Headphones,
@@ -75,41 +75,62 @@ function UtilityGroup({
   onToggle: () => void;
   onNavigate?: () => void;
 }) {
+  const panelId = useId();
+
   return (
-    <div>
+    <div className="relative">
+      <div
+        id={panelId}
+        role="menu"
+        aria-hidden={!open}
+        className={cn(
+          "absolute inset-x-0 bottom-full z-30 mb-2 origin-bottom rounded-2xl bg-popover/98 p-2 text-popover-foreground shadow-xl ring-1 ring-foreground/12 backdrop-blur-xl",
+          "will-change-transform transition-[opacity,transform,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+          open
+            ? "visible translate-y-0 scale-100 opacity-100"
+            : "pointer-events-none invisible translate-y-2 scale-[0.97] opacity-0"
+        )}
+      >
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            role="menuitem"
+            tabIndex={open ? undefined : -1}
+            onClick={onNavigate}
+            className={({ isActive }) => cn(
+              "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200",
+              "text-popover-foreground/80 hover:bg-muted hover:text-popover-foreground",
+              isActive && "bg-accent font-semibold text-accent-foreground"
+            )}
+          >
+            <item.icon className="size-5 shrink-0" strokeWidth={1.75} />
+            <span>{item.label}</span>
+            <span className="sr-only">{item.description}</span>
+          </NavLink>
+        ))}
+      </div>
+
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        aria-controls={panelId}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/75",
+          "transition-colors duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          open && "text-sidebar-accent-foreground"
+        )}
       >
         <Icon className="size-4.5" strokeWidth={1.75} />
         <span className="flex-1 text-left">{label}</span>
-        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          className={cn(
+            "size-3.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            open && "rotate-180"
+          )}
+        />
       </button>
-      {open && (
-        <div className="mt-1 space-y-1 pl-3">
-          {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={onNavigate}
-              className={({ isActive }) => cn(
-                "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-sidebar-accent",
-                isActive && "bg-sidebar-accent"
-              )}
-            >
-              <div className="grid size-8 shrink-0 place-items-center rounded-lg border bg-background/75 text-primary shadow-xs">
-                <item.icon className="size-4" strokeWidth={1.75} />
-              </div>
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold text-sidebar-foreground">{item.label}</span>
-                <span className="block truncate text-[10px] text-muted-foreground">{item.description}</span>
-              </span>
-            </NavLink>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
