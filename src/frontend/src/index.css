@@ -57,45 +57,44 @@
 }
 
 /*
- * Italplast — Control de Obras
- * Marca: violeta #8A0FA8. Neutros fríos "aluminio anodizado" con
- * leve matiz violeta. La marca se puede re-tintar en runtime desde
- * Personalizar escribiendo --brand-h/--brand-c (accent picker).
+ * Italplast — Gestión de proyectos
+ * Marca: azul #0060AF, extraído del logo oficial. Neutros fríos
+ * "aluminio anodizado" y acento configurable desde Personalizar.
  */
 :root {
-    --brand: #8a0fa8;
-    --background: oklch(0.972 0.004 310);          /* aluminio pálido, matiz violeta */
-    --foreground: oklch(0.21 0.02 315);            /* tinta con subtono violeta */
+    --brand: #0060af;
+    --background: oklch(0.972 0.004 250);          /* aluminio pálido, matiz azul */
+    --foreground: oklch(0.21 0.02 250);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.21 0.02 315);
+    --card-foreground: oklch(0.21 0.02 250);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.21 0.02 315);
-    --primary: oklch(0.47 0.216 322);              /* #8A0FA8 */
-    --primary-foreground: oklch(0.985 0.005 322);
-    --secondary: oklch(0.945 0.01 314);
-    --secondary-foreground: oklch(0.3 0.04 318);
-    --muted: oklch(0.945 0.008 310);
-    --muted-foreground: oklch(0.52 0.015 312);
-    --accent: oklch(0.94 0.03 322);
-    --accent-foreground: oklch(0.4 0.15 322);
+    --popover-foreground: oklch(0.21 0.02 250);
+    --primary: #0060af;
+    --primary-foreground: #ffffff;
+    --secondary: oklch(0.945 0.01 250);
+    --secondary-foreground: oklch(0.3 0.04 250);
+    --muted: oklch(0.945 0.008 250);
+    --muted-foreground: oklch(0.52 0.015 250);
+    --accent: #e6f2fb;
+    --accent-foreground: #004b88;
     --destructive: oklch(0.5 0.19 27);
     --border: oklch(0.885 0.008 310);              /* línea de aluminio */
     --input: oklch(0.885 0.008 310);
-    --ring: oklch(0.47 0.216 322);
-    --chart-1: oklch(0.47 0.216 322);
+    --ring: #0060af;
+    --chart-1: #0060af;
     --chart-2: oklch(0.55 0.12 155);
     --chart-3: oklch(0.62 0.13 65);
     --chart-4: oklch(0.55 0.05 312);
     --chart-5: oklch(0.35 0.08 318);
     --radius: 0.5rem;
-    --sidebar: oklch(0.985 0.003 310);
-    --sidebar-foreground: oklch(0.32 0.02 315);
-    --sidebar-primary: oklch(0.47 0.216 322);
-    --sidebar-primary-foreground: oklch(0.985 0.005 322);
-    --sidebar-accent: oklch(0.94 0.03 322);
-    --sidebar-accent-foreground: oklch(0.4 0.15 322);
-    --sidebar-border: oklch(0.9 0.006 310);
-    --sidebar-ring: oklch(0.47 0.216 322);
+    --sidebar: oklch(0.985 0.003 250);
+    --sidebar-foreground: oklch(0.32 0.02 250);
+    --sidebar-primary: #0060af;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e6f2fb;
+    --sidebar-accent-foreground: #004b88;
+    --sidebar-border: oklch(0.9 0.006 250);
+    --sidebar-ring: #0060af;
     --estado-progreso: oklch(0.52 0.12 155);       /* verde obra */
     --estado-pausada: oklch(0.6 0.13 70);          /* ámbar señalización */
     --estado-riesgo: oklch(0.5 0.19 27);           /* rojo riesgo */
@@ -103,37 +102,37 @@
 }
 
 .dark {
-    --background: oklch(0.185 0.012 315);          /* grafito violáceo */
+    --background: oklch(0.185 0.012 250);          /* grafito azulado */
     --foreground: oklch(0.94 0.006 310);
-    --card: oklch(0.23 0.014 315);
+    --card: oklch(0.23 0.014 250);
     --card-foreground: oklch(0.94 0.006 310);
-    --popover: oklch(0.23 0.014 315);
+    --popover: oklch(0.23 0.014 250);
     --popover-foreground: oklch(0.94 0.006 310);
-    --primary: oklch(0.66 0.19 322);               /* violeta iluminado p/ contraste */
-    --primary-foreground: oklch(0.16 0.03 322);
-    --secondary: oklch(0.28 0.016 315);
+    --primary: #4aa3df;                            /* azul de marca iluminado */
+    --primary-foreground: #071a29;
+    --secondary: oklch(0.28 0.016 250);
     --secondary-foreground: oklch(0.9 0.01 312);
-    --muted: oklch(0.27 0.014 315);
+    --muted: oklch(0.27 0.014 250);
     --muted-foreground: oklch(0.66 0.012 312);
-    --accent: oklch(0.31 0.05 322);
-    --accent-foreground: oklch(0.85 0.08 322);
+    --accent: oklch(0.31 0.05 250);
+    --accent-foreground: #91cff3;
     --destructive: oklch(0.62 0.19 27);
-    --border: oklch(0.31 0.014 315);
-    --input: oklch(0.33 0.014 315);
-    --ring: oklch(0.66 0.19 322);
-    --chart-1: oklch(0.66 0.19 322);
+    --border: oklch(0.31 0.014 250);
+    --input: oklch(0.33 0.014 250);
+    --ring: #4aa3df;
+    --chart-1: #4aa3df;
     --chart-2: oklch(0.62 0.12 155);
     --chart-3: oklch(0.68 0.13 65);
     --chart-4: oklch(0.6 0.05 312);
     --chart-5: oklch(0.8 0.08 318);
-    --sidebar: oklch(0.21 0.013 315);
+    --sidebar: oklch(0.21 0.013 250);
     --sidebar-foreground: oklch(0.9 0.008 310);
-    --sidebar-primary: oklch(0.66 0.19 322);
-    --sidebar-primary-foreground: oklch(0.16 0.03 322);
-    --sidebar-accent: oklch(0.31 0.05 322);
-    --sidebar-accent-foreground: oklch(0.85 0.08 322);
-    --sidebar-border: oklch(0.29 0.013 315);
-    --sidebar-ring: oklch(0.66 0.19 322);
+    --sidebar-primary: #4aa3df;
+    --sidebar-primary-foreground: #071a29;
+    --sidebar-accent: oklch(0.31 0.05 250);
+    --sidebar-accent-foreground: #91cff3;
+    --sidebar-border: oklch(0.29 0.013 250);
+    --sidebar-ring: #4aa3df;
     --estado-progreso: oklch(0.62 0.12 155);
     --estado-pausada: oklch(0.68 0.13 70);
     --estado-riesgo: oklch(0.62 0.19 27);

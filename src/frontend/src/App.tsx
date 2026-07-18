@@ -11,6 +11,10 @@ import ProyectoDetalle from "@/pages/ProyectoDetalle";
 import Todo from "@/pages/Todo";
 import Usuarios from "@/pages/Usuarios";
 import Personalizar from "@/pages/Personalizar";
+import Account from "@/pages/Account";
+import Updates from "@/pages/Updates";
+import Documentation from "@/pages/Documentation";
+import ContactSupport from "@/pages/ContactSupport";
 
 export default function App() {
   return (
@@ -25,7 +29,12 @@ export default function App() {
               <Route path="/proyectos" element={<Proyectos />} />
               <Route path="/proyectos/:id" element={<ProyectoDetalle />} />
               <Route path="/tareas" element={<Todo />} />
-              <Route path="/personalizar" element={<Personalizar />} />
+              <Route path="/personalizar" element={<Navigate to="/settings/appearance" replace />} />
+              <Route path="/settings/account" element={<Account />} />
+              <Route path="/settings/appearance" element={<Personalizar />} />
+              <Route path="/settings/updates" element={<Updates />} />
+              <Route path="/support/documentation" element={<Documentation />} />
+              <Route path="/support/contact" element={<ContactSupport />} />
 
               {/* Clientes: admin + supervisor */}
               <Route element={<RequireRole roles={["administrator", "supervisor"]} />}>

@@ -1,35 +1,9 @@
 import { useEffect, useState } from "react";
 import { Sun, Moon, Monitor, RotateCcw } from "lucide-react";
-import { aplicarTema } from "@/components/app/AppShell";
+import { ACENTOS, aplicarAcento, aplicarTema, type Tema } from "@/lib/theme";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-type Tema = "claro" | "oscuro" | "sistema";
-
-// Acentos alternativos en OKLCH — mismo croma/luz que el violeta de marca
-const ACENTOS = [
-  { nombre: "Violeta Italplast", valor: "oklch(0.47 0.216 322)", oscuro: "oklch(0.66 0.19 322)" },
-  { nombre: "Azul plano", valor: "oklch(0.47 0.19 262)", oscuro: "oklch(0.66 0.17 262)" },
-  { nombre: "Verde obra", valor: "oklch(0.47 0.14 155)", oscuro: "oklch(0.66 0.13 155)" },
-  { nombre: "Naranja señal", valor: "oklch(0.55 0.16 55)", oscuro: "oklch(0.7 0.15 55)" }
-];
-
-function aplicarAcento(idx: number) {
-  const acento = ACENTOS[idx];
-  const raiz = document.documentElement;
-  if (idx === 0) {
-    raiz.style.removeProperty("--primary");
-    raiz.style.removeProperty("--ring");
-    raiz.style.removeProperty("--sidebar-primary");
-    return;
-  }
-  const oscuro = raiz.classList.contains("dark");
-  const valor = oscuro ? acento.oscuro : acento.valor;
-  raiz.style.setProperty("--primary", valor);
-  raiz.style.setProperty("--ring", valor);
-  raiz.style.setProperty("--sidebar-primary", valor);
-}
 
 export default function Personalizar() {
   const [tema, setTema] = useState<Tema>(() => (localStorage.getItem("co-tema") as Tema) ?? "sistema");
@@ -54,7 +28,7 @@ export default function Personalizar() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
-        <div className="senal">Preferencias</div>
+        <div className="senal">Settings</div>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Personalizar</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Preferencias locales de este equipo. No cambian datos de obra.
