@@ -7,6 +7,13 @@
       "runtimeArgs": ["start"],
       "cwd": "src/backend",
       "port": 3000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "src/frontend",
+      "port": 5173
     }
   ]
 }

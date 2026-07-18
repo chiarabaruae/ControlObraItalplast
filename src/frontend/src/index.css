@@ -1,0 +1,186 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/archivo";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-sans: 'Inter Variable', system-ui, sans-serif;
+    --font-heading: 'Archivo Variable', 'Inter Variable', sans-serif;
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    /* Estados de obra — tonos industriales */
+    --color-estado-progreso: var(--estado-progreso);
+    --color-estado-pausada: var(--estado-pausada);
+    --color-estado-riesgo: var(--estado-riesgo);
+    --color-estado-plan: var(--estado-plan);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * Italplast — Control de Obras
+ * Marca: violeta #8A0FA8. Neutros fríos "aluminio anodizado" con
+ * leve matiz violeta. La marca se puede re-tintar en runtime desde
+ * Personalizar escribiendo --brand-h/--brand-c (accent picker).
+ */
+:root {
+    --brand: #8a0fa8;
+    --background: oklch(0.972 0.004 310);          /* aluminio pálido, matiz violeta */
+    --foreground: oklch(0.21 0.02 315);            /* tinta con subtono violeta */
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.21 0.02 315);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.21 0.02 315);
+    --primary: oklch(0.47 0.216 322);              /* #8A0FA8 */
+    --primary-foreground: oklch(0.985 0.005 322);
+    --secondary: oklch(0.945 0.01 314);
+    --secondary-foreground: oklch(0.3 0.04 318);
+    --muted: oklch(0.945 0.008 310);
+    --muted-foreground: oklch(0.52 0.015 312);
+    --accent: oklch(0.94 0.03 322);
+    --accent-foreground: oklch(0.4 0.15 322);
+    --destructive: oklch(0.5 0.19 27);
+    --border: oklch(0.885 0.008 310);              /* línea de aluminio */
+    --input: oklch(0.885 0.008 310);
+    --ring: oklch(0.47 0.216 322);
+    --chart-1: oklch(0.47 0.216 322);
+    --chart-2: oklch(0.55 0.12 155);
+    --chart-3: oklch(0.62 0.13 65);
+    --chart-4: oklch(0.55 0.05 312);
+    --chart-5: oklch(0.35 0.08 318);
+    --radius: 0.5rem;
+    --sidebar: oklch(0.985 0.003 310);
+    --sidebar-foreground: oklch(0.32 0.02 315);
+    --sidebar-primary: oklch(0.47 0.216 322);
+    --sidebar-primary-foreground: oklch(0.985 0.005 322);
+    --sidebar-accent: oklch(0.94 0.03 322);
+    --sidebar-accent-foreground: oklch(0.4 0.15 322);
+    --sidebar-border: oklch(0.9 0.006 310);
+    --sidebar-ring: oklch(0.47 0.216 322);
+    --estado-progreso: oklch(0.52 0.12 155);       /* verde obra */
+    --estado-pausada: oklch(0.6 0.13 70);          /* ámbar señalización */
+    --estado-riesgo: oklch(0.5 0.19 27);           /* rojo riesgo */
+    --estado-plan: oklch(0.52 0.015 312);          /* gris plano */
+}
+
+.dark {
+    --background: oklch(0.185 0.012 315);          /* grafito violáceo */
+    --foreground: oklch(0.94 0.006 310);
+    --card: oklch(0.23 0.014 315);
+    --card-foreground: oklch(0.94 0.006 310);
+    --popover: oklch(0.23 0.014 315);
+    --popover-foreground: oklch(0.94 0.006 310);
+    --primary: oklch(0.66 0.19 322);               /* violeta iluminado p/ contraste */
+    --primary-foreground: oklch(0.16 0.03 322);
+    --secondary: oklch(0.28 0.016 315);
+    --secondary-foreground: oklch(0.9 0.01 312);
+    --muted: oklch(0.27 0.014 315);
+    --muted-foreground: oklch(0.66 0.012 312);
+    --accent: oklch(0.31 0.05 322);
+    --accent-foreground: oklch(0.85 0.08 322);
+    --destructive: oklch(0.62 0.19 27);
+    --border: oklch(0.31 0.014 315);
+    --input: oklch(0.33 0.014 315);
+    --ring: oklch(0.66 0.19 322);
+    --chart-1: oklch(0.66 0.19 322);
+    --chart-2: oklch(0.62 0.12 155);
+    --chart-3: oklch(0.68 0.13 65);
+    --chart-4: oklch(0.6 0.05 312);
+    --chart-5: oklch(0.8 0.08 318);
+    --sidebar: oklch(0.21 0.013 315);
+    --sidebar-foreground: oklch(0.9 0.008 310);
+    --sidebar-primary: oklch(0.66 0.19 322);
+    --sidebar-primary-foreground: oklch(0.16 0.03 322);
+    --sidebar-accent: oklch(0.31 0.05 322);
+    --sidebar-accent-foreground: oklch(0.85 0.08 322);
+    --sidebar-border: oklch(0.29 0.013 315);
+    --sidebar-ring: oklch(0.66 0.19 322);
+    --estado-progreso: oklch(0.62 0.12 155);
+    --estado-pausada: oklch(0.68 0.13 70);
+    --estado-riesgo: oklch(0.62 0.19 27);
+    --estado-plan: oklch(0.62 0.012 312);
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+    h1, h2, h3, h4 {
+        font-family: var(--font-heading);
+        letter-spacing: -0.01em;
+    }
+}
+
+@layer components {
+    /* Señalética industrial: eyebrows Archivo expandida en mayúsculas */
+    .senal {
+        font-family: var(--font-heading);
+        font-stretch: 118%;
+        font-weight: 650;
+        font-size: 0.6875rem;
+        line-height: 1;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--primary);
+    }
+    .senal-muted {
+        color: var(--muted-foreground);
+    }
+    /* Cifras de obra: mono tabular */
+    .cifra {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+/* Regla de avance: llenado animado salvo reduced-motion */
+.avance-fill {
+    transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+    .avance-fill {
+        transition: none;
+    }
+}
