@@ -590,5 +590,27 @@ export function createProyectosRoutes(container) {
     }
   });
 
+  // GET /api/admin/gantt/global
+  router.get("/gantt/global", async (request, response, next) => {
+    try {
+      const result = await container.pool.query(`
+        SELECT 
+          o.id as proyecto_id, o.nombre as nombre_proyecto, o.cliente_id, 
+          c.nombre as cliente_nombre, o.oferta_nro, o.serie, 
+          o.total_aberturas, o.responsable, o.estado, o.semaforo,
+          cp.fecha_limite_firma_abaco, cp.inicio_fabrica, 
+          cp.fecha_compromiso_fin_produccion, cp.fecha_comprometida_inicio_instalacion, 
+          cp.fin_instalacion
+        FROM obras o
+        LEFT JOIN clientes c ON o.cliente_id = c.id
+        LEFT JOIN cronogramas_proyecto cp ON o.id = cp.proyecto_id
+        ORDER BY o.fecha_inicio DESC
+      `);
+      response.json(result.rows);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }

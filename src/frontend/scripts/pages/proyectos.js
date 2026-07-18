@@ -6,7 +6,7 @@ import { setTopbarSection } from "../layout.js";
 let obras = [];
 let clientesList = [];
 let searchTerm = "";
-let currentView = "grid"; // Opciones: 'grid', 'list', 'kanban', 'gantt'
+let currentView = "gantt"; // Opciones: 'grid', 'list', 'kanban', 'gantt'
 let activeProjectId = null; // ID del proyecto en "Pantalla 2" (Funcionalidad Específica)
 let activeTab = null; // 'resumen', 'documentos', 'cronogramas', 'seguimientos'
 
@@ -42,10 +42,10 @@ function renderMain(container) {
         </div>
         <div style="display: flex; gap: 1rem;">
           <div class="view-toggles" style="display: flex; background: var(--bg-alt); padding: 4px; border-radius: 8px;">
-            <button class="btn btn-ghost btn-sm ${currentView === 'list' ? 'active' : ''}" data-view="list" title="Vista Lista (Popover)">${icons.list}</button>
-            <button class="btn btn-ghost btn-sm ${currentView === 'grid' ? 'active' : ''}" data-view="grid" title="Vista Tarjetas (Acordeón)">${icons.grid}</button>
-            <button class="btn btn-ghost btn-sm ${currentView === 'kanban' ? 'active' : ''}" data-view="kanban" title="Vista Kanban">K</button>
-            <button class="btn btn-ghost btn-sm ${currentView === 'gantt' ? 'active' : ''}" data-view="gantt" title="Vista Gantt Global">G</button>
+            <button class="btn btn-ghost btn-sm ${currentView === 'gantt' ? 'active' : ''}" data-view="gantt" title="Vista Gantt / Cronograma">${icons.gantt}</button>
+            <button class="btn btn-ghost btn-sm ${currentView === 'grid' ? 'active' : ''}" data-view="grid" title="Vista Tarjetas">${icons.grid}</button>
+            <button class="btn btn-ghost btn-sm ${currentView === 'list' ? 'active' : ''}" data-view="list" title="Vista Lista">${icons.list}</button>
+            <button class="btn btn-ghost btn-sm ${currentView === 'kanban' ? 'active' : ''}" data-view="kanban" title="Vista Kanban">${icons.kanban}</button>
           </div>
           <button class="btn btn-primary" id="btn-new-proyecto" type="button">${icons.plus} Nuevo Proyecto</button>
         </div>
@@ -68,11 +68,13 @@ function renderMain(container) {
   if (obras.length === 0 && !searchTerm) {
     viewContainer.innerHTML = renderEmpty("No hay proyectos cargados", "Crea un nuevo proyecto para comenzar");
   } else {
-    // Renderizamos la vista actual
     if (currentView === "grid") viewContainer.innerHTML = renderGridView();
     else if (currentView === "list") viewContainer.innerHTML = renderListView();
     else if (currentView === "kanban") viewContainer.innerHTML = renderKanbanView();
-    else if (currentView === "gantt") viewContainer.innerHTML = renderGanttView();
+    else if (currentView === "gantt") {
+      viewContainer.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--muted)">Cargando Gantt Global...</div>';
+      renderGanttView(viewContainer);
+    }
   }
 
   bindMainEvents(container);
@@ -150,8 +152,136 @@ function renderKanbanView() {
   return `<div style="padding: 2rem; text-align: center; color: var(--muted);">Vista Kanban en construcción...</div>`;
 }
 
-function renderGanttView() {
-  return `<div style="padding: 2rem; text-align: center; color: var(--muted);">Vista Gantt Global en construcción...</div>`;
+async function renderGanttView(container) {
+  try {
+    const ganttData = await apiGet("/gantt/global");
+    
+    if (ganttData.length === 0) {
+      container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--muted);">No hay proyectos con cronograma para mostrar en el Gantt.</div>`;
+      return;
+    }
+
+    const today = new Date();
+    // Fechas límites del Gantt basadas en los datos (simplificado)
+    const minDate = new Date(Math.min(...ganttData.map(d => new Date(d.fecha_limite_firma_abaco || d.inicio_fabrica || today).getTime())));
+    const maxDate = new Date(Math.max(...ganttData.map(d => new Date(d.fin_instalacion || today).getTime())));
+    
+    // Add some padding
+    minDate.setDate(minDate.getDate() - 7);
+    maxDate.setDate(maxDate.getDate() + 14);
+
+    const totalDays = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)));
+    const dayWidth = 20; // px por día
+    const ganttWidth = totalDays * dayWidth;
+
+    // Helper positions
+    const getPos = (dateStr) => {
+      if (!dateStr) return 0;
+      const d = new Date(dateStr);
+      return Math.max(0, Math.ceil((d - minDate) / (1000 * 60 * 60 * 24)) * dayWidth);
+    };
+
+    const getWidth = (startStr, endStr) => {
+      if (!startStr || !endStr) return dayWidth;
+      const start = new Date(startStr);
+      const end = new Date(endStr);
+      return Math.max(dayWidth, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) * dayWidth);
+    };
+
+    const todayPos = getPos(today);
+
+    let rowsHtml = ganttData.map(p => {
+      // Row principal
+      const mainRow = `
+        <div class="gantt-row main-row" onclick="this.parentElement.classList.toggle('collapsed')" style="display:flex; border-bottom: 1px solid var(--border); background: var(--card-bg); cursor: pointer;">
+          <div class="gantt-side" style="width: 350px; flex-shrink: 0; padding: 0.5rem; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="collapse-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            <div style="flex:1; overflow:hidden;">
+              <div style="font-weight: 500; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${esc(p.nombre_proyecto)}</div>
+              <div style="font-size: 0.75rem; color: var(--muted);">${esc(p.cliente_nombre || 'Sin cliente')} | Oferta: ${esc(p.oferta_nro || '-')}</div>
+            </div>
+            ${renderBadge(p.semaforo || 'gris')}
+          </div>
+          <div class="gantt-timeline-area" style="position: relative; width: ${ganttWidth}px; min-height: 40px;">
+            <!-- Barra resumen (visible cuando colapsado) -->
+            <div class="summary-bar" style="position: absolute; top: 12px; left: ${getPos(p.fecha_limite_firma_abaco || p.inicio_fabrica)}px; width: ${getWidth(p.fecha_limite_firma_abaco || p.inicio_fabrica, p.fin_instalacion)}px; height: 16px; background: var(--border); border-radius: 8px;"></div>
+          </div>
+        </div>
+      `;
+
+      // Sub rows
+      const renderSubRow = (title, type, color, start, end) => `
+        <div class="gantt-subrow" style="display:flex; border-bottom: 1px dashed var(--border); background: var(--bg-alt); min-height: 32px;">
+          <div class="gantt-side" style="width: 350px; flex-shrink: 0; padding: 0.25rem 0.5rem 0.25rem 2.5rem; border-right: 1px solid var(--border); display: flex; align-items: center; font-size: 0.85rem; color: var(--muted);">
+            ${title}
+          </div>
+          <div class="gantt-timeline-area" style="position: relative; width: ${ganttWidth}px;">
+            ${start ? (type === 'hito' ? 
+              `<div class="gantt-hito" style="position: absolute; top: 8px; left: ${getPos(start) - 6}px; width: 12px; height: 12px; background: ${color}; transform: rotate(45deg); cursor: pointer;" title="${title}: ${formatDate(start)}"></div>` 
+              : 
+              `<div class="gantt-bar" style="position: absolute; top: 6px; left: ${getPos(start)}px; width: ${getWidth(start, end)}px; height: 20px; background: ${color}; border-radius: 4px; cursor: pointer; opacity: 0.8;" title="${title}: ${formatDate(start)} - ${formatDate(end)}"></div>`
+            ) : `<span style="font-size:0.75rem; color: var(--muted); padding-left: 10px; line-height: 32px;">No definido</span>`}
+          </div>
+        </div>
+      `;
+
+      const subRows = `
+        <div class="gantt-subrows">
+          ${renderSubRow('1. Firma de ábaco', 'hito', '#3b82f6', p.fecha_limite_firma_abaco)}
+          ${renderSubRow('2. Producción en fábrica', 'barra', '#8b5cf6', p.inicio_fabrica, p.fecha_compromiso_fin_produccion)}
+          ${renderSubRow('3. Compromiso fin producción', 'hito', '#ef4444', p.fecha_compromiso_fin_produccion)}
+          ${renderSubRow('4. Inicio instalación', 'hito', '#eab308', p.fecha_comprometida_inicio_instalacion)}
+          ${renderSubRow('5. Instalación en obra', 'barra', '#10b981', p.fecha_comprometida_inicio_instalacion, p.fin_instalacion)}
+          ${renderSubRow('6. Fin instalación', 'hito', '#10b981', p.fin_instalacion)}
+        </div>
+      `;
+
+      return `<div class="gantt-project-group">${mainRow}${subRows}</div>`;
+    }).join("");
+
+    container.innerHTML = `
+      <style>
+        .gantt-container { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; background: var(--bg); }
+        .gantt-header { display: flex; background: var(--bg-alt); border-bottom: 2px solid var(--border); font-weight: 500; font-size: 0.85rem; color: var(--muted); }
+        .gantt-body { overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: column; position: relative; }
+        .gantt-project-group.collapsed .gantt-subrows { display: none; }
+        .gantt-project-group.collapsed .collapse-icon { transform: rotate(-90deg); }
+        .gantt-project-group:not(.collapsed) .summary-bar { display: none; }
+        .gantt-project-group:hover .main-row { background: var(--bg) !important; }
+        .gantt-bar:hover, .gantt-hito:hover { opacity: 1 !important; filter: brightness(1.2); }
+      </style>
+      <div class="card" style="padding: 1rem; margin-bottom: 1rem;">
+        <div style="display:flex; justify-content: space-between; align-items: center;">
+          <div style="display:flex; gap: 1rem;">
+            <select class="btn btn-ghost" style="border: 1px solid var(--border)"><option>Escala: Día</option><option>Escala: Semana</option></select>
+          </div>
+          <div>
+            <button class="btn btn-secondary">${icons.download} Exportar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="gantt-container">
+        <div class="gantt-header">
+          <div style="width: 350px; flex-shrink: 0; padding: 0.75rem; border-right: 1px solid var(--border);">Proyecto / Obra</div>
+          <div style="position: relative; width: ${ganttWidth}px; overflow: hidden; display: flex; align-items: center; background-image: repeating-linear-gradient(to right, transparent, transparent ${dayWidth-1}px, var(--border) ${dayWidth-1}px, var(--border) ${dayWidth}px);">
+            <!-- Días/Meses podrían ir aquí en el futuro -->
+            <div style="position: absolute; left: ${todayPos}px; top: 0; bottom: 0; width: 2px; background: rgba(239, 68, 68, 0.5); z-index: 10;" title="Hoy"></div>
+          </div>
+        </div>
+        <div class="gantt-body" style="width: 100%;">
+          <div style="display: flex; min-width: max-content;">
+            <div style="display: flex; flex-direction: column; width: 100%;">
+              <div style="position: absolute; left: calc(350px + ${todayPos}px); top: 0; bottom: 0; width: 2px; background: rgba(239, 68, 68, 0.5); z-index: 1;" title="Hoy"></div>
+              ${rowsHtml}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state"><h3>Error cargando Gantt</h3><p>${esc(err.message)}</p></div>`;
+  }
 }
 
 // ==================== VISTA FUNCIONALIDAD ESPECÍFICA ====================
@@ -216,10 +346,12 @@ function renderContenidoModulo(tab, proyecto) {
         <div class="card-header"><h2>Gestión de Oferta y Cronograma</h2></div>
         <div style="padding: 1.5rem;">
           <p style="color:var(--muted); margin-bottom:1rem;">Carga aquí la Oferta (PDF) para extraer el total de aberturas y habilitar el desglose ítem por ítem para el Gantt del proyecto.</p>
-          <div style="text-align:center; padding: 2rem; border: 2px dashed var(--border); border-radius: 8px; cursor: pointer;">
+          <input type="file" id="file-oferta" accept=".pdf" style="display:none;" />
+          <div style="text-align:center; padding: 2rem; border: 2px dashed var(--border); border-radius: 8px; cursor: pointer;" onclick="document.getElementById('file-oferta').click()">
             ${icons.plus}
             <p style="margin: 0.5rem 0 0;">Subir Archivo PDF (Oferta)</p>
           </div>
+          <div id="status-oferta" style="margin-top:1rem; text-align:center; font-size:0.85rem;"></div>
         </div>
       </div>
     `;
@@ -237,7 +369,9 @@ function renderContenidoModulo(tab, proyecto) {
               <span style="font-size:0.85rem; color:var(--muted);">Sube el PDF o Excel de producción para compararlo con la oferta y habilitar el listado reordenable.</span>
             </div>
           </div>
-          <button class="btn btn-primary">Subir Ábaco</button>
+          <input type="file" id="file-abaco" accept=".xlsx,.csv" style="display:none;" />
+          <button class="btn btn-primary" onclick="document.getElementById('file-abaco').click()">${icons.plus} Subir Ábaco</button>
+          <div id="status-abaco" style="margin-top:1rem; font-size:0.85rem;"></div>
         </div>
       </div>
     `;
@@ -370,6 +504,77 @@ function bindMainEvents(container) {
         renderProyectos(container); // Recargar todo
       } catch (err) {
         container.querySelector("#modal-status-proyecto").textContent = err.message;
+      }
+    });
+  }
+
+  // Upload Oferta
+  const fileOferta = container.querySelector("#file-oferta");
+  if (fileOferta) {
+    fileOferta.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const status = container.querySelector("#status-oferta");
+      status.textContent = "Subiendo archivo y extrayendo datos...";
+      
+      const formData = new FormData();
+      formData.append("archivo", file);
+      
+      try {
+        const token = localStorage.getItem("token") || "";
+        const res = await fetch(`/api/admin/obras/${activeProjectId}/documentos/oferta`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        
+        status.style.color = "var(--green)";
+        status.textContent = "✅ Oferta procesada: " + (result.datos_extraidos?.oferta_nro || 'OK');
+        
+        // Timeout para refrescar y ver los cambios si queremos
+        setTimeout(() => renderProyectos(container), 2000);
+      } catch (error) {
+        status.style.color = "var(--red)";
+        status.textContent = "❌ Error: " + error.message;
+      }
+    });
+  }
+
+  // Upload Abaco
+  const fileAbaco = container.querySelector("#file-abaco");
+  if (fileAbaco) {
+    fileAbaco.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const status = container.querySelector("#status-abaco");
+      status.textContent = "Subiendo ábaco y procesando ítems...";
+      
+      const formData = new FormData();
+      formData.append("archivo", file);
+      
+      try {
+        const token = localStorage.getItem("token") || "";
+        const res = await fetch(`/api/admin/obras/${activeProjectId}/documentos/abaco`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        
+        status.style.color = "var(--green)";
+        status.textContent = "✅ Ábaco procesado. " + result.total_aberturas + " aberturas cargadas.";
+        
+        setTimeout(() => renderProyectos(container), 2000);
+      } catch (error) {
+        status.style.color = "var(--red)";
+        status.textContent = "❌ Error: " + error.message;
       }
     });
   }
