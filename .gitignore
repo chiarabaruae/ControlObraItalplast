@@ -41,6 +41,7 @@ venv/
 *.bacpac
 *.mdf
 *.ldf
+src/backend/storage/
 
 # IDE / OS
 .vs/
@@ -55,3 +56,8 @@ Desktop.ini
 # Claude Code (local-only settings)
 .claude/settings.local.json
 
+# Gitleaks local reports and binaries
+gitleaks-report.json
+findings.json
+gitleaks.exe
+gitleaks.zip

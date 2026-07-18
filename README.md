@@ -93,6 +93,7 @@ Arquitectura general:
 
 ```text
 Frontend (JS) -> Backend Express -> PostgreSQL (local)
+```
 
 ---
 

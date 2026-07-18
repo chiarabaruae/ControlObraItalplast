@@ -1,13 +1,15 @@
 // Layout: Sidebar + Topbar rendering
 import { icons, getInitials } from "./ui.js";
 import { navigate, getCurrentPath } from "./router.js";
+import { canAccessProjectWorkspace } from "./authz.js";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard", path: "/dashboard" },
   { id: "clientes", label: "Clientes", icon: "clientes", path: "/clientes" },
-  { id: "obras", label: "Obras", icon: "obras", path: "/proyectos" },
+  { id: "obras", label: "Obras", icon: "obras", path: "/proyectos", projectWorkspaceOnly: true },
   { id: "tareas", label: "To-Do", icon: "tareas", path: "/todo" },
   { id: "personalizar", label: "Personalizar", icon: "personalizar", path: "/personalizar" },
+  { id: "ajustes", label: "Ajustes", icon: "personalizar", path: "/ajustes/usuarios", adminOnly: true },
 ];
 
 let sidebarClients = [];
@@ -51,6 +53,9 @@ export function renderLayout(container, user) {
           </div>
         </div>
       </header>
+      <div class="app-loading-overlay" id="app-loading-overlay" aria-hidden="true">
+        <div class="app-loading-spinner" role="status" aria-live="polite" aria-label="Cargando"></div>
+      </div>
       <div class="page-content" id="page-content">
         <div class="loading">Cargando...</div>
       </div>
@@ -65,7 +70,12 @@ function renderNav() {
   const nav = document.getElementById("side-nav");
   if (!nav) return;
   const current = getCurrentPath();
-  nav.innerHTML = NAV_ITEMS.map(item => {
+  const role = nav.dataset.role || "";
+  nav.innerHTML = NAV_ITEMS.filter(item => {
+    if (item.adminOnly && role !== "administrator") return false;
+    if (item.projectWorkspaceOnly && !canAccessProjectWorkspace(role)) return false;
+    return true;
+  }).map(item => {
     const isActive = current.startsWith(item.path) ? "active" : "";
     return `<button class="nav-item ${isActive}" data-path="${item.path}" type="button">
       ${icons[item.icon]}
@@ -77,15 +87,18 @@ function renderNav() {
 function renderClientList() {
   const el = document.getElementById("sidebar-client-list");
   if (!el) return;
-  el.innerHTML = sidebarClients.filter(c => c.estado === "activo").slice(0, 8).map(c =>
+  el.innerHTML = sidebarClients.filter(c => String(c.estado || "").toLowerCase() === "activo").slice(0, 8).map(c =>
     `<div class="sidebar-client">
-      <div class="avatar-sm">${getInitials(c.nombre)}</div>
-      <span>${esc(c.nombre).toUpperCase()}</span>
+      <div class="avatar-sm">${getInitials(c.nombre || c.nombre_cliente || "")}</div>
+      <span>${esc(c.nombre || c.nombre_cliente || "-").toUpperCase()}</span>
     </div>`
   ).join("") || '<div style="padding:6px 14px;font-size:12px;color:var(--muted)">Sin clientes</div>';
 }
 
 function bindLayoutEvents(user) {
+  document.getElementById("side-nav")?.setAttribute("data-role", user.role ?? "");
+  renderNav();
+
   // Nav clicks
   document.getElementById("side-nav")?.addEventListener("click", e => {
     const btn = e.target.closest("[data-path]");

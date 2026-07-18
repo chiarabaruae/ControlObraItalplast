@@ -7,27 +7,39 @@ function getToken() {
 
 export async function api(path, options = {}) {
   const token = getToken();
-  const response = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.headers ?? {})
+  const notifyLoading = options.notifyLoading !== false;
+  const loadingDetail = {
+    source: "request",
+    method: String(options.method ?? "GET").toUpperCase(),
+    path
+  };
+  if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:start", { detail: loadingDetail }));
+
+  try {
+    const response = await fetch(`${BASE}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(options.headers ?? {})
+      }
+    });
+
+    if (response.status === 204) return null;
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        sessionStorage.clear();
+        location.reload();
+      }
+      throw new Error(data.error ?? "Error de API");
     }
-  });
 
-  if (response.status === 204) return null;
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      sessionStorage.clear();
-      location.reload();
-    }
-    throw new Error(data.error ?? "Error de API");
+    return data;
+  } finally {
+    if (notifyLoading) window.dispatchEvent(new CustomEvent("co:loading:end", { detail: loadingDetail }));
   }
-
-  return data;
 }
 
 export async function apiGet(path) {
@@ -45,6 +57,14 @@ export async function apiPost(path, body) {
 export async function apiPut(path, body) {
   return api(path, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+}
+
+export async function apiPatch(path, body = {}) {
+  return api(path, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });

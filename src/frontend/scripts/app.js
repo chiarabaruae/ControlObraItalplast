@@ -4,9 +4,12 @@ import { renderLayout, getPageContent, setSidebarClients } from "./layout.js";
 import { renderDashboard } from "./pages/dashboard.js";
 import { renderClientes } from "./pages/clientes.js";
 import { renderProyectos } from "./pages/proyectos.js";
+import { renderProyectoDetalle } from "./pages/proyecto-detalle.js";
 import { renderTodo } from "./pages/todo.js";
 import { renderPersonalizar } from "./pages/personalizar.js";
+import { renderAjustesUsuarios } from "./pages/ajustes-usuarios.js";
 import { apiGet } from "./api.js";
+import { canAccessProjectWorkspace } from "./authz.js";
 
 // ============ AUTH ============
 const loginShell = document.getElementById("login-shell");
@@ -125,11 +128,23 @@ function enterApp(user) {
   });
   addRoute("/clientes", () => {
     const el = getPageContent();
-    if (el) renderClientes(el);
+    if (el) renderClientes(el, currentUser);
   });
   addRoute("/proyectos", () => {
     const el = getPageContent();
-    if (el) renderProyectos(el);
+    if (!canAccessProjectWorkspace(currentUser?.role)) {
+      navigate("/todo");
+      return;
+    }
+    if (el) renderProyectos(el, currentUser);
+  });
+  addRoute("/proyectos/:id", ({ id }) => {
+    const el = getPageContent();
+    if (!canAccessProjectWorkspace(currentUser?.role)) {
+      navigate("/todo");
+      return;
+    }
+    if (el) renderProyectoDetalle(el, id, currentUser);
   });
   addRoute("/todo", () => {
     const el = getPageContent();
@@ -139,6 +154,22 @@ function enterApp(user) {
     const el = getPageContent();
     if (el) renderPersonalizar(el);
   });
+  addRoute("/ajustes/usuarios", () => {
+    const el = getPageContent();
+    if (currentUser?.role !== "administrator") {
+      navigate("/dashboard");
+      return;
+    }
+    if (el) renderAjustesUsuarios(el, currentUser);
+  });
+  addRoute("/ajustes", () => {
+    navigate("/ajustes/usuarios");
+  });
+
+  // Ensure we always land on the dashboard after login.
+  if (!window.location.hash) {
+    navigate("/dashboard");
+  }
 
   // Start routing
   startRouter();
