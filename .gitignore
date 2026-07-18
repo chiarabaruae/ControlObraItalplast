@@ -51,6 +51,10 @@ src/backend/storage/
 .idea/
 Thumbs.db
 Desktop.ini
+.DS_Store
+
+# Claude Code (local-only settings)
+.claude/settings.local.json
 
 # Gitleaks local reports and binaries
 gitleaks-report.json
