@@ -2,13 +2,13 @@ import { useState } from "react";
 import { Link, Navigate, useParams } from "react-router";
 import {
   ArrowLeft, MapPin, CalendarRange, Factory, HardHat, FileText,
-  Upload, FileSpreadsheet, File, Printer, Minus, Plus, ListTodo
+  Upload, FileSpreadsheet, File, Printer, Minus, Plus, ListTodo, Ruler, Hammer
 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
   proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, tareasIniciales,
-  type EtapaSeguimiento, type Proyecto, type Tarea
+  nombreTipoProducto, type ConfiguracionProductoProyecto, type EtapaSeguimiento, type Proyecto, type Tarea
 } from "@/mocks/data";
 import { formatFecha, formatFechaCorta } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
@@ -38,7 +38,9 @@ function Seguimiento({ titulo, icono: Icono, etapasIniciales, puedeEditar }: {
     );
   };
 
-  const total = Math.round(etapas.reduce((a, e) => a + e.avance, 0) / etapas.length);
+  const total = etapas.length > 0
+    ? Math.round(etapas.reduce((a, e) => a + e.avance, 0) / etapas.length)
+    : 0;
 
   return (
     <Card>
@@ -172,6 +174,49 @@ function TareasProyecto({ tareas }: { tareas: Tarea[] }) {
 
 const DOC_ICONOS = { oferta: FileText, abaco: FileSpreadsheet, plano: File, otro: File };
 
+function SeguimientoPorProductos({ productos, puedeEditar }: {
+  productos: ConfiguracionProductoProyecto[];
+  puedeEditar: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      {productos.map((producto) => {
+        const etiqueta = nombreTipoProducto(producto.tipo);
+        const grupos = [
+          ...(producto.etapasFabricacionPremarcos.length > 0
+            ? [{ titulo: "Fabricación de premarcos", icono: Ruler, etapas: producto.etapasFabricacionPremarcos }]
+            : []),
+          ...(producto.etapasInstalacionPremarcos.length > 0
+            ? [{ titulo: "Instalación de premarcos", icono: Hammer, etapas: producto.etapasInstalacionPremarcos }]
+            : []),
+          { titulo: "Fábrica", icono: Factory, etapas: producto.etapasFabrica },
+          { titulo: "Obra", icono: HardHat, etapas: producto.etapasObra }
+        ];
+
+        return (
+          <section key={producto.tipo} className="space-y-3">
+            <div>
+              <div className="senal">Producto</div>
+              <h2 className="mt-1 font-heading text-lg font-semibold">{etiqueta}</h2>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              {grupos.map((grupo) => (
+                <Seguimiento
+                  key={`${producto.tipo}-${grupo.titulo}`}
+                  titulo={grupo.titulo}
+                  icono={grupo.icono}
+                  etapasIniciales={grupo.etapas}
+                  puedeEditar={puedeEditar}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ProyectoDetalle() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -183,6 +228,20 @@ export default function ProyectoDetalle() {
   const lider = usuarioPorId(p.liderId);
   const totalAberturas = p.aberturas.reduce((a, ab) => a + ab.cantidad, 0);
   const tareasDelProyecto = tareasIniciales.filter((t) => t.proyectoId === p.id);
+  const productos = p.productos?.length
+    ? p.productos
+    : p.tipoProducto
+      ? [{
+          tipo: p.tipoProducto,
+          etapasFabricacionPremarcos: p.etapasFabricacionPremarcos,
+          etapasInstalacionPremarcos: p.etapasInstalacionPremarcos,
+          etapasFabrica: p.etapasFabrica,
+          etapasObra: p.etapasObra
+        }]
+      : [];
+  const productosOperativos = productos.filter((producto) => producto.tipo !== "servicios");
+  const soloServicios = productos.length > 0 && productosOperativos.length === 0;
+  const seguimientoPorProducto = productosOperativos.length > 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -202,14 +261,30 @@ export default function ProyectoDetalle() {
             <span>{cliente?.nombre}</span>
             <span>Líder: <span className="font-medium text-foreground">{lider?.displayName ?? "Sin asignar"}</span></span>
           </div>
+          {productos.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {productos.map((producto) => (
+                <span key={producto.tipo} className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  {nombreTipoProducto(producto.tipo)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="w-full sm:w-64">
-          <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-            <span>Avance general</span>
-            <span className="cifra">{formatFecha(p.fechaInicio)} → {formatFecha(p.fechaFinEstimada)}</span>
+        {soloServicios ? (
+          <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            <div className="font-medium text-foreground">Servicio</div>
+            <div className="cifra mt-1 text-xs">Inicio: {formatFecha(p.fechaInicio)}</div>
           </div>
-          <AvanceMeter valor={avanceGeneral(p)} size="lg" />
-        </div>
+        ) : (
+          <div className="w-full sm:w-64">
+            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+              <span>Avance general</span>
+              <span className="cifra">{formatFecha(p.fechaInicio)} → {formatFecha(p.fechaFinEstimada)}</span>
+            </div>
+            <AvanceMeter valor={avanceGeneral(p)} size="lg" />
+          </div>
+        )}
       </header>
 
       <Tabs defaultValue="resumen">
@@ -217,8 +292,16 @@ export default function ProyectoDetalle() {
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="tareas">Tareas</TabsTrigger>
           <TabsTrigger value="cronograma">Cronograma</TabsTrigger>
-          <TabsTrigger value="fabrica">Fábrica</TabsTrigger>
-          <TabsTrigger value="obra">Obra</TabsTrigger>
+          {seguimientoPorProducto ? (
+            <TabsTrigger value="seguimiento">Seguimiento por producto</TabsTrigger>
+          ) : !soloServicios && (
+            <>
+              {p.etapasFabricacionPremarcos.length > 0 && <TabsTrigger value="fabricacion-premarcos">Fabricación premarcos</TabsTrigger>}
+              {p.etapasInstalacionPremarcos.length > 0 && <TabsTrigger value="instalacion-premarcos">Instalación premarcos</TabsTrigger>}
+              <TabsTrigger value="fabrica">Fábrica</TabsTrigger>
+              <TabsTrigger value="obra">Obra</TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="informe">Informe</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
         </TabsList>
@@ -228,7 +311,7 @@ export default function ProyectoDetalle() {
           <Card>
             <CardContent className="text-sm leading-relaxed">{p.descripcion}</CardContent>
           </Card>
-          <Card>
+          {!soloServicios && <Card>
             <CardHeader className="flex-row items-baseline justify-between">
               <CardTitle className="font-heading text-base">Ábaco de aberturas</CardTitle>
               <span className="cifra text-xs text-muted-foreground">{totalAberturas} unidades</span>
@@ -261,7 +344,7 @@ export default function ProyectoDetalle() {
                 </TableBody>
               </Table>
             </CardContent>
-          </Card>
+          </Card>}
         </TabsContent>
 
         {/* Tareas */}
@@ -275,12 +358,31 @@ export default function ProyectoDetalle() {
         </TabsContent>
 
         {/* Seguimientos */}
-        <TabsContent value="fabrica" className="mt-4">
-          <Seguimiento titulo="Seguimiento de fábrica" icono={Factory} etapasIniciales={p.etapasFabrica} puedeEditar={permisos.editarAvance(user.role)} />
-        </TabsContent>
-        <TabsContent value="obra" className="mt-4">
-          <Seguimiento titulo="Seguimiento de obra" icono={HardHat} etapasIniciales={p.etapasObra} puedeEditar={permisos.editarAvance(user.role)} />
-        </TabsContent>
+        {seguimientoPorProducto && (
+          <TabsContent value="seguimiento" className="mt-4">
+            <SeguimientoPorProductos productos={productosOperativos} puedeEditar={permisos.editarAvance(user.role)} />
+          </TabsContent>
+        )}
+        {!seguimientoPorProducto && !soloServicios && p.etapasFabricacionPremarcos.length > 0 && (
+          <TabsContent value="fabricacion-premarcos" className="mt-4">
+            <Seguimiento titulo="Fabricación de premarcos" icono={Ruler} etapasIniciales={p.etapasFabricacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />
+          </TabsContent>
+        )}
+        {!seguimientoPorProducto && !soloServicios && p.etapasInstalacionPremarcos.length > 0 && (
+          <TabsContent value="instalacion-premarcos" className="mt-4">
+            <Seguimiento titulo="Instalación de premarcos" icono={Hammer} etapasIniciales={p.etapasInstalacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />
+          </TabsContent>
+        )}
+        {!seguimientoPorProducto && !soloServicios && (
+          <TabsContent value="fabrica" className="mt-4">
+            <Seguimiento titulo="Seguimiento de fábrica" icono={Factory} etapasIniciales={p.etapasFabrica} puedeEditar={permisos.editarAvance(user.role)} />
+          </TabsContent>
+        )}
+        {!seguimientoPorProducto && !soloServicios && (
+          <TabsContent value="obra" className="mt-4">
+            <Seguimiento titulo="Seguimiento de obra" icono={HardHat} etapasIniciales={p.etapasObra} puedeEditar={permisos.editarAvance(user.role)} />
+          </TabsContent>
+        )}
 
         {/* Informe */}
         <TabsContent value="informe" className="mt-4">
@@ -292,23 +394,24 @@ export default function ProyectoDetalle() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-5 text-sm">
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className={`grid gap-4 ${soloServicios ? "sm:grid-cols-1" : "sm:grid-cols-3"}`}>
                 <div>
-                  <div className="senal senal-muted">General</div>
-                  <div className="cifra mt-1 text-3xl font-bold">{avanceGeneral(p)}%</div>
+                  <div className="senal senal-muted">{soloServicios ? "Tipo" : "General"}</div>
+                  <div className="cifra mt-1 text-3xl font-bold">{soloServicios ? "Servicio" : `${avanceGeneral(p)}%`}</div>
                 </div>
-                <div>
+                {!soloServicios && <div>
                   <div className="senal senal-muted">Fábrica</div>
                   <div className="cifra mt-1 text-3xl font-bold">{p.avanceFabrica}%</div>
-                </div>
-                <div>
+                </div>}
+                {!soloServicios && <div>
                   <div className="senal senal-muted">Obra</div>
                   <div className="cifra mt-1 text-3xl font-bold">{p.avanceObra}%</div>
-                </div>
+                </div>}
               </div>
               <p className="leading-relaxed text-muted-foreground">
-                {p.nombre} — {cliente?.nombre}. Inicio {formatFecha(p.fechaInicio)}, entrega estimada {formatFecha(p.fechaFinEstimada)}.
-                {" "}{totalAberturas} aberturas en {p.aberturas.length} tipologías. {p.descripcion}
+                {p.nombre} — {cliente?.nombre}. Inicio {formatFecha(p.fechaInicio)}
+                {!soloServicios && `, entrega estimada ${formatFecha(p.fechaFinEstimada)}`}.
+                {!soloServicios && ` ${totalAberturas} aberturas en ${p.aberturas.length} tipologías.`} {p.descripcion}
               </p>
             </CardContent>
           </Card>

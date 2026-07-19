@@ -25,6 +25,27 @@ export interface Cliente {
 
 export type EstadoObra = "planificada" | "en_progreso" | "pausada" | "finalizada" | "cancelada";
 
+export type TipoProducto =
+  | "aberturas_aluminio"
+  | "aberturas_pvc"
+  | "mosquiteras"
+  | "persianas"
+  | "aberturas_velux"
+  | "servicios";
+
+export const TIPOS_PRODUCTO: { valor: TipoProducto; label: string }[] = [
+  { valor: "aberturas_aluminio", label: "Aberturas de aluminio" },
+  { valor: "aberturas_pvc", label: "Aberturas de PVC" },
+  { valor: "mosquiteras", label: "Mosquiteras" },
+  { valor: "persianas", label: "Persianas" },
+  { valor: "aberturas_velux", label: "Aberturas Velux de techo" },
+  { valor: "servicios", label: "Servicios" }
+];
+
+export function nombreTipoProducto(tipo?: TipoProducto) {
+  return TIPOS_PRODUCTO.find((opcion) => opcion.valor === tipo)?.label ?? "Producto no especificado";
+}
+
 export interface EtapaSeguimiento {
   nombre: string;
   avance: number; // 0-100
@@ -52,18 +73,31 @@ export interface Documento {
   tamano: string;
 }
 
+export interface ConfiguracionProductoProyecto {
+  tipo: TipoProducto;
+  etapasFabricacionPremarcos: EtapaSeguimiento[];
+  etapasInstalacionPremarcos: EtapaSeguimiento[];
+  etapasFabrica: EtapaSeguimiento[];
+  etapasObra: EtapaSeguimiento[];
+}
+
 export interface Proyecto {
   id: string;
   nombre: string;
   clienteId: string;
   ubicacion: string;
   liderId: string;
+  productos?: ConfiguracionProductoProyecto[];
+  /** Compatibilidad temporal con proyectos creados antes de permitir múltiples productos. */
+  tipoProducto?: TipoProducto;
   estado: EstadoObra;
   fechaCreacion?: string;
   fechaInicio: string;
   fechaFinEstimada: string;
   avanceFabrica: number;
   avanceObra: number;
+  etapasFabricacionPremarcos: EtapaSeguimiento[];
+  etapasInstalacionPremarcos: EtapaSeguimiento[];
   etapasFabrica: EtapaSeguimiento[];
   etapasObra: EtapaSeguimiento[];
   aberturas: Abertura[];
@@ -115,6 +149,20 @@ export const clientes: Cliente[] = [
 export const ETAPAS_FABRICA = ["Corte de perfiles", "Soldadura", "Limpieza", "Herrajes", "Vidriado", "Control y embalaje"];
 export const ETAPAS_FABRICA_OPCIONALES = ["Precorte"];
 export const ETAPAS_OBRA = ["Medición en obra", "Preparación de vanos", "Colocación de marcos", "Colocación de hojas", "Ajuste y sellado"];
+export const ETAPAS_FABRICACION_PREMARCOS = [
+  "Relevamiento y medición de vanos",
+  "Despiece y preparación de materiales",
+  "Corte y armado de premarcos",
+  "Control dimensional",
+  "Preparación para entrega"
+];
+export const ETAPAS_INSTALACION_PREMARCOS = [
+  "Coordinación de instalación",
+  "Traslado a obra",
+  "Presentación y nivelación",
+  "Fijación de premarcos",
+  "Control final de plomo y nivel"
+];
 
 export function etapas(nombres: string[], avances: number[]): EtapaSeguimiento[] {
   return nombres.map((nombre, i) => ({ nombre, avance: avances[i] ?? 0 }));
@@ -133,6 +181,8 @@ export const proyectos: Proyecto[] = [
     fechaFinEstimada: "2026-09-30",
     avanceFabrica: 72,
     avanceObra: 38,
+    etapasFabricacionPremarcos: [],
+    etapasInstalacionPremarcos: [],
     etapasFabrica: etapas(ETAPAS_FABRICA, [100, 100, 95, 70, 45, 20]),
     etapasObra: etapas(ETAPAS_OBRA, [100, 80, 10, 0, 0]),
     aberturas: [
@@ -165,6 +215,8 @@ export const proyectos: Proyecto[] = [
     fechaFinEstimada: "2026-08-28",
     avanceFabrica: 34,
     avanceObra: 0,
+    etapasFabricacionPremarcos: [],
+    etapasInstalacionPremarcos: [],
     etapasFabrica: etapas(ETAPAS_FABRICA, [90, 55, 40, 15, 0, 0]),
     etapasObra: etapas(ETAPAS_OBRA, [60, 0, 0, 0, 0]),
     aberturas: [
@@ -193,6 +245,8 @@ export const proyectos: Proyecto[] = [
     fechaFinEstimada: "2026-10-15",
     avanceFabrica: 58,
     avanceObra: 12,
+    etapasFabricacionPremarcos: [],
+    etapasInstalacionPremarcos: [],
     etapasFabrica: etapas(ETAPAS_FABRICA, [100, 85, 70, 40, 25, 0]),
     etapasObra: etapas(ETAPAS_OBRA, [45, 15, 0, 0, 0]),
     aberturas: [
@@ -220,6 +274,8 @@ export const proyectos: Proyecto[] = [
     fechaFinEstimada: "2026-04-24",
     avanceFabrica: 100,
     avanceObra: 100,
+    etapasFabricacionPremarcos: [],
+    etapasInstalacionPremarcos: [],
     etapasFabrica: etapas(ETAPAS_FABRICA, [100, 100, 100, 100, 100, 100]),
     etapasObra: etapas(ETAPAS_OBRA, [100, 100, 100, 100, 100]),
     aberturas: [
@@ -272,7 +328,28 @@ export function obtenerProyectos(): Proyecto[] {
 
   try {
     const parsed = JSON.parse(guardados) as Proyecto[];
-    return Array.isArray(parsed) ? parsed : proyectos;
+    return Array.isArray(parsed)
+      ? parsed.map((proyecto) => {
+          const etapasFabricacionPremarcos = proyecto.etapasFabricacionPremarcos ?? [];
+          const etapasInstalacionPremarcos = proyecto.etapasInstalacionPremarcos ?? [];
+          const productos = proyecto.productos ?? (proyecto.tipoProducto
+            ? [{
+                tipo: proyecto.tipoProducto,
+                etapasFabricacionPremarcos,
+                etapasInstalacionPremarcos,
+                etapasFabrica: proyecto.etapasFabrica ?? [],
+                etapasObra: proyecto.etapasObra ?? []
+              }]
+            : []);
+
+          return {
+            ...proyecto,
+            productos,
+            etapasFabricacionPremarcos,
+            etapasInstalacionPremarcos
+          };
+        })
+      : proyectos;
   } catch {
     return proyectos;
   }

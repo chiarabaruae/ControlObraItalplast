@@ -116,15 +116,36 @@ diseña ya en Fase 2 con mocks; se conecta en Fase 4.*
 - En Fase 2, la creación queda resuelta en frontend/mock con persistencia temporal
   en `localStorage`, porque todavía no hay base de datos ni endpoint confirmado
   que permita validar trazabilidad real.
-- El alta de proyecto debe pedir nombre, cliente y fecha de inicio. La fecha de
-  creación se genera automáticamente y se muestra solo como dato de lectura.
+- El alta de proyecto debe pedir nombre, cliente, uno o más tipos de producto y fecha de
+  inicio. Líder y ubicación pueden cargarse durante el alta. La fecha de creación
+  se genera automáticamente y se muestra solo como dato de lectura.
+- Los tipos de producto iniciales son: aberturas de aluminio, aberturas de PVC,
+  mosquiteras, persianas, aberturas Velux de techo y servicios.
+- Un proyecto puede reunir varios tipos de producto. Cada tipo conserva su propia
+  configuración de premarcos, fábrica y obra, sin compartir ni sobrescribir las
+  etapas de los otros productos seleccionados.
+- La selección de productos es múltiple. Al seleccionar un tipo aparece su editor
+  de etapas; al deseleccionarlo se oculta y no se guarda en el proyecto. Durante
+  el formulario, volver a seleccionarlo recupera la configuración que tenía.
+- `Servicios` no utiliza seguimiento por etapas de premarcos, fábrica u obra; puede
+  coexistir con otros productos, que sí conservan sus etapas independientes.
 - La fecha fin estimada queda vacía al alta y debe poder editarse posteriormente.
-- El proyecto se crea con etapas seleccionables. Por defecto quedan tildadas las
-  etapas estándar de fábrica y obra; `Precorte` queda disponible como etapa
-  opcional no seleccionada.
-- Las etapas no seleccionadas no aparecen en seguimiento. La posibilidad de
-  agregar etapas luego de creado el proyecto queda como requerimiento futuro,
-  porque implica diseñar trazabilidad de cambios del alcance.
+- Para cada producto distinto de `Servicios`, la configuración contiene cuatro
+  grupos: fabricación de premarcos (opcional), instalación de premarcos
+  (opcional e independiente), fábrica del producto (obligatorio) y obra del
+  producto (obligatorio).
+- Fabricación e instalación de premarcos pueden combinarse libremente: ambas,
+  solo fabricación, solo instalación o ninguna. Esto contempla premarcos del
+  cliente, entrega sin instalación e instalación de premarcos existentes.
+- Cada grupo permite seleccionar, renombrar, eliminar y agregar subetapas antes
+  de crear el proyecto. Los cambios se guardan únicamente en ese proyecto y no
+  modifican los valores predeterminados de otros proyectos.
+- Por defecto quedan seleccionadas las etapas estándar de fábrica y obra;
+  `Precorte` queda disponible como etapa no seleccionada. Los grupos opcionales
+  de premarcos parten de una propuesta editable de subetapas operativas.
+- Como evolución futura, Settings tendrá plantillas globales por producto. Solo
+  administradores y supervisores podrán modificar esas condiciones globales;
+  los permisos específicos se definirán al conectar el backend.
 ### Personalizar
 Disponible para los 3 roles (tema claro/oscuro/sistema + color de acento;
 preferencias locales, sin impacto en datos).
@@ -142,6 +163,11 @@ preferencias locales, sin impacto en datos).
 4. **Consolidación**: la sección `obras` desaparece como pantalla independiente;
    queda una sola sección **Proyectos** cuyo detalle absorbe los módulos
    (Resumen/Documentos/Cronogramas/Seguimientos). `obras.js` no se migra.
+5. **2026-07-18 — Etapas configurables por producto y proyecto**: un proyecto
+   admite varios tipos de producto, cada uno con etapas independientes. Las
+   modificaciones de nombres, altas y bajas afectan solo a ese producto dentro
+   del proyecto en creación. Las plantillas globales se administrarán más
+   adelante con acceso restringido a administradores y supervisores.
 
 ## Implicancias para Fase 2 (React + mocks)
 

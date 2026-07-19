@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Check, Plus, MapPin, Factory, HardHat } from "lucide-react";
+import { Check, Factory, Hammer, HardHat, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
   clientes, usuarios, clientePorId, usuarioPorId, avanceGeneral, etapas,
-  ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA, obtenerProyectos,
-  guardarProyectos, type EstadoObra, type Proyecto
+  ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
+  ETAPAS_FABRICACION_PREMARCOS, ETAPAS_INSTALACION_PREMARCOS,
+  TIPOS_PRODUCTO, nombreTipoProducto, obtenerProyectos, guardarProyectos,
+  type ConfiguracionProductoProyecto, type EstadoObra, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { formatFecha } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
@@ -17,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 const FILTROS: { valor: EstadoObra | "todas"; label: string }[] = [
@@ -27,10 +30,181 @@ const FILTROS: { valor: EstadoObra | "todas"; label: string }[] = [
   { valor: "finalizada", label: "Finalizadas" }
 ];
 
+interface EtapaConfigurable {
+  id: string;
+  nombre: string;
+  seleccionada: boolean;
+}
+
+interface ConfiguracionProductoFormulario {
+  fabricaraPremarcos: boolean;
+  instalaraPremarcos: boolean;
+  etapasFabricacionPremarcos: EtapaConfigurable[];
+  etapasInstalacionPremarcos: EtapaConfigurable[];
+  etapasFabrica: EtapaConfigurable[];
+  etapasObra: EtapaConfigurable[];
+}
+
+function crearEtapasConfigurables(nombres: string[], seleccionadas: string[] = nombres): EtapaConfigurable[] {
+  return nombres.map((nombre, indice) => ({
+    id: `${indice}-${nombre}`,
+    nombre,
+    seleccionada: seleccionadas.includes(nombre)
+  }));
+}
+
+function crearConfiguracionProducto(): ConfiguracionProductoFormulario {
+  return {
+    fabricaraPremarcos: false,
+    instalaraPremarcos: false,
+    etapasFabricacionPremarcos: crearEtapasConfigurables(ETAPAS_FABRICACION_PREMARCOS),
+    etapasInstalacionPremarcos: crearEtapasConfigurables(ETAPAS_INSTALACION_PREMARCOS),
+    etapasFabrica: crearEtapasConfigurables(
+      [...ETAPAS_FABRICA, ...ETAPAS_FABRICA_OPCIONALES],
+      ETAPAS_FABRICA
+    ),
+    etapasObra: crearEtapasConfigurables(ETAPAS_OBRA)
+  };
+}
+
+function crearMapaConfiguraciones() {
+  return Object.fromEntries(
+    TIPOS_PRODUCTO.map((producto) => [producto.valor, crearConfiguracionProducto()])
+  ) as Record<TipoProducto, ConfiguracionProductoFormulario>;
+}
+
+function etapasSeleccionadas(configuracion: EtapaConfigurable[]) {
+  return configuracion
+    .filter((etapa) => etapa.seleccionada)
+    .map((etapa) => etapa.nombre.trim());
+}
+
+function tieneEtapasInvalidas(configuracion: EtapaConfigurable[]) {
+  const nombres = etapasSeleccionadas(configuracion);
+  return nombres.some((nombre) => !nombre) || new Set(nombres.map((nombre) => nombre.toLocaleLowerCase())).size !== nombres.length;
+}
+
+function EditorEtapas({
+  idBase,
+  contexto,
+  titulo,
+  descripcion,
+  icono: Icono,
+  valor,
+  alCambiar,
+  opcional = false,
+  habilitado = true,
+  alCambiarHabilitado
+}: {
+  idBase: string;
+  contexto: string;
+  titulo: string;
+  descripcion: string;
+  icono: typeof Factory;
+  valor: EtapaConfigurable[];
+  alCambiar: (valor: EtapaConfigurable[]) => void;
+  opcional?: boolean;
+  habilitado?: boolean;
+  alCambiarHabilitado?: (habilitado: boolean) => void;
+}) {
+  const [nuevaEtapa, setNuevaEtapa] = useState("");
+
+  const agregar = () => {
+    const nombre = nuevaEtapa.trim();
+    if (!nombre) return;
+    alCambiar([
+      ...valor,
+      { id: `etapa-${Date.now()}-${Math.random().toString(16).slice(2)}`, nombre, seleccionada: true }
+    ]);
+    setNuevaEtapa("");
+  };
+
+  return (
+    <section className="rounded-xl border bg-card/60 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h4 className="flex items-center gap-2 font-heading text-sm font-semibold">
+            <Icono className="size-4 text-primary" strokeWidth={1.75} /> {titulo}
+          </h4>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{descripcion}</p>
+        </div>
+        {opcional && (
+          <div className="flex shrink-0 items-center gap-2">
+            <Label htmlFor={idBase} className="text-xs">{habilitado ? "Sí" : "No"}</Label>
+            <Switch
+              id={idBase}
+              checked={habilitado}
+              onCheckedChange={alCambiarHabilitado}
+              aria-label={`Activar ${titulo} de ${contexto}`}
+            />
+          </div>
+        )}
+      </div>
+
+      {habilitado ? (
+        <div className="mt-4 space-y-2">
+          {valor.map((etapa) => (
+            <div key={etapa.id} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => alCambiar(valor.map((item) => item.id === etapa.id ? { ...item, seleccionada: !item.seleccionada } : item))}
+                aria-pressed={etapa.seleccionada}
+                aria-label={`${etapa.seleccionada ? "Quitar" : "Agregar"} etapa ${etapa.nombre} de ${contexto}`}
+                className={`grid size-9 shrink-0 place-items-center rounded-lg border transition-colors ${
+                  etapa.seleccionada ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {etapa.seleccionada && <Check className="size-4" />}
+              </button>
+              <Input
+                value={etapa.nombre}
+                onChange={(evento) => alCambiar(valor.map((item) => item.id === etapa.id ? { ...item, nombre: evento.target.value } : item))}
+                aria-label={`Nombre de etapa ${etapa.nombre} de ${contexto}`}
+                className={etapa.seleccionada ? "" : "text-muted-foreground line-through opacity-70"}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={() => alCambiar(valor.filter((item) => item.id !== etapa.id))}
+                aria-label={`Eliminar etapa ${etapa.nombre} de ${contexto}`}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          ))}
+
+          <div className="flex items-center gap-2 pt-1">
+            <Input
+              value={nuevaEtapa}
+              onChange={(evento) => setNuevaEtapa(evento.target.value)}
+              onKeyDown={(evento) => {
+                if (evento.key === "Enter") {
+                  evento.preventDefault();
+                  agregar();
+                }
+              }}
+              placeholder="Agregar una etapa"
+              aria-label={`Nueva etapa para ${titulo} de ${contexto}`}
+            />
+            <Button type="button" variant="outline" className="shrink-0 gap-1.5" onClick={agregar} disabled={!nuevaEtapa.trim()}>
+              <Plus className="size-4" /> Agregar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+          Este grupo no se agregará al seguimiento de {contexto}.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default function Proyectos() {
   const { user } = useAuth();
   const hoy = new Date().toISOString().slice(0, 10);
-  const etapasFabricaIniciales = [...ETAPAS_FABRICA];
   const [filtro, setFiltro] = useState<EstadoObra | "todas">("todas");
   const [listaProyectos, setListaProyectos] = useState<Proyecto[]>(() => obtenerProyectos());
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -38,17 +212,29 @@ export default function Proyectos() {
   const [clienteId, setClienteId] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [liderId, setLiderId] = useState("");
+  const [tiposSeleccionados, setTiposSeleccionados] = useState<TipoProducto[]>([]);
+  const [configuraciones, setConfiguraciones] = useState<Record<TipoProducto, ConfiguracionProductoFormulario>>(
+    () => crearMapaConfiguraciones()
+  );
   const [fechaInicio, setFechaInicio] = useState("");
-  const [etapasFabricaSeleccionadas, setEtapasFabricaSeleccionadas] = useState<string[]>(etapasFabricaIniciales);
-  const [etapasObraSeleccionadas, setEtapasObraSeleccionadas] = useState<string[]>(ETAPAS_OBRA);
   if (!user) return null;
 
-  const visibles = listaProyectos.filter((p) => filtro === "todas" || p.estado === filtro);
-  const responsables = usuarios.filter((u) => u.isActive && (u.role === "administrator" || u.role === "supervisor"));
+  const visibles = listaProyectos.filter((proyecto) => filtro === "todas" || proyecto.estado === filtro);
+  const responsables = usuarios.filter((usuario) => usuario.isActive && (usuario.role === "administrator" || usuario.role === "supervisor"));
+  const productosConfigurables = tiposSeleccionados.filter((tipo) => tipo !== "servicios");
+  const incluyeServicios = tiposSeleccionados.includes("servicios");
 
-  const alternarEtapa = (grupo: "fabrica" | "obra", nombreEtapa: string) => {
-    const setter = grupo === "fabrica" ? setEtapasFabricaSeleccionadas : setEtapasObraSeleccionadas;
-    setter((prev) => prev.includes(nombreEtapa) ? prev.filter((e) => e !== nombreEtapa) : [...prev, nombreEtapa]);
+  const alternarTipoProducto = (tipo: TipoProducto) => {
+    setTiposSeleccionados((actuales) =>
+      actuales.includes(tipo) ? actuales.filter((seleccionado) => seleccionado !== tipo) : [...actuales, tipo]
+    );
+  };
+
+  const actualizarConfiguracion = (tipo: TipoProducto, cambios: Partial<ConfiguracionProductoFormulario>) => {
+    setConfiguraciones((actuales) => ({
+      ...actuales,
+      [tipo]: { ...actuales[tipo], ...cambios }
+    }));
   };
 
   const reiniciarFormulario = () => {
@@ -56,23 +242,106 @@ export default function Proyectos() {
     setClienteId("");
     setUbicacion("");
     setLiderId("");
+    setTiposSeleccionados([]);
+    setConfiguraciones(crearMapaConfiguraciones());
     setFechaInicio("");
-    setEtapasFabricaSeleccionadas(etapasFabricaIniciales);
-    setEtapasObraSeleccionadas(ETAPAS_OBRA);
+  };
+
+  const cambiarModal = (abierto: boolean) => {
+    setModalAbierto(abierto);
+    if (!abierto) reiniciarFormulario();
   };
 
   const crearProyecto = () => {
     const nombreLimpio = nombre.trim();
     const ubicacionLimpia = ubicacion.trim();
 
-    if (!nombreLimpio || !clienteId || !fechaInicio) {
-      toast("Faltan datos", { description: "Nombre, cliente y fecha de inicio son obligatorios." });
+    if (!nombreLimpio || !clienteId || tiposSeleccionados.length === 0 || !fechaInicio) {
+      toast("Faltan datos", { description: "Nombre, cliente, al menos un producto y fecha de inicio son obligatorios." });
       return;
     }
-    if (etapasFabricaSeleccionadas.length === 0 && etapasObraSeleccionadas.length === 0) {
-      toast("Seleccioná etapas", { description: "El proyecto necesita al menos una etapa de fábrica u obra." });
-      return;
+
+    for (const tipo of productosConfigurables) {
+      const etiquetaProducto = nombreTipoProducto(tipo);
+      const configuracion = configuraciones[tipo];
+      const fabricaSeleccionada = etapasSeleccionadas(configuracion.etapasFabrica);
+      const obraSeleccionada = etapasSeleccionadas(configuracion.etapasObra);
+      const fabricacionPremarcosSeleccionada = configuracion.fabricaraPremarcos
+        ? etapasSeleccionadas(configuracion.etapasFabricacionPremarcos)
+        : [];
+      const instalacionPremarcosSeleccionada = configuracion.instalaraPremarcos
+        ? etapasSeleccionadas(configuracion.etapasInstalacionPremarcos)
+        : [];
+
+      if (fabricaSeleccionada.length === 0 || obraSeleccionada.length === 0) {
+        toast(`Revisá ${etiquetaProducto}`, { description: "Fábrica y obra deben conservar al menos una etapa seleccionada." });
+        return;
+      }
+      if (configuracion.fabricaraPremarcos && fabricacionPremarcosSeleccionada.length === 0) {
+        toast(`Revisá ${etiquetaProducto}`, { description: "La fabricación de premarcos necesita al menos una etapa seleccionada." });
+        return;
+      }
+      if (configuracion.instalaraPremarcos && instalacionPremarcosSeleccionada.length === 0) {
+        toast(`Revisá ${etiquetaProducto}`, { description: "La instalación de premarcos necesita al menos una etapa seleccionada." });
+        return;
+      }
+
+      const gruposActivos = [
+        ...(configuracion.fabricaraPremarcos ? [{ nombre: "Fabricación de premarcos", etapas: configuracion.etapasFabricacionPremarcos }] : []),
+        ...(configuracion.instalaraPremarcos ? [{ nombre: "Instalación de premarcos", etapas: configuracion.etapasInstalacionPremarcos }] : []),
+        { nombre: "Fábrica", etapas: configuracion.etapasFabrica },
+        { nombre: "Obra", etapas: configuracion.etapasObra }
+      ];
+      const grupoInvalido = gruposActivos.find((grupo) => tieneEtapasInvalidas(grupo.etapas));
+      if (grupoInvalido) {
+        toast(`Revisá ${etiquetaProducto}`, {
+          description: `${grupoInvalido.nombre} contiene nombres vacíos o repetidos.`
+        });
+        return;
+      }
     }
+
+    const productos: ConfiguracionProductoProyecto[] = tiposSeleccionados.map((tipo) => {
+      if (tipo === "servicios") {
+        return {
+          tipo,
+          etapasFabricacionPremarcos: [],
+          etapasInstalacionPremarcos: [],
+          etapasFabrica: [],
+          etapasObra: []
+        };
+      }
+
+      const configuracion = configuraciones[tipo];
+      return {
+        tipo,
+        etapasFabricacionPremarcos: etapas(
+          configuracion.fabricaraPremarcos ? etapasSeleccionadas(configuracion.etapasFabricacionPremarcos) : [],
+          []
+        ),
+        etapasInstalacionPremarcos: etapas(
+          configuracion.instalaraPremarcos ? etapasSeleccionadas(configuracion.etapasInstalacionPremarcos) : [],
+          []
+        ),
+        etapasFabrica: etapas(etapasSeleccionadas(configuracion.etapasFabrica), []),
+        etapasObra: etapas(etapasSeleccionadas(configuracion.etapasObra), [])
+      };
+    });
+
+    const etapasFabricacionPremarcosProyecto = productos.flatMap((producto) => producto.etapasFabricacionPremarcos);
+    const etapasInstalacionPremarcosProyecto = productos.flatMap((producto) => producto.etapasInstalacionPremarcos);
+    const etapasFabricaProyecto = productos.flatMap((producto) => producto.etapasFabrica);
+    const etapasObraProyecto = productos.flatMap((producto) => producto.etapasObra);
+    const hitos = productos.flatMap((producto) => {
+      const etiquetaProducto = nombreTipoProducto(producto.tipo);
+      return [
+        ...producto.etapasFabricacionPremarcos.map((etapa) => `Fabricación de premarcos · ${etapa.nombre}`),
+        ...producto.etapasInstalacionPremarcos.map((etapa) => `Instalación de premarcos · ${etapa.nombre}`),
+        ...producto.etapasFabrica.map((etapa) => `Fábrica · ${etapa.nombre}`),
+        ...producto.etapasObra.map((etapa) => `Obra · ${etapa.nombre}`)
+      ].map((etapa) => ({ etapa: `${etiquetaProducto} · ${etapa}`, inicio: fechaInicio, fin: fechaInicio }));
+    });
+    const soloServicios = productos.every((producto) => producto.tipo === "servicios");
 
     const nuevo: Proyecto = {
       id: `p-${Date.now()}`,
@@ -80,50 +349,30 @@ export default function Proyectos() {
       clienteId,
       ubicacion: ubicacionLimpia || "Sin ubicación",
       liderId,
+      productos,
       estado: "planificada",
       fechaCreacion: hoy,
       fechaInicio,
       fechaFinEstimada: "",
       avanceFabrica: 0,
       avanceObra: 0,
-      etapasFabrica: etapas(etapasFabricaSeleccionadas, []),
-      etapasObra: etapas(etapasObraSeleccionadas, []),
+      etapasFabricacionPremarcos: etapasFabricacionPremarcosProyecto,
+      etapasInstalacionPremarcos: etapasInstalacionPremarcosProyecto,
+      etapasFabrica: etapasFabricaProyecto,
+      etapasObra: etapasObraProyecto,
       aberturas: [],
-      cronograma: [
-        ...etapasFabricaSeleccionadas.map((etapa) => ({ etapa, inicio: fechaInicio, fin: fechaInicio })),
-        ...etapasObraSeleccionadas.map((etapa) => ({ etapa, inicio: fechaInicio, fin: fechaInicio }))
-      ],
+      cronograma: hitos,
       documentos: [],
-      descripcion: "Proyecto creado manualmente. Pendiente cargar oferta, ábaco y descripción operativa."
+      descripcion: soloServicios
+        ? "Servicio creado manualmente. No requiere seguimiento por etapas de fábrica u obra."
+        : `Proyecto creado manualmente con ${productos.length} tipo${productos.length === 1 ? "" : "s"} de producto. Pendiente cargar oferta, ábaco y descripción operativa.`
     };
 
     const actualizada = [nuevo, ...listaProyectos];
     setListaProyectos(actualizada);
     guardarProyectos(actualizada);
-    setModalAbierto(false);
-    reiniciarFormulario();
-    toast("Proyecto creado", { description: nuevo.nombre });
-  };
-
-  const CheckEtapa = ({ grupo, nombreEtapa }: { grupo: "fabrica" | "obra"; nombreEtapa: string }) => {
-    const seleccionadas = grupo === "fabrica" ? etapasFabricaSeleccionadas : etapasObraSeleccionadas;
-    const activo = seleccionadas.includes(nombreEtapa);
-
-    return (
-      <button
-        type="button"
-        onClick={() => alternarEtapa(grupo, nombreEtapa)}
-        aria-pressed={activo}
-        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-          activo ? "border-primary/40 bg-primary/10 text-foreground" : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        <span>{nombreEtapa}</span>
-        <span className={`grid size-5 place-items-center rounded border ${activo ? "border-primary bg-primary text-primary-foreground" : "border-input"}`}>
-          {activo && <Check className="size-3.5" />}
-        </span>
-      </button>
-    );
+    cambiarModal(false);
+    toast("Proyecto creado", { description: `${nuevo.nombre} · ${productos.length} producto${productos.length === 1 ? "" : "s"}` });
   };
 
   return (
@@ -134,13 +383,13 @@ export default function Proyectos() {
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Proyectos</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={filtro} onValueChange={(v) => setFiltro(v as EstadoObra | "todas")}>
+          <Select value={filtro} onValueChange={(valor) => setFiltro(valor as EstadoObra | "todas")}>
             <SelectTrigger className="w-40" aria-label="Filtrar por estado">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {FILTROS.map((f) => (
-                <SelectItem key={f.valor} value={f.valor}>{f.label}</SelectItem>
+              {FILTROS.map((opcion) => (
+                <SelectItem key={opcion.valor} value={opcion.valor}>{opcion.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -152,12 +401,12 @@ export default function Proyectos() {
         </div>
       </header>
 
-      <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
-        <DialogContent className="sm:max-w-3xl">
+      <Dialog open={modalAbierto} onOpenChange={cambiarModal}>
+        <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>Nuevo proyecto</DialogTitle>
             <DialogDescription>
-              Cargá los datos base y elegí qué etapas aplican antes de crear el proyecto.
+              Seleccioná uno o varios productos y personalizá las etapas de cada uno para este proyecto.
             </DialogDescription>
           </DialogHeader>
 
@@ -165,17 +414,17 @@ export default function Proyectos() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="nombre-proyecto">Nombre del proyecto *</Label>
-                <Input id="nombre-proyecto" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Proyecto 2680/26" />
+                <Input id="nombre-proyecto" value={nombre} onChange={(evento) => setNombre(evento.target.value)} placeholder="Ej. Proyecto 2680/26" />
               </div>
               <div className="space-y-1.5">
                 <Label>Cliente *</Label>
                 <Select value={clienteId} onValueChange={setClienteId}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Cliente">
                     <SelectValue placeholder="Seleccionar cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {clientes.filter((c) => c.estado === "activo").map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                    {clientes.filter((cliente) => cliente.estado === "activo").map((cliente) => (
+                      <SelectItem key={cliente.id} value={cliente.id}>{cliente.nombre}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -183,98 +432,192 @@ export default function Proyectos() {
               <div className="space-y-1.5">
                 <Label>Líder</Label>
                 <Select value={liderId} onValueChange={setLiderId}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full" aria-label="Líder">
                     <SelectValue placeholder="Sin asignar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {responsables.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>{u.displayName}</SelectItem>
+                    {responsables.map((responsable) => (
+                      <SelectItem key={responsable.id} value={responsable.id}>{responsable.displayName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2 sm:col-span-2">
+                <div>
+                  <Label>Tipos de producto *</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">Podés seleccionar varios. Cada uno conserva sus propias etapas.</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {TIPOS_PRODUCTO.map((producto) => {
+                    const activo = tiposSeleccionados.includes(producto.valor);
+                    return (
+                      <button
+                        key={producto.valor}
+                        type="button"
+                        onClick={() => alternarTipoProducto(producto.valor)}
+                        aria-pressed={activo}
+                        className={`flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                          activo ? "border-primary/50 bg-primary/10 text-foreground" : "text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                        }`}
+                      >
+                        <span>{producto.label}</span>
+                        <span className={`grid size-5 shrink-0 place-items-center rounded border ${activo ? "border-primary bg-primary text-primary-foreground" : "border-input"}`}>
+                          {activo && <Check className="size-3.5" />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ubicacion-proyecto">Ubicación</Label>
-                <Input id="ubicacion-proyecto" value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Ciudad, obra o dirección" />
+                <Input id="ubicacion-proyecto" value={ubicacion} onChange={(evento) => setUbicacion(evento.target.value)} placeholder="Ciudad, obra o dirección" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="fecha-inicio-proyecto">Fecha de inicio *</Label>
-                <Input id="fecha-inicio-proyecto" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+                <Input id="fecha-inicio-proyecto" type="date" value={fechaInicio} onChange={(evento) => setFechaInicio(evento.target.value)} />
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <section className="space-y-2">
-                <div>
-                  <h3 className="font-heading text-sm font-semibold">Etapas de fábrica</h3>
-                  <p className="text-xs text-muted-foreground">Todas vienen tildadas por defecto, salvo etapas opcionales.</p>
-                </div>
-                <div className="grid gap-2">
-                  {[...ETAPAS_FABRICA, ...ETAPAS_FABRICA_OPCIONALES].map((etapaNombre) => (
-                    <CheckEtapa key={etapaNombre} grupo="fabrica" nombreEtapa={etapaNombre} />
-                  ))}
-                </div>
-              </section>
+            {incluyeServicios && (
+              <div className="rounded-xl border border-primary/25 bg-primary/8 p-4">
+                <h3 className="font-heading text-sm font-semibold text-primary">Servicios</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Este producto se agrega sin etapas de premarcos, fábrica u obra. Los demás productos conservan sus configuraciones independientes.
+                </p>
+              </div>
+            )}
 
-              <section className="space-y-2">
-                <div>
-                  <h3 className="font-heading text-sm font-semibold">Etapas de obra</h3>
-                  <p className="text-xs text-muted-foreground">Las etapas no seleccionadas no aparecerán en seguimiento.</p>
-                </div>
-                <div className="grid gap-2">
-                  {ETAPAS_OBRA.map((etapaNombre) => (
-                    <CheckEtapa key={etapaNombre} grupo="obra" nombreEtapa={etapaNombre} />
-                  ))}
-                </div>
-              </section>
-            </div>
+            {productosConfigurables.map((tipo) => {
+              const configuracion = configuraciones[tipo];
+              const etiquetaProducto = nombreTipoProducto(tipo);
+              return (
+                <section key={tipo} className="grid gap-4 rounded-2xl border border-primary/20 bg-primary/[0.025] p-4">
+                  <div>
+                    <div className="senal">Etapas del producto</div>
+                    <h3 className="mt-1 font-heading text-lg font-semibold">{etiquetaProducto}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Estos cambios se aplican solo a {etiquetaProducto.toLocaleLowerCase()} dentro de este proyecto.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <EditorEtapas
+                      idBase={`${tipo}-fabricacion-premarcos`}
+                      contexto={etiquetaProducto}
+                      titulo="Fabricación de premarcos"
+                      descripcion="Activala cuando Italplast deba fabricar los premarcos. Es independiente de la instalación."
+                      icono={Ruler}
+                      valor={configuracion.etapasFabricacionPremarcos}
+                      alCambiar={(valor) => actualizarConfiguracion(tipo, { etapasFabricacionPremarcos: valor })}
+                      opcional
+                      habilitado={configuracion.fabricaraPremarcos}
+                      alCambiarHabilitado={(valor) => actualizarConfiguracion(tipo, { fabricaraPremarcos: valor })}
+                    />
+                    <EditorEtapas
+                      idBase={`${tipo}-instalacion-premarcos`}
+                      contexto={etiquetaProducto}
+                      titulo="Instalación de premarcos"
+                      descripcion="Activala cuando Italplast deba instalar premarcos propios o existentes."
+                      icono={Hammer}
+                      valor={configuracion.etapasInstalacionPremarcos}
+                      alCambiar={(valor) => actualizarConfiguracion(tipo, { etapasInstalacionPremarcos: valor })}
+                      opcional
+                      habilitado={configuracion.instalaraPremarcos}
+                      alCambiarHabilitado={(valor) => actualizarConfiguracion(tipo, { instalaraPremarcos: valor })}
+                    />
+                    <EditorEtapas
+                      idBase={`${tipo}-fabrica`}
+                      contexto={etiquetaProducto}
+                      titulo="Etapas de fábrica"
+                      descripcion="Grupo obligatorio para la fabricación de este producto."
+                      icono={Factory}
+                      valor={configuracion.etapasFabrica}
+                      alCambiar={(valor) => actualizarConfiguracion(tipo, { etapasFabrica: valor })}
+                    />
+                    <EditorEtapas
+                      idBase={`${tipo}-obra`}
+                      contexto={etiquetaProducto}
+                      titulo="Etapas de obra"
+                      descripcion="Grupo obligatorio para la instalación y cierre de este producto en obra."
+                      icono={HardHat}
+                      valor={configuracion.etapasObra}
+                      alCambiar={(valor) => actualizarConfiguracion(tipo, { etapasObra: valor })}
+                    />
+                  </div>
+                </section>
+              );
+            })}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalAbierto(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => cambiarModal(false)}>Cancelar</Button>
             <Button onClick={crearProyecto}>Crear proyecto</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <section className="grid gap-4 md:grid-cols-2">
-        {visibles.map((p) => {
-          const lider = usuarioPorId(p.liderId);
+        {visibles.map((proyecto) => {
+          const lider = usuarioPorId(proyecto.liderId);
+          const productosProyecto = proyecto.productos?.length
+            ? proyecto.productos
+            : proyecto.tipoProducto
+              ? [{ tipo: proyecto.tipoProducto }]
+              : [];
+          const soloServicios = productosProyecto.length > 0 && productosProyecto.every((producto) => producto.tipo === "servicios");
           return (
-            <Link key={p.id} to={`/proyectos/${p.id}`} className="group">
+            <Link key={proyecto.id} to={`/proyectos/${proyecto.id}`} className="group">
               <Card className="h-full gap-4 py-5 transition-all group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-md">
                 <CardContent className="space-y-4 px-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate font-heading text-lg font-bold tracking-tight group-hover:text-primary">
-                        {p.nombre}
+                        {proyecto.nombre}
                       </div>
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="size-3 shrink-0" />
-                        <span className="truncate">{p.ubicacion}</span>
+                        <span className="truncate">{proyecto.ubicacion}</span>
                       </div>
+                      {productosProyecto.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {productosProyecto.map((producto) => (
+                            <span key={producto.tipo} className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                              {nombreTipoProducto(producto.tipo)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <EstadoBadge estado={p.estado} className="shrink-0" />
+                    <EstadoBadge estado={proyecto.estado} className="shrink-0" />
                   </div>
 
-                  <div className="space-y-2.5">
-                    <div>
-                      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><Factory className="size-3" /> Fábrica</span>
-                      </div>
-                      <AvanceMeter valor={p.avanceFabrica} etapas={p.etapasFabrica.length} size="sm" />
+                  {soloServicios ? (
+                    <div className="rounded-lg border bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
+                      Servicio sin seguimiento por etapas de fábrica u obra.
                     </div>
-                    <div>
-                      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><HardHat className="size-3" /> Obra</span>
+                  ) : (
+                    <div className="space-y-2.5">
+                      <div>
+                        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1"><Factory className="size-3" /> Fábrica</span>
+                        </div>
+                        <AvanceMeter valor={proyecto.avanceFabrica} etapas={proyecto.etapasFabrica.length} size="sm" />
                       </div>
-                      <AvanceMeter valor={p.avanceObra} etapas={p.etapasObra.length} size="sm" />
+                      <div>
+                        <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1"><HardHat className="size-3" /> Obra</span>
+                        </div>
+                        <AvanceMeter valor={proyecto.avanceObra} etapas={proyecto.etapasObra.length} size="sm" />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-                    <span className="truncate">{clientePorId(p.clienteId)?.nombre}</span>
-                    <span className="cifra shrink-0">{avanceGeneral(p)}% · {formatFecha(p.fechaFinEstimada)}</span>
+                    <span className="truncate">{clientePorId(proyecto.clienteId)?.nombre}</span>
+                    <span className="cifra shrink-0">
+                      {soloServicios ? formatFecha(proyecto.fechaInicio) : `${avanceGeneral(proyecto)}% · ${formatFecha(proyecto.fechaFinEstimada)}`}
+                    </span>
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Líder: <span className="font-medium text-foreground">{lider?.displayName ?? "Sin asignar"}</span>
