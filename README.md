@@ -1,6 +1,6 @@
-# Control Obras — Italplast
+# Gestión de proyectos — Italplast
 
-Aplicación web interna para gestionar clientes, proyectos multiproducto, etapas, documentos, cronogramas y seguimiento operativo de Italplast.
+Aplicación web interna para gestionar clientes, proyectos multiproducto, presupuestos ejecutivos, etapas, tareas, documentos y seguimiento operativo de Italplast.
 
 > Contexto vigente para agentes y colaboradores: [docs/context-index.md](docs/context-index.md).
 
@@ -10,8 +10,10 @@ Aplicación web interna para gestionar clientes, proyectos multiproducto, etapas
 
 Este proyecto centraliza el flujo operativo de obras de Italplast:
 
-1. Se crean y gestionan proyectos locales.
-2. Se hace seguimiento del estado de cada proyecto (tablero, fechas, documentos, etc.).
+1. Se crea un proyecto con uno o más tipos de producto y sus etapas particulares.
+2. Se carga y revisa el presupuesto ejecutivo PDF que origina los componentes y tareas.
+3. Fábrica e Instalación completan tareas con evidencia y el avance se calcula automáticamente.
+4. El estado general se administra desde un tablero Kanban con transiciones condicionadas.
 
 ---
 
@@ -21,7 +23,29 @@ Para que el equipo pueda:
 
 - convertir oportunidades comerciales en proyectos de ejecución,
 - controlar avance de obras en una sola plataforma,
+- coordinar fabricación, premarcos e instalación mediante tareas verificables,
 - mantener trazabilidad entre CRM (externo) y operación (interna).
+
+---
+
+## Estado actual
+
+La interfaz activa está en **Fase 2** y usa React con datos mock y persistencia temporal en `localStorage`.
+
+Funcionalidades disponibles:
+
+- acceso por Documento y Contraseña con roles Administrador, Supervisor y Usuario;
+- gestión mock de clientes y usuarios;
+- proyectos con aluminio, PVC, mosquiteras, persianas, Velux y servicios;
+- configuración independiente de etapas y premarcos por producto;
+- carga y revisión del presupuesto ejecutivo mediante extracción de texto embebido con PDF.js;
+- tareas de Fábrica e Instalación con fechas, check, evidencia obligatoria y observaciones;
+- sincronización del seguimiento con la sección global **Tareas**;
+- avance automático derivado de tareas completadas, sin edición manual de porcentajes;
+- tablero Kanban horizontal arrastrable con confirmaciones, pausas, cierres y acciones administrativas;
+- personalización visual, datos de cuenta, actualizaciones y soporte.
+
+Los cuatro proyectos iniciales incluyen componentes, tareas y evidencias **demostrativas** para recorrer el flujo. No representan información operativa real.
 
 ---
 
@@ -42,7 +66,7 @@ Para que el equipo pueda:
 ## ¿Cuál es la estructura del proyecto?
 
 ```text
-ControlAvancesObra/
+ControlObraItalplast/
   docs/
   src/
     backend/
@@ -96,9 +120,11 @@ Resumen de flujo funcional:
 3. Administradores pueden crear proyectos con uno o más tipos de producto.
 4. El presupuesto ejecutivo PDF se lee localmente y sus componentes se revisan antes de confirmar.
 5. Cada producto conserva sus propias etapas de premarcos, fábrica e instalación.
-6. Los componentes y etapas generan matrices de tareas; cada cierre exige evidencia y recalcula el avance.
-7. Los datos de Fase 2 se guardan temporalmente en `localStorage`.
-8. La conexión completa con la API y PostgreSQL queda para las fases siguientes.
+6. Los componentes y etapas generan listas de tareas con fechas; cada cierre exige evidencia y recalcula el avance.
+7. Las mismas tareas se consultan y actualizan desde el detalle del proyecto y la sección Tareas.
+8. El tablero Kanban aplica reglas antes de cada cambio de estado.
+9. Los datos de Fase 2 se guardan temporalmente en `localStorage`.
+10. La conexión completa con la API y PostgreSQL queda para las fases siguientes.
 
 Arquitectura general:
 
@@ -121,10 +147,11 @@ Resumen funcional de pantallas:
 - `Login`: acceso mock por Documento y Contraseña, con recuperación de contraseña demostrativa.
 - `Dashboard`: resumen operativo general (estado de obras y métricas rápidas).
 - `Clientes`: clientes del CRM , vinculación con proyectos y creación de proyecto.
-- `Proyectos`: tarjetas, alta multiproducto con presupuesto ejecutivo y matrices de Fábrica/Instalación.
-- `Tareas`: tareas internas de seguimiento.
-- `Settings`: Account, Personalizar y Updates.
-- `Support`: Documentation y Contact support.
+- `Proyectos`: tarjetas, Kanban arrastrable y alta multiproducto con presupuesto ejecutivo.
+- `Detalle de proyecto`: resumen, tareas internas, cronograma, Fábrica, Instalación, informe y documentos.
+- `Tareas`: seguimiento sincronizado de proyectos y tareas internas del equipo.
+- `Configuración`: Cuenta, Personalizar y Actualizaciones.
+- `Soporte`: Documentación y Contactar soporte.
 - `Usuarios` (admin): gestión mock de usuarios y roles.
 
 ## Desarrollo del frontend React
@@ -135,6 +162,10 @@ npm install
 npm run dev
 ```
 
+Vite sirve normalmente la aplicación en [http://localhost:5173](http://localhost:5173). Si ese puerto está ocupado, informa el siguiente disponible.
+
+Para la sesión mock puede usarse el documento `2319471` (Administrador) y cualquier contraseña de al menos cuatro caracteres. No son credenciales de producción.
+
 Validación:
 
 ```bash
@@ -142,5 +173,29 @@ npm run build
 npm run lint
 npm run diagnostico:presupuestos -- /ruta/presupuesto.pdf
 ```
+
+El lint puede mostrar cuatro advertencias conocidas de Fast Refresh; no son errores de compilación.
+
+## Backend
+
+```bash
+cd src/backend
+npm install
+npm run dev
+```
+
+La API Express/PostgreSQL permanece en evolución y todavía no cubre todos los flujos del frontend React.
+
+## Contexto y contribución
+
+Antes de realizar cambios materiales, consultar:
+
+- [AGENTS.md](AGENTS.md)
+- [docs/context-index.md](docs/context-index.md)
+- [docs/project-context.md](docs/project-context.md)
+- [docs/decisions.md](docs/decisions.md)
+- [docs/flujo-roles.md](docs/flujo-roles.md)
+
+La documentación contextual forma parte de la definición de terminado y debe actualizarse junto con el código relacionado.
 
 ---

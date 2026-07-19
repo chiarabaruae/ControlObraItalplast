@@ -2,7 +2,7 @@
 context_id: controlobra-project-context
 context_type: current_project_state
 last_updated: 2026-07-19
-branch: feature/frontend-react-migration
+branch: main
 tags:
   - italplast
   - react
@@ -28,7 +28,7 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 
 ## Estado actual
 
-- Rama activa de trabajo: `feature/frontend-react-migration`.
+- Rama estable publicada: `main`, actualizada desde `feature/frontend-react-migration` el 2026-07-19.
 - Frontend activo: React, TypeScript, Vite, Tailwind CSS y componentes shadcn/Radix.
 - Versión visible: `AppWebb v0.2.0`.
 - La Fase 2 usa datos mock y persistencia temporal en `localStorage`.

@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-19 — Promoción de la migración React a main y README vigente
+
+**Alcance:** se actualizan el README principal y la guía del frontend antes de integrar `feature/frontend-react-migration` en `main` mediante fast-forward.
+
+**Impacto:** el punto de entrada del repositorio describe la Fase 2 real: proyectos multiproducto, presupuesto ejecutivo, listas de tareas con evidencia, sincronización global, avance por checks, Kanban condicionado, ejecución local y credenciales mock. `main` pasa a ser la rama estable que contiene la migración React vigente.
+
+**Archivos clave:** `README.md`, `src/frontend/README.md`, `docs/project-context.md`, `docs/change-log.md`.
+
+**Validaciones:** comprobación de que `origin/main` es ancestro de la feature, `npm run build`, `npm run lint`, `git diff --check` y publicación de ambas ramas sobre el mismo commit.
+
 ## 2026-07-19 — Tareas demostrativas sincronizadas y avance solo por checks
 
 **Alcance:** los proyectos mock existentes reciben presupuestos, productos y tareas ficticias para visualizar el seguimiento vigente; se retira el editor manual de porcentajes.
