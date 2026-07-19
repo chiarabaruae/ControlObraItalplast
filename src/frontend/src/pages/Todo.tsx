@@ -4,7 +4,7 @@
 // que en el detalle del proyecto, y actualiza el avance en todos lados.
 import { useState } from "react";
 import { Link } from "react-router";
-import { Plus, Check, RotateCcw, Trash2, Pencil, Camera, ClipboardList } from "lucide-react";
+import { Plus, Check, RotateCcw, Trash2, Pencil, ClipboardList } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import { ETIQUETAS_GRUPO } from "@/lib/seguimiento-presupuesto";
@@ -17,6 +17,7 @@ import { PrioridadBadge } from "@/components/app/EstadoBadge";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 
@@ -32,6 +33,7 @@ export default function Todo() {
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales);
   const [proyectos, setProyectos] = useState<Proyecto[]>(() => obtenerProyectos());
   const [filtro, setFiltro] = useState<Filtro>("todas");
+  const [proyectoFiltro, setProyectoFiltro] = useState("todos");
   const [seleccion, setSeleccion] = useState<SeleccionSeguimiento>();
   if (!user) return null;
 
@@ -50,7 +52,10 @@ export default function Todo() {
   const seguimiento = proyectos.flatMap((proyecto) =>
     (proyecto.tareasPresupuesto ?? []).map((tarea) => ({ proyecto, tarea }))
   );
-  const seguimientoVisibles = seguimiento.filter(({ tarea }) => {
+  const seguimientoDelProyecto = seguimiento.filter(({ proyecto }) =>
+    proyectoFiltro === "todos" || proyecto.id === proyectoFiltro
+  );
+  const seguimientoVisibles = seguimientoDelProyecto.filter(({ tarea }) => {
     if (filtro === "pendientes") return !tarea.completada;
     if (filtro === "finalizadas") return tarea.completada;
     return true;
@@ -123,12 +128,27 @@ export default function Todo() {
 
       {/* Seguimiento de proyectos */}
       <section className="space-y-2">
-        <div className="flex items-center gap-2">
-          <ClipboardList className="size-4 text-primary" />
-          <h2 className="font-heading text-sm font-semibold">Seguimiento de proyectos</h2>
-          <span className="cifra text-xs text-muted-foreground">
-            {seguimiento.filter(({ tarea }) => !tarea.completada).length} pendientes
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="size-4 text-primary" />
+            <h2 className="font-heading text-sm font-semibold">Seguimiento de proyectos</h2>
+            <span className="cifra text-xs text-muted-foreground">
+              {seguimientoDelProyecto.filter(({ tarea }) => !tarea.completada).length} pendientes
+            </span>
+          </div>
+          <Select value={proyectoFiltro} onValueChange={setProyectoFiltro}>
+            <SelectTrigger className="w-full sm:w-64" aria-label="Filtrar seguimiento por proyecto">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los proyectos</SelectItem>
+              {proyectos
+                .filter((proyecto) => (proyecto.tareasPresupuesto?.length ?? 0) > 0)
+                .map((proyecto) => (
+                  <SelectItem key={proyecto.id} value={proyecto.id}>{proyecto.nombre}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         </div>
         <Card>
           <CardContent className="px-0">
@@ -154,7 +174,7 @@ export default function Todo() {
                         onClick={() => setSeleccion({ proyecto, tarea })}
                         disabled={!puedeAvance && !tarea.completada}
                       >
-                        {tarea.completada ? <Check className="size-3.5" /> : <Camera className="size-3.5" />}
+                        <Check className="size-3.5" />
                       </Button>
                     </TableCell>
                     <TableCell className={`font-medium ${tarea.completada ? "line-through" : ""}`}>

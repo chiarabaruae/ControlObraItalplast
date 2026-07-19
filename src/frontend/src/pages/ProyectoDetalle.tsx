@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { Link, Navigate, useParams } from "react-router";
 import {
-  ArrowLeft, MapPin, CalendarRange, Factory, HardHat, FileText,
-  Upload, File, Printer, Minus, Plus, ListTodo, Ruler, Hammer
+  ArrowLeft, MapPin, CalendarRange, FileText,
+  Upload, File, Printer, ListTodo
 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
   proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, guardarProyecto, tareasIniciales,
-  nombreTipoProducto, aplicarCambioTarea, type ConfiguracionProductoProyecto, type EtapaSeguimiento,
-  type Proyecto, type Tarea, type TareaPresupuesto
+  nombreTipoProducto, aplicarCambioTarea, type Proyecto, type Tarea, type TareaPresupuesto
 } from "@/mocks/data";
 import { formatFecha, formatFechaCorta } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
@@ -23,62 +22,6 @@ import { toast } from "sonner";
 
 function pendiente(accion: string) {
   toast(accion, { description: "Se conecta al backend en la Fase 4." });
-}
-
-// ── Seguimiento por etapas (fábrica / obra) ─────────────────────
-function Seguimiento({ titulo, icono: Icono, etapasIniciales, puedeEditar }: {
-  titulo: string;
-  icono: typeof Factory;
-  etapasIniciales: EtapaSeguimiento[];
-  puedeEditar: boolean;
-}) {
-  const [etapas, setEtapas] = useState(etapasIniciales);
-
-  const ajustar = (i: number, delta: number) => {
-    setEtapas((prev) =>
-      prev.map((e, idx) => (idx === i ? { ...e, avance: Math.min(100, Math.max(0, e.avance + delta)) } : e))
-    );
-  };
-
-  const total = etapas.length > 0
-    ? Math.round(etapas.reduce((a, e) => a + e.avance, 0) / etapas.length)
-    : 0;
-
-  return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 font-heading text-base">
-          <Icono className="size-4.5 text-primary" strokeWidth={1.75} /> {titulo}
-        </CardTitle>
-        <span className="cifra text-sm font-semibold">{total}%</span>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {etapas.map((etapa, i) => (
-          <div key={etapa.nombre}>
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-sm">{etapa.nombre}</span>
-              {puedeEditar && (
-                <span className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="size-6" aria-label={`Bajar avance de ${etapa.nombre}`} onClick={() => ajustar(i, -5)}>
-                    <Minus className="size-3" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="size-6" aria-label={`Subir avance de ${etapa.nombre}`} onClick={() => ajustar(i, 5)}>
-                    <Plus className="size-3" />
-                  </Button>
-                </span>
-              )}
-            </div>
-            <AvanceMeter valor={etapa.avance} size="sm" />
-          </div>
-        ))}
-        {puedeEditar && (
-          <p className="border-t pt-3 text-xs text-muted-foreground">
-            Ajustás de a 5%. En la Fase 4 cada cambio queda auditado con tu usuario y hora.
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
 }
 
 // ── Cronograma: barras sobre el rango total del proyecto ────────
@@ -174,54 +117,23 @@ function TareasProyecto({ tareas }: { tareas: Tarea[] }) {
   );
 }
 
-const DOC_ICONOS = { oferta: FileText, presupuesto: FileText, plano: File, otro: File };
-
-function SeguimientoPorProductos({ productos, puedeEditar, lado }: {
-  productos: ConfiguracionProductoProyecto[];
-  puedeEditar: boolean;
-  lado: "fabrica" | "instalacion";
-}) {
+function SeguimientoPendiente() {
   return (
-    <div className="space-y-6">
-      {productos.map((producto) => {
-        const etiqueta = nombreTipoProducto(producto.tipo);
-        const grupos = lado === "fabrica"
-          ? [
-              ...(producto.etapasFabricacionPremarcos.length > 0
-                ? [{ titulo: "Premarcos · fabricación", icono: Ruler, etapas: producto.etapasFabricacionPremarcos }]
-                : []),
-              { titulo: "Producto · fabricación", icono: Factory, etapas: producto.etapasFabrica }
-            ]
-          : [
-              ...(producto.etapasInstalacionPremarcos.length > 0
-                ? [{ titulo: "Premarcos · instalación", icono: Hammer, etapas: producto.etapasInstalacionPremarcos }]
-                : []),
-              { titulo: "Producto · instalación", icono: HardHat, etapas: producto.etapasObra }
-            ];
-
-        return (
-          <section key={producto.tipo} className="space-y-3">
-            <div>
-              <div className="senal">Producto</div>
-              <h2 className="mt-1 font-heading text-lg font-semibold">{etiqueta}</h2>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              {grupos.map((grupo) => (
-                <Seguimiento
-                  key={`${producto.tipo}-${grupo.titulo}`}
-                  titulo={grupo.titulo}
-                  icono={grupo.icono}
-                  etapasIniciales={grupo.etapas}
-                  puedeEditar={puedeEditar}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
-    </div>
+    <Card>
+      <CardContent className="flex flex-col items-center px-6 py-12 text-center">
+        <div className="grid size-12 place-items-center rounded-xl bg-primary/10 text-primary">
+          <ListTodo className="size-6" />
+        </div>
+        <h2 className="mt-4 font-heading font-semibold">Seguimiento pendiente de generar</h2>
+        <p className="mt-1 max-w-md text-sm text-muted-foreground">
+          Este proyecto todavía no tiene componentes y tareas generadas desde un presupuesto ejecutivo. El avance manual por porcentajes ya no está disponible.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
+
+const DOC_ICONOS = { oferta: FileText, presupuesto: FileText, plano: File, otro: File };
 
 export default function ProyectoDetalle() {
   const { id } = useParams();
@@ -284,7 +196,6 @@ export default function ProyectoDetalle() {
       : [];
   const productosOperativos = productos.filter((producto) => producto.tipo !== "servicios");
   const soloServicios = productos.length > 0 && productosOperativos.length === 0;
-  const seguimientoPorProducto = productosOperativos.length > 0;
   const seguimientoGenerado = Boolean(p.tareasPresupuesto?.length && p.presupuestoEjecutivo?.items.length);
 
   return (
@@ -418,13 +329,8 @@ export default function ProyectoDetalle() {
           <TabsContent value="fabrica" className="mt-4">
             {seguimientoGenerado ? (
               <SeguimientoPresupuesto proyecto={p} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} alAgregar={agregarTareaPresupuesto} alEliminarTarea={eliminarTareaPresupuesto} />
-            ) : seguimientoPorProducto ? (
-              <SeguimientoPorProductos productos={productosOperativos} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} />
             ) : (
-              <div className="space-y-4">
-                {p.etapasFabricacionPremarcos.length > 0 && <Seguimiento titulo="Premarcos · fabricación" icono={Ruler} etapasIniciales={p.etapasFabricacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />}
-                <Seguimiento titulo="Producto · fabricación" icono={Factory} etapasIniciales={p.etapasFabrica} puedeEditar={permisos.editarAvance(user.role)} />
-              </div>
+              <SeguimientoPendiente />
             )}
           </TabsContent>
         )}
@@ -432,13 +338,8 @@ export default function ProyectoDetalle() {
           <TabsContent value="instalacion" className="mt-4">
             {seguimientoGenerado ? (
               <SeguimientoPresupuesto proyecto={p} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} alAgregar={agregarTareaPresupuesto} alEliminarTarea={eliminarTareaPresupuesto} />
-            ) : seguimientoPorProducto ? (
-              <SeguimientoPorProductos productos={productosOperativos} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} />
             ) : (
-              <div className="space-y-4">
-                {p.etapasInstalacionPremarcos.length > 0 && <Seguimiento titulo="Premarcos · instalación" icono={Hammer} etapasIniciales={p.etapasInstalacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />}
-                <Seguimiento titulo="Producto · instalación" icono={HardHat} etapasIniciales={p.etapasObra} puedeEditar={permisos.editarAvance(user.role)} />
-              </div>
+              <SeguimientoPendiente />
             )}
           </TabsContent>
         )}

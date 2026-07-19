@@ -30,7 +30,8 @@ const FILTROS: { valor: EstadoObra | "todas"; label: string }[] = [
   { valor: "en_progreso", label: "En progreso" },
   { valor: "pausada", label: "Pausadas" },
   { valor: "planificada", label: "Planificadas" },
-  { valor: "finalizada", label: "Finalizadas" }
+  { valor: "finalizada", label: "Finalizadas" },
+  { valor: "cancelada", label: "Canceladas" }
 ];
 
 interface EtapaConfigurable {
@@ -492,7 +493,9 @@ export default function Proyectos() {
       {vista === "tablero" && (
         <TableroProyectos
           proyectos={listaProyectos}
-          puedeMover={permisos.editarAvance(user.role)}
+          puedeMover={permisos.cambiarEstadoProyecto(user.role)}
+          puedeCancelar={permisos.cancelarProyecto(user.role)}
+          puedeReabrir={permisos.reabrirProyecto(user.role)}
           usuarioId={user.id}
           alGuardar={actualizarProyecto}
         />

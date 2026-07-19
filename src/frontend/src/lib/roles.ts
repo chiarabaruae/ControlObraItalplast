@@ -25,6 +25,9 @@ export const permisos = {
   gestionarPresupuesto: (r: Role) => r === "administrator" || r === "supervisor",
   generarSeguimiento: (r: Role) => r === "administrator" || r === "supervisor",
   editarAvance: (r: Role) => r === "administrator" || r === "supervisor",
+  cambiarEstadoProyecto: (r: Role) => r === "administrator" || r === "supervisor",
+  cancelarProyecto: (r: Role) => r === "administrator",
+  reabrirProyecto: (r: Role) => r === "administrator",
   comentarObra: (r: Role) => r === "administrator" || r === "supervisor",
 
   // Tareas

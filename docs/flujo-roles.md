@@ -78,7 +78,9 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | Ver todos los proyectos en Tarjetas y Tablero | ✅ | ✅ | ✅ |
-| Solicitar cambio de estado desde el tablero | ✅ | ✅ | ❌ |
+| Arrastrar o solicitar cambio ordinario de estado | ✅ | ✅ | ❌ |
+| Cancelar o reactivar proyecto con motivo | ✅ | ❌ | ❌ |
+| Reabrir proyecto finalizado con motivo | ✅ | ❌ | ❌ |
 | Crear proyecto | ✅ | ❌ | ❌ |
 | Editar datos del proyecto | ✅ | ❌ | ❌ |
 | Eliminar proyecto | ✅ | ❌ | ❌ |
@@ -203,7 +205,10 @@ correo y número de teléfono son opcionales.
 - Administradores y supervisores pueden agregar tareas manuales, renombrarlas,
   cambiar sus fechas de inicio/entrega o eliminarlas dentro del proyecto.
 - La sección Tareas reúne seguimiento de proyectos y tareas internas. Cerrar una
-  tarea de seguimiento desde cualquiera de las dos vistas usa el mismo diálogo.
+  tarea de seguimiento desde cualquiera de las dos vistas usa el mismo diálogo
+  y persiste sobre la misma colección del proyecto. Puede filtrarse por proyecto.
+- El disparador de cierre usa siempre un check; la evidencia obligatoria se pide
+  dentro del diálogo y no se representa mediante un ícono de cámara en la lista.
 - Marcar una tarea como lista exige una imagen. Observaciones es opcional.
 - Se registra quién y cuándo completó la tarea. La evidencia se puede consultar
   y la tarea se puede reabrir.
@@ -212,21 +217,29 @@ correo y número de teléfono son opcionales.
 - En Fase 2, administradores y supervisores pueden cerrar estas tareas. La
   asignación por persona para habilitar a Usuario (`viewer`) queda pendiente del
   modelo real de responsables.
+- Los cuatro proyectos mock incluyen seguimiento ficticio para recorrer el
+  flujo completo. Los proyectos anteriores sin datos suficientes muestran
+  "Seguimiento pendiente de generar"; no se permite editar porcentajes a mano.
 
 ### Tablero de proyectos y transiciones
 
-- El tablero actual muestra Planificadas, En progreso, Pausadas y Finalizadas.
-- Administradores y supervisores pueden mover mediante un menú; Usuario solo consulta.
-- En progreso exige avance registrado; sin avance se informa el bloqueo y se
-  deriva a las tareas. Con avance ya existente, el cambio actual es directo.
-- Pausada exige motivo y conserva el historial de pausas.
-- Finalizada exige evidencia y lleva las tareas pendientes al 100%.
-- El retorno a Planificada es directo, aunque el proyecto tenga avance.
-- El estado `cancelada` existe en el tipo `EstadoObra`, pero no tiene columna ni flujo.
-- Reanudar una Pausada no registra todavía el cierre de la pausa. Reabrir una
-  Finalizada no define cómo revertir `cierre`, evidencia o tareas completadas.
-- El arrastre y la confirmación de todos los movimientos quedan pendientes para
-  la siguiente iteración del tablero.
+- El tablero muestra Planificadas, En progreso, Pausadas y Finalizadas en una fila
+  horizontal con desplazamiento lateral. Administradores y supervisores pueden
+  arrastrar por el asa o usar el menú; Usuario solo consulta.
+- Todo movimiento manual abre confirmación, bloqueo o formulario según su regla.
+- En progreso exige avance registrado; sin avance se deriva a las tareas. El
+  primer avance cambia automáticamente Planificada a En progreso.
+- Un proyecto con avance no puede volver a Planificada.
+- Pausada exige motivo. Reanudar exige observación y cierra la pausa abierta con
+  usuario y fecha.
+- Finalizada exige evidencia y lleva las tareas pendientes al 100%. No se puede
+  arrastrar desde este estado.
+- Solo administración puede reabrir una Finalizada con motivo. Vuelve a En
+  progreso y conserva las tareas ya cerradas; no se revierte avance en silencio.
+- Cancelar es una acción administrativa separada de las columnas y exige motivo.
+  Los cancelados se muestran en un bloque aparte; administración puede
+  reactivarlos con motivo hacia Planificada o En progreso según su avance.
+- Cada cambio conserva origen, destino, usuario y fecha en `historialEstados`.
 
 ### Configuración y Soporte
 
@@ -258,9 +271,13 @@ preferencias visuales son locales y no modifican datos operativos.
 7. **2026-07-19 — Seguimiento como lista de tareas con fechas**: se mantiene la
    generación componente × etapa, pero la operación se presenta como listas
    editables y se integra con Tareas.
-8. **2026-07-19 — Tablero por estado condicionado**: pausa y cierre exigen datos
-   auditables; antes del arrastre deben definirse cancelación, reapertura,
-   reanudación y retorno a Planificada.
+8. **2026-07-19 — Tablero horizontal arrastrable y condicionado**: el arrastre
+   comparte las mismas reglas que el menú; pausa, reanudación, cierre,
+   cancelación, reactivación y reapertura quedan auditadas. Cancelar y reabrir
+   son acciones exclusivas de administración.
+9. **2026-07-19 — Seguimiento demostrativo unificado**: los proyectos mock usan
+   tareas ficticias por componente y etapa, sincronizadas con Tareas. El avance
+   manual por `+ / −` se retira y el check es el único disparador de cierre.
 
 ## Implicancias para Fase 2 (React + mocks)
 

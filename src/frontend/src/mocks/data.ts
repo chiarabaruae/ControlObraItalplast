@@ -139,12 +139,35 @@ export interface RegistroPausa {
   fecha: string;
   usuarioId: string;
   motivo: string;
+  reanudadaEn?: string;
+  reanudadaPorId?: string;
+  motivoReanudacion?: string;
 }
 
 export interface RegistroCierre {
   fecha: string;
   usuarioId: string;
   evidenciaGeneral?: EvidenciaTarea;
+  reabiertoEn?: string;
+  reabiertoPorId?: string;
+  motivoReapertura?: string;
+}
+
+export interface RegistroCancelacion {
+  fecha: string;
+  usuarioId: string;
+  motivo: string;
+  reactivadaEn?: string;
+  reactivadaPorId?: string;
+  motivoReactivacion?: string;
+}
+
+export interface RegistroCambioEstado {
+  fecha: string;
+  usuarioId: string;
+  origen: EstadoObra;
+  destino: EstadoObra;
+  motivo?: string;
 }
 
 export interface ConfiguracionProductoProyecto {
@@ -183,6 +206,10 @@ export interface Proyecto {
   pausas?: RegistroPausa[];
   /** Registro del cierre manual desde el tablero (avances al 100%). */
   cierre?: RegistroCierre;
+  /** Cancelación vigente o histórica, siempre con motivo. */
+  cancelacion?: RegistroCancelacion;
+  /** Auditoría de cambios manuales y automáticos de estado. */
+  historialEstados?: RegistroCambioEstado[];
   descripcion: string;
 }
 
@@ -249,7 +276,7 @@ export function etapas(nombres: string[], avances: number[]): EtapaSeguimiento[]
 }
 
 // ── Proyectos ───────────────────────────────────────────────────
-export const proyectos: Proyecto[] = [
+const proyectosBase: Proyecto[] = [
   {
     id: "p-aviadores",
     nombre: "Torre Aviadores",
@@ -374,6 +401,128 @@ export const proyectos: Proyecto[] = [
   }
 ];
 
+const ETAPAS_DEMO_PREMARCO_FABRICA = etapas([
+  "Relevamiento de vanos",
+  "Corte y armado",
+  "Control de medidas"
+], [0, 0, 0]);
+
+const ETAPAS_DEMO_PREMARCO_INSTALACION = etapas([
+  "Coordinación de entrega",
+  "Colocación y nivelación"
+], [0, 0]);
+
+const EVIDENCIA_DEMO_DATA_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+    <rect width="960" height="540" fill="#0060AF"/>
+    <rect x="54" y="54" width="852" height="432" rx="28" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-opacity="0.45" stroke-width="3"/>
+    <text x="480" y="250" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="48" font-weight="700">ITALPLAST</text>
+    <text x="480" y="315" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="26">Evidencia demostrativa</text>
+  </svg>
+`)}`;
+
+function fechaInterpolada(inicio: string, fin: string, indice: number, total: number) {
+  const inicioMs = new Date(`${inicio}T00:00:00Z`).getTime();
+  const finMs = new Date(`${fin || inicio}T00:00:00Z`).getTime();
+  const proporcion = total <= 1 ? 1 : indice / (total - 1);
+  return new Date(inicioMs + (finMs - inicioMs) * proporcion).toISOString().slice(0, 10);
+}
+
+function crearSeguimientoDemostrativo(proyecto: Proyecto): Proyecto {
+  const tipos = [...new Set(proyecto.aberturas.map((abertura) =>
+    abertura.material === "PVC" ? "aberturas_pvc" as const : "aberturas_aluminio" as const
+  ))];
+  const productos: ConfiguracionProductoProyecto[] = tipos.map((tipo) => {
+    const llevaPremarcos = proyecto.id === "p-aviadores" && tipo === "aberturas_aluminio";
+    return {
+      tipo,
+      etapasFabricacionPremarcos: llevaPremarcos ? ETAPAS_DEMO_PREMARCO_FABRICA : [],
+      etapasInstalacionPremarcos: llevaPremarcos ? ETAPAS_DEMO_PREMARCO_INSTALACION : [],
+      etapasFabrica: proyecto.etapasFabrica,
+      etapasObra: proyecto.etapasObra
+    };
+  });
+  const items: ItemPresupuesto[] = proyecto.aberturas.map((abertura, indice) => ({
+    id: `demo-${proyecto.id}-${abertura.codigo.toLocaleLowerCase()}`,
+    posicion: String(indice + 1),
+    codigo: abertura.codigo,
+    ambiente: indice % 2 === 0 ? "Sector principal" : "Sector secundario",
+    cantidad: abertura.cantidad,
+    ancho: abertura.ancho,
+    alto: abertura.alto,
+    descripcion: abertura.descripcion,
+    serie: abertura.material === "PVC" ? "Línea PVC demostrativa" : "Línea aluminio demostrativa",
+    color: abertura.material === "PVC" ? "Blanco" : "Negro microtexturado",
+    vidrio: "Según presupuesto ejecutivo",
+    tipoProducto: abertura.material === "PVC" ? "aberturas_pvc" : "aberturas_aluminio"
+  }));
+  const tareasSinEstado = productos.flatMap((producto) => {
+    const itemsProducto = items.filter((item) => item.tipoProducto === producto.tipo);
+    const grupos = [
+      { grupo: "fabricacion_premarcos" as const, etapas: producto.etapasFabricacionPremarcos },
+      { grupo: "instalacion_premarcos" as const, etapas: producto.etapasInstalacionPremarcos },
+      { grupo: "fabrica" as const, etapas: producto.etapasFabrica },
+      { grupo: "instalacion" as const, etapas: producto.etapasObra }
+    ];
+    return grupos.flatMap(({ grupo, etapas: etapasGrupo }) =>
+      itemsProducto.flatMap((item) => etapasGrupo.map((etapa) => ({
+        id: `demo-${proyecto.id}-${producto.tipo}-${grupo}-${item.id}-${etapa.nombre}`,
+        itemId: item.id,
+        tipoProducto: producto.tipo,
+        grupo,
+        etapa: etapa.nombre,
+        completada: false
+      })))
+    );
+  });
+  const tareasPresupuesto: TareaPresupuesto[] = tareasSinEstado.map((tarea, indice, todas) => {
+    const avanceObjetivo = tarea.grupo === "fabrica" || tarea.grupo === "fabricacion_premarcos"
+      ? proyecto.avanceFabrica
+      : proyecto.avanceObra;
+    const grupo = todas.filter((actual) =>
+      actual.grupo === tarea.grupo && actual.tipoProducto === tarea.tipoProducto
+    );
+    const indiceGrupo = grupo.findIndex((actual) => actual.id === tarea.id);
+    const cantidadCompletada = Math.round(grupo.length * avanceObjetivo / 100);
+    const completada = proyecto.estado === "finalizada" || indiceGrupo < cantidadCompletada;
+    const fechaFin = fechaInterpolada(proyecto.fechaInicio, proyecto.fechaFinEstimada, indice, todas.length);
+    return {
+      ...tarea,
+      fechaInicio: proyecto.fechaInicio,
+      fechaFin,
+      completada,
+      evidencia: completada ? {
+        nombre: "evidencia-demostrativa.svg",
+        tipo: "image/svg+xml",
+        tamano: 1024,
+        dataUrl: EVIDENCIA_DEMO_DATA_URL
+      } : undefined,
+      observaciones: completada ? "Dato ficticio para visualizar el flujo de seguimiento." : undefined,
+      completadaEn: completada ? `${fechaFin}T15:00:00.000Z` : undefined,
+      completadaPorId: completada ? proyecto.liderId : undefined
+    };
+  });
+  const documentoPresupuesto = proyecto.documentos.find((documento) => documento.tipo === "presupuesto");
+
+  return {
+    ...proyecto,
+    productos,
+    presupuestoEjecutivo: {
+      nombreArchivo: documentoPresupuesto?.nombre ?? `Presupuesto ejecutivo demo — ${proyecto.nombre}.pdf`,
+      tamano: 0,
+      formato: "desconocido",
+      numero: `DEMO-${proyecto.id.replace("p-", "").toLocaleUpperCase()}`,
+      fecha: documentoPresupuesto?.fecha ?? proyecto.fechaInicio,
+      importadoEn: `${proyecto.fechaInicio}T12:00:00.000Z`,
+      items
+    },
+    tareasPresupuesto
+  };
+}
+
+/** Proyectos mock enriquecidos para poder recorrer el seguimiento por checks sin cargar PDFs reales. */
+export const proyectos: Proyecto[] = proyectosBase.map(crearSeguimientoDemostrativo);
+
 // ── Tareas ──────────────────────────────────────────────────────
 export const tareasIniciales: Tarea[] = [
   { id: "t-1", proyectoId: "p-aviadores", titulo: "Verificar medidas de vanos piso 3", responsableId: "u-oscar", fechaFin: "2026-07-21", estado: "en_progreso", prioridad: "alta" },
@@ -426,6 +575,29 @@ export function contarEvidencias(p: Proyecto): number {
   return enTareas + (p.cierre?.evidenciaGeneral ? 1 : 0);
 }
 
+export function registrarCambioEstado(
+  proyecto: Proyecto,
+  destino: EstadoObra,
+  usuarioId: string,
+  motivo?: string
+): Proyecto {
+  if (proyecto.estado === destino) return proyecto;
+  return {
+    ...proyecto,
+    estado: destino,
+    historialEstados: [
+      ...(proyecto.historialEstados ?? []),
+      {
+        fecha: new Date().toISOString(),
+        usuarioId,
+        origen: proyecto.estado,
+        destino,
+        motivo: motivo?.trim() || undefined
+      }
+    ]
+  };
+}
+
 /**
  * Aplica el cambio de una tarea de seguimiento y las reglas de estado:
  * un proyecto planificado pasa solo a "en progreso" con su primer avance.
@@ -438,7 +610,12 @@ export function aplicarCambioTarea(p: Proyecto, tareaActualizada: TareaPresupues
     )
   };
   if (actualizado.estado === "planificada" && proyectoTieneAvance(actualizado)) {
-    actualizado.estado = "en_progreso";
+    return registrarCambioEstado(
+      actualizado,
+      "en_progreso",
+      tareaActualizada.completadaPorId ?? "sistema",
+      "Primer avance registrado"
+    );
   }
   return actualizado;
 }
@@ -454,9 +631,10 @@ export function obtenerProyectos(): Proyecto[] {
     const parsed = JSON.parse(guardados) as Proyecto[];
     return Array.isArray(parsed)
       ? parsed.map((proyecto) => {
+          const demostrativo = proyectos.find((actual) => actual.id === proyecto.id);
           const etapasFabricacionPremarcos = proyecto.etapasFabricacionPremarcos ?? [];
           const etapasInstalacionPremarcos = proyecto.etapasInstalacionPremarcos ?? [];
-          const productos = proyecto.productos ?? (proyecto.tipoProducto
+          const productosMigrados = proyecto.productos ?? (proyecto.tipoProducto
             ? [{
                 tipo: proyecto.tipoProducto,
                 etapasFabricacionPremarcos,
@@ -465,6 +643,9 @@ export function obtenerProyectos(): Proyecto[] {
                 etapasObra: proyecto.etapasObra ?? []
               }]
             : []);
+          const productos = productosMigrados.length > 0
+            ? productosMigrados
+            : (demostrativo?.productos ?? []);
           const documentos = (proyecto.documentos ?? []).map((documento) => {
             const tiposVigentes = ["oferta", "presupuesto", "plano", "otro"];
             return tiposVigentes.includes(String(documento.tipo))
@@ -478,7 +659,10 @@ export function obtenerProyectos(): Proyecto[] {
             documentos,
             etapasFabricacionPremarcos,
             etapasInstalacionPremarcos,
-            tareasPresupuesto: proyecto.tareasPresupuesto ?? []
+            presupuestoEjecutivo: proyecto.presupuestoEjecutivo ?? demostrativo?.presupuestoEjecutivo,
+            tareasPresupuesto: proyecto.tareasPresupuesto?.length
+              ? proyecto.tareasPresupuesto
+              : (demostrativo?.tareasPresupuesto ?? [])
           };
         })
       : proyectos;

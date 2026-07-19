@@ -3,7 +3,7 @@
 // fechas de entrega. El supervisor puede agregar tareas nuevas, renombrar,
 // cambiar fechas o eliminar. Completar exige evidencia fotográfica.
 import { useMemo, useState } from "react";
-import { CalendarDays, Camera, Check, Factory, HardHat, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Check, Factory, HardHat, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ETIQUETAS_GRUPO, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
 import { formatFechaCorta } from "@/lib/format";
@@ -69,7 +69,7 @@ function FilaTarea({
         disabled={!puedeCompletar && !tarea.completada}
         aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${titulo}`}
       >
-        {tarea.completada ? <Check className="size-4" /> : <Camera className="size-4" />}
+        <Check className="size-4" />
       </Button>
 
       <div className="min-w-0 flex-1">

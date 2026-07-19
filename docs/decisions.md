@@ -117,7 +117,7 @@ tags:
 
 **Decisión:** generar una tarea por `componente × etapa`; exigir imagen para completar, permitir observación opcional y derivar todos los porcentajes desde tareas completadas.
 
-**Consecuencias:** desaparece el ajuste manual de porcentaje en proyectos nuevos. Las evidencias se comprimen en Fase 2, pero el backend deberá almacenarlas como archivos auditables y no como datos en el navegador.
+**Consecuencias:** desaparece el ajuste manual de porcentaje del flujo activo. Las evidencias se comprimen en Fase 2, pero el backend deberá almacenarlas como archivos auditables y no como datos en el navegador.
 
 ## D-012 — Premarcos anidados en Fábrica e Instalación
 
@@ -151,7 +151,7 @@ tags:
 
 **Decisión:** Proyectos suma vista Tablero (Planificadas / En progreso / Pausadas / Finalizadas). Pasar a En progreso solo ocurre con avance registrado (automático con el primer avance); pausar exige motivo que queda en el historial (`pausas`); finalizar advierte que los avances se guardan al 100%, exige al menos una evidencia (existente o adjuntada como evidencia general) y registra el cierre (`cierre`).
 
-**Consecuencias:** los estados dejan de ser un campo editable a mano y pasan a reflejar reglas operativas trazables. La implementación inicial usa un menú; el arrastre, la confirmación de todos los movimientos y las políticas para cancelación, reapertura y retorno a Planificada requieren una definición adicional antes de ampliarla.
+**Consecuencias:** los estados dejan de ser un campo editable a mano y pasan a reflejar reglas operativas trazables. Esta primera definición se amplía en D-017 con arrastre, confirmaciones y políticas de excepción.
 
 ## D-016 — Interfaz íntegramente en español
 
@@ -160,3 +160,23 @@ tags:
 **Decisión:** todo texto visible para la persona usuaria va en español (Configuración, Soporte, Cuenta, Actualizaciones, Documentación, Contactar soporte, Inicio, Buscar actualizaciones). Los identificadores de código y rutas pueden permanecer en inglés.
 
 **Consecuencias:** los rótulos ingleses previos quedan prohibidos en UI; el criterio aplica a toda pantalla nueva.
+
+## D-017 — Kanban arrastrable con transiciones protegidas
+
+**Estado:** aceptada.
+
+**Contexto:** el tablero debía comportarse como un Kanban horizontal sin permitir que el gesto de arrastre eludiera las condiciones operativas ni borrara la trazabilidad de pausas, cierres o excepciones.
+
+**Decisión:** usar columnas horizontales y tarjetas arrastrables con `@dnd-kit/core`. Arrastrar y usar el menú ejecutan el mismo flujo: todo movimiento requiere confirmación, validación o información obligatoria. En progreso exige avance; un proyecto con avance no vuelve a Planificada; Pausada exige motivo y su reanudación exige observación; Finalizada exige evidencia. Cancelar y reactivar son acciones administrativas con motivo fuera de las columnas. Reabrir una Finalizada también es una acción administrativa excepcional, no un destino de arrastre.
+
+**Consecuencias:** administradores y supervisores cambian estados ordinarios; solo administradores cancelan, reactivan o reabren. Las transiciones se registran en `historialEstados` y las operaciones especiales mantienen sus registros en `pausas`, `cierre` o `cancelacion`. Reabrir conserva las tareas cerradas y vuelve a En progreso; no revierte silenciosamente el avance.
+
+## D-018 — Seguimiento por checks también en proyectos demostrativos
+
+**Estado:** aceptada.
+
+**Contexto:** los proyectos mock anteriores a la carga de presupuestos seguían mostrando porcentajes editables y dejaban vacía la sección global de seguimiento, lo que impedía visualizar y probar el flujo vigente.
+
+**Decisión:** derivar componentes y tareas ficticias desde las aberturas de los cuatro proyectos iniciales. El seguimiento activo usa exclusivamente `tareasPresupuesto`, tanto en el detalle como en Tareas. La acción se muestra con check y solicita evidencia dentro del diálogo. Los proyectos desconocidos que aún no tengan seguimiento muestran un estado pendiente de generación, sin controles porcentuales.
+
+**Consecuencias:** el porcentaje queda siempre derivado de checks en la interfaz activa y ambas vistas comparten la persistencia de proyecto. Los presupuestos, fechas y evidencias sembrados quedan identificados como demostrativos; sirven para pruebas visuales, no como información operativa ni como migración definitiva del backend.

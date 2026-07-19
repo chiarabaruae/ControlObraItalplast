@@ -16,6 +16,26 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-19 — Tareas demostrativas sincronizadas y avance solo por checks
+
+**Alcance:** los proyectos mock existentes reciben presupuestos, productos y tareas ficticias para visualizar el seguimiento vigente; se retira el editor manual de porcentajes.
+
+**Impacto:** Fábrica e Instalación muestran listas por componente y etapa en Torre Aviadores, Ykua Sati, Ñasaindy y Dúplex Lambaré. Torre Aviadores incluye premarcos de aluminio. Las mismas tareas aparecen en la sección Tareas, que suma filtro por proyecto; completar o reabrir desde una vista se refleja en la otra. Todos los disparadores de cierre usan check y la evidencia se solicita dentro del diálogo. Las evidencias precargadas están identificadas como demostrativas.
+
+**Archivos clave:** `src/frontend/src/mocks/data.ts`, `src/frontend/src/pages/ProyectoDetalle.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`, `docs/project-context.md`, `docs/decisions.md`, `docs/flujo-roles.md`.
+
+**Validaciones:** `npm run build`, `npm run lint`, `git diff --check` y simulación localhost de reapertura en el detalle, cierre desde Tareas y verificación posterior en el detalle.
+
+## 2026-07-19 — Kanban horizontal arrastrable y ciclo de estados seguro
+
+**Alcance:** la vista Tablero adopta columnas horizontales, tarjetas arrastrables y una política completa de transición, cancelación y reapertura.
+
+**Impacto:** administradores y supervisores pueden arrastrar o usar el menú, siempre con la misma confirmación o condición. En progreso exige avance, Planificada rechaza proyectos con avance, pausa y reanudación guardan motivo, y finalizar conserva su advertencia y evidencia. Cancelar, reactivar y reabrir son acciones especiales exclusivas de administración con motivo obligatorio. El modelo suma auditoría general en `historialEstados` y datos de reanudación, reapertura y cancelación.
+
+**Archivos clave:** `src/frontend/src/components/proyectos/TableroProyectos.tsx`, `src/frontend/src/pages/Proyectos.tsx`, `src/frontend/src/lib/roles.ts`, `src/frontend/src/mocks/data.ts`, `src/frontend/package.json`, `docs/project-context.md`, `docs/decisions.md`, `docs/flujo-roles.md`.
+
+**Validaciones:** `npm run build`, `npm run lint`, `git diff --check` y simulación en localhost del tablero, arrastre y diálogos condicionados.
+
 ## 2026-07-19 — Auditoría contextual de tareas y tablero
 
 **Alcance:** se verificó el commit `e294af1` ya publicado y se completó la documentación especializada que faltaba.
