@@ -1,3 +1,14 @@
+---
+context_id: controlobra-architecture
+context_type: technical_architecture
+last_updated: 2026-07-18
+tags:
+  - architecture
+  - frontend
+  - backend
+  - migration
+---
+
 # Arquitectura
 
 Este proyecto se organiza con una base hexagonal. La idea es que las reglas de negocio vivan en el centro y que los detalles externos, como HTTP, SQL Server, autenticacion, archivos o servicios de terceros, entren mediante adaptadores.
@@ -22,7 +33,11 @@ Contiene la entrada HTTP: endpoints, controladores, middlewares, configuracion y
 
 ### Frontend
 
-Contiene la interfaz de usuario. Por ahora es una pantalla HTML/CSS/JS sin dependencias para poder verla sin instalar Node.js.
+Contiene la interfaz de usuario. La interfaz activa de Fase 2 está construida con React, TypeScript, Vite, Tailwind CSS y componentes shadcn/Radix dentro de `src/frontend/src`.
+
+La versión HTML/CSS/JS sin build permanece como legado durante la migración y no debe considerarse la fuente principal para nuevas funcionalidades.
+
+El frontend React todavía trabaja principalmente con mocks y `localStorage`. La integración completa con los casos de uso y adaptadores backend se realizará progresivamente.
 
 ## Regla de dependencias
 
@@ -52,5 +67,15 @@ El login queda modelado como caso de uso, pero el adaptador actual es de demostr
 - Backend: Node.js con JavaScript.
 - API HTTP: Express.
 - Base de datos: PostgreSQL.
-- Frontend inicial: HTML, CSS y JavaScript sin build.
+- Frontend activo: React, TypeScript, Vite y Tailwind CSS.
+- Frontend legado: HTML, CSS y JavaScript sin build.
 - Utilidades: Python para scripts de soporte cuando haga falta.
+
+## Contexto canónico
+
+El estado vigente y las decisiones se mantienen en:
+
+- `docs/context-index.md`
+- `docs/project-context.md`
+- `docs/decisions.md`
+- `docs/change-log.md`

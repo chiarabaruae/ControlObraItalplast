@@ -1,4 +1,19 @@
+---
+context_id: controlobra-context7-setup
+context_type: environment_setup
+last_updated: 2026-07-18
+status: environment_specific
+tags:
+  - context7
+  - mcp
+  - documentation
+---
+
 # Context7 setup
+
+> Registro de una instalación realizada en un entorno Windows anterior. La regla
+> vigente para agentes está en `AGENTS.md`; las rutas y comandos de configuración
+> deben verificarse para el equipo actual antes de reutilizarlos.
 
 ## What was installed
 

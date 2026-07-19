@@ -1,6 +1,8 @@
 # Control Obras — Italplast
 
-Aplicación web interna para gestionar obras de instalación de aberturas: clientes, proyectos, etapas, documentos, cronogramas y seguimiento operativo.
+Aplicación web interna para gestionar clientes, proyectos multiproducto, etapas, documentos, cronogramas y seguimiento operativo de Italplast.
+
+> Contexto vigente para agentes y colaboradores: [docs/context-index.md](docs/context-index.md).
 
 ---
 
@@ -27,7 +29,8 @@ Para que el equipo pueda:
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | HTML + CSS + JavaScript (ES Modules, sin build) |
+| Frontend activo | React + TypeScript + Vite + Tailwind CSS + shadcn/Radix |
+| Frontend legado | HTML + CSS + JavaScript (conservado durante la migración) |
 | Backend API | Node.js + Express |
 | Base local operativa | PostgreSQL (Railway) |
 | Base externa CRM | MySQL/MariaDB (vista `leads`) |
@@ -52,10 +55,13 @@ ControlAvancesObra/
         infrastructure/
         shared/
     frontend/
-      index.html
-      scripts/
+      src/
+        components/
+        context/
+        lib/
+        mocks/
         pages/
-      styles/
+      public/
   tools/
 ```
 
@@ -72,9 +78,11 @@ ControlAvancesObra/
 - `src/backend/src/http/`: rutas y middlewares Express.
 - `src/backend/src/infrastructure/`: adaptadores (PostgreSQL, MySQL, seguridad, servicios).
 - `src/backend/src/shared/`: configuración compartida (env, utilidades).
-- `src/frontend/`: SPA (login + app) en JS vanilla.
-- `src/frontend/scripts/pages/`: pantallas (Dashboard, Clientes, Proyectos, etc.).
-- `src/frontend/styles/`: estilos globales y componentes visuales.
+- `src/frontend/src/`: frontend React activo.
+- `src/frontend/src/pages/`: pantallas de Dashboard, Clientes, Proyectos, Tareas, Usuarios, Settings y Support.
+- `src/frontend/src/components/`: shell, componentes de aplicación y UI reutilizable.
+- `src/frontend/src/mocks/`: modelo y persistencia temporal de Fase 2.
+- `src/frontend/scripts/` y `styles/`: frontend vanilla legado durante la migración.
 - `tools/`: utilidades de soporte del repo.
 
 ---
@@ -83,16 +91,19 @@ ControlAvancesObra/
 
 Resumen de flujo funcional:
 
-1. Usuario inicia sesión.
-2. Frontend consume API backend (`/api/...`) con JWT.
-3. Módulo Clientes lee datos de CRM externo (`leads`) en modo solo lectura.
-4. Desde Clientes se crean proyectos en DB local y se vinculan al cliente externo.
-5. Módulo Proyectos/Obras opera sobre datos locales (estados, tablero, seguimiento, documentos).
+1. Usuario inicia sesión en el frontend React mock.
+2. La navegación y las acciones visibles se filtran por rol.
+3. Administradores pueden crear proyectos con uno o más tipos de producto.
+4. Cada producto conserva sus propias etapas de premarcos, fábrica y obra.
+5. Los datos de Fase 2 se guardan temporalmente en `localStorage`.
+6. La conexión completa con la API y PostgreSQL queda para las fases siguientes.
 
 Arquitectura general:
 
 ```text
-Frontend (JS) -> Backend Express -> PostgreSQL (local)
+Frontend React (mocks/localStorage, Fase 2)
+              ↓ conexión progresiva
+Backend Express -> PostgreSQL
 ```
 
 ---
@@ -105,12 +116,28 @@ Incluye una maqueta fija en HTML que imita la interfaz principal del Dashboard:
 
 Resumen funcional de pantallas:
 
-- `Login`: acceso con usuario/contraseña y sesión JWT.
+- `Login`: acceso mock por Documento y Contraseña, con recuperación de contraseña demostrativa.
 - `Dashboard`: resumen operativo general (estado de obras y métricas rápidas).
 - `Clientes`: clientes del CRM , vinculación con proyectos y creación de proyecto.
-- `Proyectos / Obras`: tablero de gestión de proyectos (lista, matriz, kanban, gantt y módulos internos).
-- `To-Do`: tareas internas de seguimiento.
-- `Personalizar`: ajustes visuales (tema y color de acento).
-- `Ajustes / Usuarios` (admin): gestión básica de usuarios y roles.
+- `Proyectos`: tarjetas, alta multiproducto y seguimiento por producto.
+- `Tareas`: tareas internas de seguimiento.
+- `Settings`: Account, Personalizar y Updates.
+- `Support`: Documentation y Contact support.
+- `Usuarios` (admin): gestión mock de usuarios y roles.
+
+## Desarrollo del frontend React
+
+```bash
+cd src/frontend
+npm install
+npm run dev
+```
+
+Validación:
+
+```bash
+npm run build
+npm run lint
+```
 
 ---

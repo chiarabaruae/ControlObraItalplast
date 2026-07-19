@@ -1,4 +1,19 @@
-# Storybook setup
+---
+context_id: controlobra-storybook-setup
+context_type: historical_setup
+last_updated: 2026-07-18
+status: historical
+tags:
+  - storybook
+  - legacy-frontend
+---
+
+# Storybook setup — histórico
+
+> Esta configuración correspondía al frontend HTML + Vite. Storybook no figura
+> actualmente en `src/frontend/package.json` ni forma parte del flujo React
+> activo. No ejecutar estas instrucciones sin decidir primero una nueva
+> configuración para React.
 
 ## Instalación usada
 

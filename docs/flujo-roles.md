@@ -1,4 +1,16 @@
-# Flujo por rol — Control de Obras Italplast
+---
+context_id: controlobra-role-flow
+context_type: functional_specification
+last_updated: 2026-07-18
+tags:
+  - roles
+  - permissions
+  - projects
+  - stages
+  - password-recovery
+---
+
+# Flujo por rol — Gestión de proyectos Italplast
 
 > Definición congelada en Fase 1 del plan de reestructuración (2026-07-17).
 > Base del rediseño frontend en React (Fase 2, datos mock) y de los permisos
@@ -6,18 +18,18 @@
 
 ## Contexto del relevamiento
 
-- El frontend vanilla actual **no filtra nada por rol**: todos los usuarios ven
-  todos los botones, y a los no-admin les fallan las escrituras con 403.
+- El frontend vanilla legado **no filtra correctamente por rol**. El frontend
+  React activo sí aplica guardas de ruta y visibilidad mediante `lib/roles.ts`.
 - El backend ya tiene una regla implícita en `admin-routes.js`: **GET = cualquier
   sesión válida, POST/PUT/DELETE = solo `administrator`**. Excepción:
   `proyectos-routes.js` (ofertas, cronogramas, seguimientos, ábacos) exige admin
   incluso para lectura — esto deberá relajarse en Fase 3/4 para que supervisor y
   viewer puedan consultar cronogramas y avances.
-- El rol **`supervisor` no existe todavía en el código** (ni middleware, ni seed,
-  ni datos). Se crea en Fase 3. La tabla `roles` de la DB está huérfana
-  (una sola fila "admin", nadie la consulta; `app_users.role` es un varchar).
-- `obras.js` y `proyecto-detalle.js` no están ruteados hoy;
-  `proyectos.js` reemplaza conceptualmente a `obras.js`.
+- El rol **`supervisor` existe en los mocks y permisos del frontend React**, pero
+  todavía debe formalizarse en middleware, seed y permisos del backend real. La
+  tabla `roles` de la DB está huérfana y `app_users.role` es un varchar.
+- Los archivos vanilla `obras.js`, `proyectos.js` y `proyecto-detalle.js` son
+  legado; las rutas activas viven en `src/frontend/src/App.tsx`.
 
 ## Roles
 
@@ -36,7 +48,8 @@
 | Proyectos | ✅ | ✅ | ✅ lectura |
 | Tareas | ✅ | ✅ | ✅ (sus tareas) |
 | Usuarios *(pantalla nueva)* | ✅ | ❌ | ❌ |
-| Personalizar | ✅ | ✅ | ✅ |
+| Settings / Personalizar | ✅ | ✅ | ✅ |
+| Support | ✅ | ✅ | ✅ |
 
 ## Matriz pantalla × rol
 
@@ -64,7 +77,7 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Editar datos del proyecto | ✅ | ❌ | ❌ |
 | Eliminar proyecto | ✅ | ❌ | ❌ |
 
-### Proyecto — detalle (menú superior: Resumen · Tareas · Cronograma · Seguimiento Fábrica · Seguimiento Obra · Informe de Avance · Documentos)
+### Proyecto — detalle (Resumen · Tareas · Cronograma · Seguimiento por producto · Informe · Documentos)
 | Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | Ver los módulos del proyecto | ✅ | ✅ | ✅ |
@@ -146,9 +159,11 @@ diseña ya en Fase 2 con mocks; se conecta en Fase 4.*
 - Como evolución futura, Settings tendrá plantillas globales por producto. Solo
   administradores y supervisores podrán modificar esas condiciones globales;
   los permisos específicos se definirán al conectar el backend.
-### Personalizar
-Disponible para los 3 roles (tema claro/oscuro/sistema + color de acento;
-preferencias locales, sin impacto en datos).
+### Settings y Support
+
+Disponibles para los 3 roles. Settings reúne Account, Personalizar y Updates;
+Support reúne Documentation y Contact support. Las preferencias visuales son
+locales y no modifican datos operativos.
 
 ## Decisiones tomadas (con fecha)
 
@@ -171,8 +186,8 @@ preferencias locales, sin impacto en datos).
 
 ## Implicancias para Fase 2 (React + mocks)
 
-- Selector "ver como" (admin / supervisor / usuario) en el login simulado para
-  recorrer los 3 flujos sin backend.
+- El login simulado solicita Documento y Contraseña. El usuario mock encontrado
+  determina el rol; no se presenta un selector manual de roles.
 - Guardas de ruta: `/usuarios` solo admin; `/clientes` admin+supervisor.
 - Renderizado condicional de acciones según la matriz de arriba (los botones
   que el rol no puede usar **no se muestran**, no se deshabilitan).
