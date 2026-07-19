@@ -94,9 +94,11 @@ Resumen de flujo funcional:
 1. Usuario inicia sesión en el frontend React mock.
 2. La navegación y las acciones visibles se filtran por rol.
 3. Administradores pueden crear proyectos con uno o más tipos de producto.
-4. Cada producto conserva sus propias etapas de premarcos, fábrica y obra.
-5. Los datos de Fase 2 se guardan temporalmente en `localStorage`.
-6. La conexión completa con la API y PostgreSQL queda para las fases siguientes.
+4. El presupuesto ejecutivo PDF se lee localmente y sus componentes se revisan antes de confirmar.
+5. Cada producto conserva sus propias etapas de premarcos, fábrica e instalación.
+6. Los componentes y etapas generan matrices de tareas; cada cierre exige evidencia y recalcula el avance.
+7. Los datos de Fase 2 se guardan temporalmente en `localStorage`.
+8. La conexión completa con la API y PostgreSQL queda para las fases siguientes.
 
 Arquitectura general:
 
@@ -119,7 +121,7 @@ Resumen funcional de pantallas:
 - `Login`: acceso mock por Documento y Contraseña, con recuperación de contraseña demostrativa.
 - `Dashboard`: resumen operativo general (estado de obras y métricas rápidas).
 - `Clientes`: clientes del CRM , vinculación con proyectos y creación de proyecto.
-- `Proyectos`: tarjetas, alta multiproducto y seguimiento por producto.
+- `Proyectos`: tarjetas, alta multiproducto con presupuesto ejecutivo y matrices de Fábrica/Instalación.
 - `Tareas`: tareas internas de seguimiento.
 - `Settings`: Account, Personalizar y Updates.
 - `Support`: Documentation y Contact support.
@@ -138,6 +140,7 @@ Validación:
 ```bash
 npm run build
 npm run lint
+npm run diagnostico:presupuestos -- /ruta/presupuesto.pdf
 ```
 
 ---

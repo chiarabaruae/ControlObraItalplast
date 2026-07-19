@@ -1,17 +1,29 @@
 ---
 context_id: controlobra-change-log
 context_type: implementation_history
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 tags:
   - changelog
   - commits
   - frontend
   - project-context
+  - executive-budget
+  - diagnostics
 ---
 
 # Registro contextual de cambios
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
+
+## 2026-07-19 — Presupuesto ejecutivo, tareas y evidencia
+
+**Alcance:** el presupuesto ejecutivo PDF pasa a ser obligatorio en el alta; se extraen y revisan componentes y se genera una matriz de tareas por etapa.
+
+**Impacto:** PDF.js reconoce tabla Excel, Preference y Preference Mercosul sin OCR. Fábrica e Instalación agrupan premarcos y producto. Cada cierre exige imagen, admite observación y recalcula el avance automáticamente.
+
+**Archivos clave:** `src/frontend/src/lib/presupuesto-parser.ts`, `src/frontend/src/lib/pdf-text.ts`, `src/frontend/src/lib/seguimiento-presupuesto.ts`, `src/frontend/src/lib/evidencias.ts`, `src/frontend/src/components/proyectos/PresupuestoUploader.tsx`, `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`, `src/frontend/src/pages/Proyectos.tsx`, `src/frontend/src/pages/ProyectoDetalle.tsx`, `src/frontend/src/mocks/data.ts`.
+
+**Validación:** `npm run build`, `npm run lint`, diagnóstico automatizado con los tres PDFs reales (4, 34 y 9 componentes), y simulación localhost de alta, generación de matrices, cierre con evidencia, recarga y persistencia.
 
 ## 2026-07-18 — Contexto durable para agentes
 

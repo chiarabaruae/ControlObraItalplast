@@ -1,13 +1,15 @@
 ---
 context_id: controlobra-role-flow
 context_type: functional_specification
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 tags:
   - roles
   - permissions
   - projects
   - stages
   - password-recovery
+  - executive-budget
+  - task-evidence
 ---
 
 # Flujo por rol — Gestión de proyectos Italplast
@@ -22,7 +24,7 @@ tags:
   React activo sí aplica guardas de ruta y visibilidad mediante `lib/roles.ts`.
 - El backend ya tiene una regla implícita en `admin-routes.js`: **GET = cualquier
   sesión válida, POST/PUT/DELETE = solo `administrator`**. Excepción:
-  `proyectos-routes.js` (ofertas, cronogramas, seguimientos, ábacos) exige admin
+  `proyectos-routes.js` (ofertas, cronogramas y seguimientos) exige admin
   incluso para lectura — esto deberá relajarse en Fase 3/4 para que supervisor y
   viewer puedan consultar cronogramas y avances.
 - El rol **`supervisor` existe en los mocks y permisos del frontend React**, pero
@@ -77,14 +79,14 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Editar datos del proyecto | ✅ | ❌ | ❌ |
 | Eliminar proyecto | ✅ | ❌ | ❌ |
 
-### Proyecto — detalle (Resumen · Tareas · Cronograma · Seguimiento por producto · Informe · Documentos)
+### Proyecto — detalle (Resumen · Tareas · Cronograma · Fábrica · Instalación · Informe · Documentos)
 | Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | Ver los módulos del proyecto | ✅ | ✅ | ✅ |
 | Subir oferta PDF → generar cronograma | ✅ | ❌ (comercial) | ❌ |
-| Subir ábaco de aberturas | ✅ | ✅ | ❌ |
-| Generar seguimientos (fábrica/obra) | ✅ | ✅ | ❌ |
-| **Editar avance de etapas** | ✅ | ✅ *(su función principal)* | ❌ |
+| Reemplazar presupuesto ejecutivo | ✅ | ✅ | ❌ |
+| Generar seguimientos (fábrica/instalación) | ✅ | ✅ | ❌ |
+| **Completar tareas de etapa con evidencia** | ✅ | ✅ *(su función principal)* | ❌ en Fase 2 |
 | Comentarios / hitos | ✅ | ✅ | ❌ |
 
 ### Tareas (antes To-Do)
@@ -129,23 +131,25 @@ diseña ya en Fase 2 con mocks; se conecta en Fase 4.*
 - En Fase 2, la creación queda resuelta en frontend/mock con persistencia temporal
   en `localStorage`, porque todavía no hay base de datos ni endpoint confirmado
   que permita validar trazabilidad real.
-- El alta de proyecto debe pedir nombre, cliente, uno o más tipos de producto y fecha de
-  inicio. Líder y ubicación pueden cargarse durante el alta. La fecha de creación
-  se genera automáticamente y se muestra solo como dato de lectura.
+- El alta de proyecto debe pedir nombre, cliente, uno o más tipos de producto,
+  fecha de inicio y la última versión del presupuesto ejecutivo PDF. Líder y
+  ubicación pueden cargarse durante el alta. La fecha de creación se genera
+  automáticamente y se muestra solo como dato de lectura. La fecha de inicio se
+  precarga con el día actual y sigue siendo editable.
 - Los tipos de producto iniciales son: aberturas de aluminio, aberturas de PVC,
   mosquiteras, persianas, aberturas Velux de techo y servicios.
 - Un proyecto puede reunir varios tipos de producto. Cada tipo conserva su propia
-  configuración de premarcos, fábrica y obra, sin compartir ni sobrescribir las
+  configuración de premarcos, fábrica e instalación, sin compartir ni sobrescribir las
   etapas de los otros productos seleccionados.
 - La selección de productos es múltiple. Al seleccionar un tipo aparece su editor
   de etapas; al deseleccionarlo se oculta y no se guarda en el proyecto. Durante
   el formulario, volver a seleccionarlo recupera la configuración que tenía.
-- `Servicios` no utiliza seguimiento por etapas de premarcos, fábrica u obra; puede
+- `Servicios` no utiliza seguimiento por etapas de premarcos, fábrica o instalación; puede
   coexistir con otros productos, que sí conservan sus etapas independientes.
 - La fecha fin estimada queda vacía al alta y debe poder editarse posteriormente.
 - Para cada producto distinto de `Servicios`, la configuración contiene cuatro
   grupos: fabricación de premarcos (opcional), instalación de premarcos
-  (opcional e independiente), fábrica del producto (obligatorio) y obra del
+  (opcional e independiente), fábrica del producto (obligatorio) e instalación del
   producto (obligatorio).
 - Fabricación e instalación de premarcos pueden combinarse libremente: ambas,
   solo fabricación, solo instalación o ninguna. Esto contempla premarcos del
@@ -153,12 +157,42 @@ diseña ya en Fase 2 con mocks; se conecta en Fase 4.*
 - Cada grupo permite seleccionar, renombrar, eliminar y agregar subetapas antes
   de crear el proyecto. Los cambios se guardan únicamente en ese proyecto y no
   modifican los valores predeterminados de otros proyectos.
-- Por defecto quedan seleccionadas las etapas estándar de fábrica y obra;
+- Por defecto quedan seleccionadas las etapas estándar de fábrica e instalación;
   `Precorte` queda disponible como etapa no seleccionada. Los grupos opcionales
   de premarcos parten de una propuesta editable de subetapas operativas.
 - Como evolución futura, Settings tendrá plantillas globales por producto. Solo
   administradores y supervisores podrán modificar esas condiciones globales;
   los permisos específicos se definirán al conectar el backend.
+
+### Lectura y revisión del presupuesto ejecutivo
+
+- El PDF es obligatorio incluso cuando el proyecto contiene solo Servicios; en
+  ese caso conserva la fuente comercial pero no genera tareas por etapas.
+- La extracción ocurre localmente con PDF.js y texto embebido. No se usa OCR en
+  Fase 2.
+- Los formatos iniciales son tabla Excel, Oferta Preference y Propuesta
+  Preference Mercosul. Un formato desconocido permite agregar filas manuales.
+- Antes de crear el proyecto se debe revisar una tabla editable. Cada fila exige
+  código, descripción, cantidad positiva y un producto que siga seleccionado.
+- Cada producto operativo seleccionado debe recibir al menos un componente.
+- Con varios productos, cada componente se asigna de forma independiente. La
+  sugerencia automática se puede corregir antes de confirmar.
+
+### Generación y cierre de tareas operativas
+
+- Se genera una tarea por cada combinación entre componente presupuestado y
+  etapa activa del producto asignado.
+- La pestaña Fábrica contiene `Premarcos · fabricación` y
+  `Producto · fabricación`. La pestaña Instalación contiene
+  `Premarcos · instalación` y `Producto · instalación`.
+- Marcar una tarea como lista exige una imagen. Observaciones es opcional.
+- Se registra quién y cuándo completó la tarea. La evidencia se puede consultar
+  y la tarea se puede reabrir.
+- Los porcentajes de bloque, producto y proyecto son derivados, no editables:
+  `completadas / total`.
+- En Fase 2, administradores y supervisores pueden cerrar estas tareas. La
+  asignación por persona para habilitar a Usuario (`viewer`) queda pendiente del
+  modelo real de responsables.
 ### Settings y Support
 
 Disponibles para los 3 roles. Settings reúne Account, Personalizar y Updates;
@@ -183,6 +217,9 @@ locales y no modifican datos operativos.
    modificaciones de nombres, altas y bajas afectan solo a ese producto dentro
    del proyecto en creación. Las plantillas globales se administrarán más
    adelante con acceso restringido a administradores y supervisores.
+6. **2026-07-19 — Presupuesto ejecutivo como fuente del seguimiento**: el PDF
+   es obligatorio, sus componentes se revisan antes del alta y generan las
+   matrices de tareas con evidencia y avance automático.
 
 ## Implicancias para Fase 2 (React + mocks)
 

@@ -1,6 +1,6 @@
 // Regla de avance — elemento firma de la interfaz.
 // Un medidor con muescas por etapa, como regla de taller: la posición de
-// cada muesca marca el fin de una etapa del proceso (fábrica u obra).
+// cada muesca marca el fin de una etapa del proceso (fábrica o instalación).
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 

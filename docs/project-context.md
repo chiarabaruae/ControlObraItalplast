@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-project-context
 context_type: current_project_state
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 branch: feature/frontend-react-migration
 tags:
   - italplast
@@ -10,6 +10,9 @@ tags:
   - project-management
   - multi-product
   - stages
+  - executive-budget
+  - pdf-parsing
+  - evidence
 ---
 
 # Contexto vigente del proyecto
@@ -28,6 +31,7 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 - La Fase 2 usa datos mock y persistencia temporal en `localStorage`.
 - El backend Express/PostgreSQL permanece en el repositorio, pero el nuevo frontend React todavía no está conectado a todas sus rutas reales.
 - Comandos principales desde `src/frontend`: `npm run dev`, `npm run build` y `npm run lint`.
+- Diagnóstico de lectores PDF: `npm run diagnostico:presupuestos -- <archivo-1.pdf> <archivo-2.pdf>`.
 
 ## Identidad visual y acceso
 
@@ -78,6 +82,18 @@ Cada tipo seleccionado conserva una configuración independiente. Desmarcar un p
 
 La configuración se agrupa por tipo, no por unidad o lote. Si dos partidas del mismo tipo necesitan condiciones distintas, todavía será necesario modelar lotes o partidas de producto.
 
+## Presupuesto ejecutivo como fuente de verdad
+
+- El alta exige la última versión del **presupuesto ejecutivo en PDF** y al menos un componente verificado.
+- El término anterior para la planilla de aberturas quedó retirado de la interfaz y del modelo activo.
+- PDF.js extrae texto embebido localmente en el navegador; los documentos analizados no requieren OCR.
+- Se reconocen tres familias iniciales: tabla exportada desde Excel, oferta Preference y propuesta Preference Mercosul.
+- La lectura nunca se confirma sola: el formulario presenta una tabla editable para corregir, agregar, eliminar y reasignar componentes a los productos seleccionados.
+- Cada componente conserva posición, código, ambiente, cantidad, medidas, descripción, serie, color, vidrio/detalle y tipo de producto.
+- El archivo PDF no se persiste completo en Fase 2; se guardan su metadata y los componentes verificados en `localStorage`.
+
+Las fuentes principales son `src/frontend/src/lib/presupuesto-parser.ts`, `src/frontend/src/lib/pdf-text.ts` y `src/frontend/src/components/proyectos/PresupuestoUploader.tsx`.
+
 ## Etapas por producto
 
 Para cada producto distinto de Servicios existen cuatro grupos:
@@ -85,27 +101,44 @@ Para cada producto distinto de Servicios existen cuatro grupos:
 1. Fabricación de premarcos: opcional.
 2. Instalación de premarcos: opcional e independiente de la fabricación.
 3. Etapas de fábrica del producto: obligatorias.
-4. Etapas de obra del producto: obligatorias.
+4. Etapas de instalación del producto: obligatorias.
 
 Cada subetapa puede seleccionarse, renombrarse, eliminarse o agregarse antes de crear el proyecto. Los cambios afectan solamente a ese producto dentro del proyecto.
 
-Servicios no genera etapas de premarcos, fábrica u obra, pero puede coexistir con otros productos que sí las tengan.
+Servicios no genera etapas de premarcos, fábrica o instalación, pero puede coexistir con otros productos que sí las tengan.
 
-El detalle del proyecto muestra el seguimiento agrupado por producto para evitar una cantidad excesiva de pestañas.
+El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de premarcos y del producto; **Instalación** reúne instalación de premarcos y del producto. Dentro de cada pestaña, las matrices siguen separadas por producto.
+
+## Tareas, evidencia y avance automático
+
+- Al crear el proyecto se genera una tarea por combinación `componente × etapa activa` del producto asignado.
+- Las matrices de Fábrica e Instalación reemplazan la carga manual de porcentaje en proyectos nuevos.
+- Completar una celda exige una evidencia de imagen; la observación es opcional.
+- La imagen se redimensiona a un máximo de 1280 px y se comprime a JPEG antes de guardarse localmente.
+- Cada cierre conserva usuario, fecha, evidencia y observación; una tarea completada puede consultarse o reabrirse.
+- El avance de grupo, Fábrica, Instalación y proyecto se calcula como `tareas completadas / tareas totales`.
+- Los proyectos anteriores sin tareas generadas mantienen el seguimiento porcentual legado para compatibilidad.
+
+Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `src/frontend/src/lib/evidencias.ts` y `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`.
 
 ## Persistencia y compatibilidad
 
 - Los proyectos mock se guardan bajo la clave `control-obras-proyectos` en `localStorage`.
 - El modelo nuevo usa `productos`, con una configuración de etapas por tipo.
 - `tipoProducto` se conserva temporalmente para migrar proyectos creados con el modelo anterior.
-- Las etapas agregadas al proyecto también se consolidan en las listas superiores de fábrica y obra para mantener compatibles las tarjetas y métricas existentes.
+- `presupuestoEjecutivo` conserva metadata e ítems revisados; `tareasPresupuesto` conserva la matriz y sus cierres.
+- Las etapas agregadas al proyecto también se consolidan en las listas superiores de fábrica e instalación para mantener compatibles las tarjetas y métricas existentes.
 
 La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 
 ## Archivos clave
 
-- `src/frontend/src/pages/Proyectos.tsx`: alta multiproducto y edición local de etapas.
-- `src/frontend/src/pages/ProyectoDetalle.tsx`: seguimiento agrupado por producto.
+- `src/frontend/src/pages/Proyectos.tsx`: alta multiproducto, presupuesto obligatorio y edición local de etapas.
+- `src/frontend/src/pages/ProyectoDetalle.tsx`: resumen de componentes y pestañas Fábrica/Instalación.
+- `src/frontend/src/components/proyectos/PresupuestoUploader.tsx`: carga y revisión del PDF.
+- `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`: matrices y cierre con evidencia.
+- `src/frontend/src/lib/presupuesto-parser.ts`: detección y parsing de los tres formatos.
+- `src/frontend/scripts/diagnostico-presupuestos.ts`: prueba repetible con PDFs reales provistos externamente.
 - `src/frontend/src/mocks/data.ts`: tipos, defaults, mocks, migración local y persistencia.
 - `src/frontend/src/components/app/AppShell.tsx`: navegación y popovers Settings/Support.
 - `src/frontend/src/context/auth.tsx`: sesión mock.
@@ -115,6 +148,11 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 ## Limitaciones conocidas
 
 - No existe backend real para el alta multiproducto ni para persistir cambios de avance.
+- El backend legado todavía conserva contratos y columnas con la terminología anterior al presupuesto ejecutivo; deben migrarse antes de conectar este flujo React.
+- La lectura usa heurísticas sobre texto embebido. Los PDFs escaneados sin texto y formatos no reconocidos requieren carga manual; no hay OCR.
+- Las evidencias viven temporalmente como imágenes comprimidas en `localStorage`; el límite de cuota del navegador impide usarlo como repositorio definitivo.
+- Las tareas se generan por componente presupuestado y etapa, no por cada unidad individual cuando `cantidad > 1`.
+- Las tareas generadas todavía no tienen responsable; en Fase 2 las completan administradores o supervisores.
 - No existe administración global de plantillas de productos y etapas.
 - Las futuras plantillas globales solo deben ser modificables por administradores y supervisores autorizados.
 - No se modelan cantidades, lotes o partidas independientes de un mismo tipo de producto.

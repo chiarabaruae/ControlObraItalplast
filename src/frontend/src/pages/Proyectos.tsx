@@ -4,15 +4,17 @@ import { Check, Factory, Hammer, HardHat, MapPin, Plus, Ruler, Trash2 } from "lu
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
-  clientes, usuarios, clientePorId, usuarioPorId, avanceGeneral, etapas,
+  clientes, usuarios, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, etapas,
   ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
   ETAPAS_FABRICACION_PREMARCOS, ETAPAS_INSTALACION_PREMARCOS,
   TIPOS_PRODUCTO, nombreTipoProducto, obtenerProyectos, guardarProyectos,
-  type ConfiguracionProductoProyecto, type EstadoObra, type Proyecto, type TipoProducto
+  type ConfiguracionProductoProyecto, type EstadoObra, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
+import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
 import { formatFecha } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
 import { EstadoBadge } from "@/components/app/EstadoBadge";
+import { PresupuestoUploader } from "@/components/proyectos/PresupuestoUploader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -216,7 +218,8 @@ export default function Proyectos() {
   const [configuraciones, setConfiguraciones] = useState<Record<TipoProducto, ConfiguracionProductoFormulario>>(
     () => crearMapaConfiguraciones()
   );
-  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaInicio, setFechaInicio] = useState(hoy);
+  const [presupuesto, setPresupuesto] = useState<PresupuestoEjecutivo>();
   if (!user) return null;
 
   const visibles = listaProyectos.filter((proyecto) => filtro === "todas" || proyecto.estado === filtro);
@@ -244,7 +247,8 @@ export default function Proyectos() {
     setLiderId("");
     setTiposSeleccionados([]);
     setConfiguraciones(crearMapaConfiguraciones());
-    setFechaInicio("");
+    setFechaInicio(hoy);
+    setPresupuesto(undefined);
   };
 
   const cambiarModal = (abierto: boolean) => {
@@ -260,10 +264,31 @@ export default function Proyectos() {
       toast("Faltan datos", { description: "Nombre, cliente, al menos un producto y fecha de inicio son obligatorios." });
       return;
     }
+    if (!presupuesto || presupuesto.items.length === 0) {
+      toast("Falta el presupuesto ejecutivo", {
+        description: "Subí la última versión del PDF y confirmá al menos un componente."
+      });
+      return;
+    }
+    const itemInvalido = presupuesto.items.find(
+      (item) => !item.codigo.trim() || !item.descripcion.trim() || item.cantidad <= 0 || !tiposSeleccionados.includes(item.tipoProducto)
+    );
+    if (itemInvalido) {
+      toast("Revisá los componentes", {
+        description: "Cada fila necesita código, descripción, cantidad positiva y un producto seleccionado en el proyecto."
+      });
+      return;
+    }
 
     for (const tipo of productosConfigurables) {
       const etiquetaProducto = nombreTipoProducto(tipo);
       const configuracion = configuraciones[tipo];
+      if (!presupuesto.items.some((item) => item.tipoProducto === tipo)) {
+        toast(`Revisá ${etiquetaProducto}`, {
+          description: "Asigná al menos un componente del presupuesto a este producto."
+        });
+        return;
+      }
       const fabricaSeleccionada = etapasSeleccionadas(configuracion.etapasFabrica);
       const obraSeleccionada = etapasSeleccionadas(configuracion.etapasObra);
       const fabricacionPremarcosSeleccionada = configuracion.fabricaraPremarcos
@@ -274,7 +299,7 @@ export default function Proyectos() {
         : [];
 
       if (fabricaSeleccionada.length === 0 || obraSeleccionada.length === 0) {
-        toast(`Revisá ${etiquetaProducto}`, { description: "Fábrica y obra deben conservar al menos una etapa seleccionada." });
+        toast(`Revisá ${etiquetaProducto}`, { description: "Fábrica e instalación deben conservar al menos una etapa seleccionada." });
         return;
       }
       if (configuracion.fabricaraPremarcos && fabricacionPremarcosSeleccionada.length === 0) {
@@ -290,7 +315,7 @@ export default function Proyectos() {
         ...(configuracion.fabricaraPremarcos ? [{ nombre: "Fabricación de premarcos", etapas: configuracion.etapasFabricacionPremarcos }] : []),
         ...(configuracion.instalaraPremarcos ? [{ nombre: "Instalación de premarcos", etapas: configuracion.etapasInstalacionPremarcos }] : []),
         { nombre: "Fábrica", etapas: configuracion.etapasFabrica },
-        { nombre: "Obra", etapas: configuracion.etapasObra }
+        { nombre: "Instalación", etapas: configuracion.etapasObra }
       ];
       const grupoInvalido = gruposActivos.find((grupo) => tieneEtapasInvalidas(grupo.etapas));
       if (grupoInvalido) {
@@ -338,10 +363,21 @@ export default function Proyectos() {
         ...producto.etapasFabricacionPremarcos.map((etapa) => `Fabricación de premarcos · ${etapa.nombre}`),
         ...producto.etapasInstalacionPremarcos.map((etapa) => `Instalación de premarcos · ${etapa.nombre}`),
         ...producto.etapasFabrica.map((etapa) => `Fábrica · ${etapa.nombre}`),
-        ...producto.etapasObra.map((etapa) => `Obra · ${etapa.nombre}`)
+        ...producto.etapasObra.map((etapa) => `Instalación · ${etapa.nombre}`)
       ].map((etapa) => ({ etapa: `${etiquetaProducto} · ${etapa}`, inicio: fechaInicio, fin: fechaInicio }));
     });
     const soloServicios = productos.every((producto) => producto.tipo === "servicios");
+    const tareasPresupuesto = generarTareasDesdePresupuesto(productos, presupuesto.items);
+    const aberturas = presupuesto.items
+      .filter((item) => item.tipoProducto === "aberturas_aluminio" || item.tipoProducto === "aberturas_pvc")
+      .map((item) => ({
+        codigo: item.codigo,
+        descripcion: item.descripcion,
+        material: item.tipoProducto === "aberturas_pvc" ? "PVC" as const : "ALU" as const,
+        cantidad: item.cantidad,
+        ancho: item.ancho,
+        alto: item.alto
+      }));
 
     const nuevo: Proyecto = {
       id: `p-${Date.now()}`,
@@ -360,12 +396,21 @@ export default function Proyectos() {
       etapasInstalacionPremarcos: etapasInstalacionPremarcosProyecto,
       etapasFabrica: etapasFabricaProyecto,
       etapasObra: etapasObraProyecto,
-      aberturas: [],
+      aberturas,
       cronograma: hitos,
-      documentos: [],
+      documentos: [{
+        nombre: presupuesto.nombreArchivo,
+        tipo: "presupuesto",
+        fecha: hoy,
+        tamano: presupuesto.tamano < 1024 * 1024
+          ? `${Math.max(1, Math.round(presupuesto.tamano / 1024))} KB`
+          : `${(presupuesto.tamano / 1024 / 1024).toFixed(1)} MB`
+      }],
+      presupuestoEjecutivo: presupuesto,
+      tareasPresupuesto,
       descripcion: soloServicios
-        ? "Servicio creado manualmente. No requiere seguimiento por etapas de fábrica u obra."
-        : `Proyecto creado manualmente con ${productos.length} tipo${productos.length === 1 ? "" : "s"} de producto. Pendiente cargar oferta, ábaco y descripción operativa.`
+        ? "Servicio creado desde presupuesto ejecutivo. No requiere seguimiento por etapas de fabricación o instalación."
+        : `Proyecto creado desde el presupuesto ejecutivo ${presupuesto.numero || presupuesto.nombreArchivo}, con ${presupuesto.items.length} componente${presupuesto.items.length === 1 ? "" : "s"} verificado${presupuesto.items.length === 1 ? "" : "s"}.`
     };
 
     const actualizada = [nuevo, ...listaProyectos];
@@ -406,7 +451,7 @@ export default function Proyectos() {
           <DialogHeader>
             <DialogTitle>Nuevo proyecto</DialogTitle>
             <DialogDescription>
-              Seleccioná uno o varios productos y personalizá las etapas de cada uno para este proyecto.
+              Seleccioná los productos, verificá el presupuesto ejecutivo y personalizá las etapas de cada uno.
             </DialogDescription>
           </DialogHeader>
 
@@ -479,11 +524,17 @@ export default function Proyectos() {
               </div>
             </div>
 
+            <PresupuestoUploader
+              valor={presupuesto}
+              tiposSeleccionados={tiposSeleccionados}
+              alCambiar={setPresupuesto}
+            />
+
             {incluyeServicios && (
               <div className="rounded-xl border border-primary/25 bg-primary/8 p-4">
                 <h3 className="font-heading text-sm font-semibold text-primary">Servicios</h3>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Este producto se agrega sin etapas de premarcos, fábrica u obra. Los demás productos conservan sus configuraciones independientes.
+                  Este producto se agrega sin etapas de premarcos, fábrica o instalación. Los demás productos conservan sus configuraciones independientes.
                 </p>
               </div>
             )}
@@ -538,8 +589,8 @@ export default function Proyectos() {
                     <EditorEtapas
                       idBase={`${tipo}-obra`}
                       contexto={etiquetaProducto}
-                      titulo="Etapas de obra"
-                      descripcion="Grupo obligatorio para la instalación y cierre de este producto en obra."
+                      titulo="Etapas de instalación"
+                      descripcion="Grupo obligatorio para la instalación y cierre de este producto."
                       icono={HardHat}
                       valor={configuracion.etapasObra}
                       alCambiar={(valor) => actualizarConfiguracion(tipo, { etapasObra: valor })}
@@ -594,7 +645,7 @@ export default function Proyectos() {
 
                   {soloServicios ? (
                     <div className="rounded-lg border bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
-                      Servicio sin seguimiento por etapas de fábrica u obra.
+                      Servicio sin seguimiento por etapas de fábrica o instalación.
                     </div>
                   ) : (
                     <div className="space-y-2.5">
@@ -602,13 +653,21 @@ export default function Proyectos() {
                         <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
                           <span className="flex items-center gap-1"><Factory className="size-3" /> Fábrica</span>
                         </div>
-                        <AvanceMeter valor={proyecto.avanceFabrica} etapas={proyecto.etapasFabrica.length} size="sm" />
+                        <AvanceMeter
+                          valor={avanceGrupo(proyecto, ["fabricacion_premarcos", "fabrica"], proyecto.avanceFabrica)}
+                          etapas={proyecto.etapasFabrica.length}
+                          size="sm"
+                        />
                       </div>
                       <div>
                         <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1"><HardHat className="size-3" /> Obra</span>
+                          <span className="flex items-center gap-1"><HardHat className="size-3" /> Instalación</span>
                         </div>
-                        <AvanceMeter valor={proyecto.avanceObra} etapas={proyecto.etapasObra.length} size="sm" />
+                        <AvanceMeter
+                          valor={avanceGrupo(proyecto, ["instalacion_premarcos", "instalacion"], proyecto.avanceObra)}
+                          etapas={proyecto.etapasObra.length}
+                          size="sm"
+                        />
                       </div>
                     </div>
                   )}

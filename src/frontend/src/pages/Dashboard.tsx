@@ -20,7 +20,7 @@ export default function Dashboard() {
   const kpis = [
     { icono: Building2, valor: activos.length, label: "Proyectos activos" },
     { icono: Factory, valor: `${Math.round(activos.reduce((a, p) => a + p.avanceFabrica, 0) / Math.max(activos.length, 1))}%`, label: "Avance fábrica" },
-    { icono: HardHat, valor: `${Math.round(activos.reduce((a, p) => a + p.avanceObra, 0) / Math.max(activos.length, 1))}%`, label: "Avance obra" },
+    { icono: HardHat, valor: `${Math.round(activos.reduce((a, p) => a + p.avanceObra, 0) / Math.max(activos.length, 1))}%`, label: "Avance instalación" },
     { icono: AlertTriangle, valor: pausadas.length, label: "Obras pausadas", alerta: pausadas.length > 0 }
   ];
 
@@ -79,7 +79,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="mb-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <HardHat className="size-3" /> Obra
+                      <HardHat className="size-3" /> Instalación
                     </div>
                     <AvanceMeter valor={p.avanceObra} etapas={p.etapasObra.length} size="md" />
                   </div>

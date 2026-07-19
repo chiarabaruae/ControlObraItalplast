@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-context-index
 context_type: retrieval_index
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 tags:
   - agents
   - context
@@ -26,6 +26,7 @@ Este archivo es el punto de entrada para recuperar contexto sin revisar todo el 
 |---|---|
 | Entender qué aplicación está activa hoy | `docs/project-context.md` |
 | Crear o modificar proyectos y etapas | `docs/project-context.md` + `docs/flujo-roles.md` |
+| Entender presupuestos PDF, tareas y evidencia | `docs/project-context.md` + decisiones D-009 a D-012 |
 | Revisar permisos por rol | `docs/flujo-roles.md` + `src/frontend/src/lib/roles.ts` |
 | Comprender por qué se eligió una solución | `docs/decisions.md` |
 | Saber qué cambió recientemente | `docs/change-log.md` + historial Git |

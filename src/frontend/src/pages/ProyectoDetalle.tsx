@@ -2,17 +2,19 @@ import { useState } from "react";
 import { Link, Navigate, useParams } from "react-router";
 import {
   ArrowLeft, MapPin, CalendarRange, Factory, HardHat, FileText,
-  Upload, FileSpreadsheet, File, Printer, Minus, Plus, ListTodo, Ruler, Hammer
+  Upload, File, Printer, Minus, Plus, ListTodo, Ruler, Hammer
 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
-  proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, tareasIniciales,
-  nombreTipoProducto, type ConfiguracionProductoProyecto, type EtapaSeguimiento, type Proyecto, type Tarea
+  proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, guardarProyecto, tareasIniciales,
+  nombreTipoProducto, type ConfiguracionProductoProyecto, type EtapaSeguimiento, type Proyecto, type Tarea,
+  type TareaPresupuesto
 } from "@/mocks/data";
 import { formatFecha, formatFechaCorta } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
 import { EstadoBadge, PrioridadBadge } from "@/components/app/EstadoBadge";
+import { SeguimientoPresupuesto } from "@/components/proyectos/SeguimientoPresupuesto";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -172,26 +174,30 @@ function TareasProyecto({ tareas }: { tareas: Tarea[] }) {
   );
 }
 
-const DOC_ICONOS = { oferta: FileText, abaco: FileSpreadsheet, plano: File, otro: File };
+const DOC_ICONOS = { oferta: FileText, presupuesto: FileText, plano: File, otro: File };
 
-function SeguimientoPorProductos({ productos, puedeEditar }: {
+function SeguimientoPorProductos({ productos, puedeEditar, lado }: {
   productos: ConfiguracionProductoProyecto[];
   puedeEditar: boolean;
+  lado: "fabrica" | "instalacion";
 }) {
   return (
     <div className="space-y-6">
       {productos.map((producto) => {
         const etiqueta = nombreTipoProducto(producto.tipo);
-        const grupos = [
-          ...(producto.etapasFabricacionPremarcos.length > 0
-            ? [{ titulo: "Fabricación de premarcos", icono: Ruler, etapas: producto.etapasFabricacionPremarcos }]
-            : []),
-          ...(producto.etapasInstalacionPremarcos.length > 0
-            ? [{ titulo: "Instalación de premarcos", icono: Hammer, etapas: producto.etapasInstalacionPremarcos }]
-            : []),
-          { titulo: "Fábrica", icono: Factory, etapas: producto.etapasFabrica },
-          { titulo: "Obra", icono: HardHat, etapas: producto.etapasObra }
-        ];
+        const grupos = lado === "fabrica"
+          ? [
+              ...(producto.etapasFabricacionPremarcos.length > 0
+                ? [{ titulo: "Premarcos · fabricación", icono: Ruler, etapas: producto.etapasFabricacionPremarcos }]
+                : []),
+              { titulo: "Producto · fabricación", icono: Factory, etapas: producto.etapasFabrica }
+            ]
+          : [
+              ...(producto.etapasInstalacionPremarcos.length > 0
+                ? [{ titulo: "Premarcos · instalación", icono: Hammer, etapas: producto.etapasInstalacionPremarcos }]
+                : []),
+              { titulo: "Producto · instalación", icono: HardHat, etapas: producto.etapasObra }
+            ];
 
         return (
           <section key={producto.tipo} className="space-y-3">
@@ -220,13 +226,37 @@ function SeguimientoPorProductos({ productos, puedeEditar }: {
 export default function ProyectoDetalle() {
   const { id } = useParams();
   const { user } = useAuth();
-  const p = id ? proyectoPorId(id) : undefined;
+  const [p, setProyecto] = useState<Proyecto | undefined>(() => (id ? proyectoPorId(id) : undefined));
   if (!user) return null;
   if (!p) return <Navigate to="/proyectos" replace />;
 
+  const actualizarTareaPresupuesto = (tareaActualizada: TareaPresupuesto) => {
+    setProyecto((actual) => {
+      if (!actual) return actual;
+      const actualizado = {
+        ...actual,
+        tareasPresupuesto: (actual.tareasPresupuesto ?? []).map((tarea) =>
+          tarea.id === tareaActualizada.id ? tareaActualizada : tarea
+        )
+      };
+      try {
+        guardarProyecto(actualizado);
+      } catch {
+        toast("No se pudo guardar el avance", {
+          description: "El almacenamiento local está lleno. Probá con una imagen más pequeña."
+        });
+        return actual;
+      }
+      return actualizado;
+    });
+  };
+
   const cliente = clientePorId(p.clienteId);
   const lider = usuarioPorId(p.liderId);
-  const totalAberturas = p.aberturas.reduce((a, ab) => a + ab.cantidad, 0);
+  const itemsPresupuesto = p.presupuestoEjecutivo?.items ?? [];
+  const totalComponentes = itemsPresupuesto.length > 0
+    ? itemsPresupuesto.reduce((total, item) => total + item.cantidad, 0)
+    : p.aberturas.reduce((total, abertura) => total + abertura.cantidad, 0);
   const tareasDelProyecto = tareasIniciales.filter((t) => t.proyectoId === p.id);
   const productos = p.productos?.length
     ? p.productos
@@ -242,6 +272,7 @@ export default function ProyectoDetalle() {
   const productosOperativos = productos.filter((producto) => producto.tipo !== "servicios");
   const soloServicios = productos.length > 0 && productosOperativos.length === 0;
   const seguimientoPorProducto = productosOperativos.length > 0;
+  const seguimientoGenerado = Boolean(p.tareasPresupuesto?.length && p.presupuestoEjecutivo?.items.length);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -292,14 +323,10 @@ export default function ProyectoDetalle() {
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="tareas">Tareas</TabsTrigger>
           <TabsTrigger value="cronograma">Cronograma</TabsTrigger>
-          {seguimientoPorProducto ? (
-            <TabsTrigger value="seguimiento">Seguimiento por producto</TabsTrigger>
-          ) : !soloServicios && (
+          {!soloServicios && (
             <>
-              {p.etapasFabricacionPremarcos.length > 0 && <TabsTrigger value="fabricacion-premarcos">Fabricación premarcos</TabsTrigger>}
-              {p.etapasInstalacionPremarcos.length > 0 && <TabsTrigger value="instalacion-premarcos">Instalación premarcos</TabsTrigger>}
               <TabsTrigger value="fabrica">Fábrica</TabsTrigger>
-              <TabsTrigger value="obra">Obra</TabsTrigger>
+              <TabsTrigger value="instalacion">Instalación</TabsTrigger>
             </>
           )}
           <TabsTrigger value="informe">Informe</TabsTrigger>
@@ -313,8 +340,15 @@ export default function ProyectoDetalle() {
           </Card>
           {!soloServicios && <Card>
             <CardHeader className="flex-row items-baseline justify-between">
-              <CardTitle className="font-heading text-base">Ábaco de aberturas</CardTitle>
-              <span className="cifra text-xs text-muted-foreground">{totalAberturas} unidades</span>
+              <div>
+                <CardTitle className="font-heading text-base">Componentes del presupuesto ejecutivo</CardTitle>
+                {p.presupuestoEjecutivo && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {p.presupuestoEjecutivo.numero ? `Nº ${p.presupuestoEjecutivo.numero} · ` : ""}{p.presupuestoEjecutivo.nombreArchivo}
+                  </p>
+                )}
+              </div>
+              <span className="cifra text-xs text-muted-foreground">{totalComponentes} unidades</span>
             </CardHeader>
             <CardContent>
               <Table>
@@ -322,25 +356,34 @@ export default function ProyectoDetalle() {
                   <TableRow>
                     <TableHead>Código</TableHead>
                     <TableHead>Descripción</TableHead>
-                    <TableHead>Material</TableHead>
+                    <TableHead>Producto</TableHead>
                     <TableHead className="text-right">Medidas</TableHead>
                     <TableHead className="text-right">Cant.</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {p.aberturas.map((ab) => (
-                    <TableRow key={ab.codigo}>
-                      <TableCell className="cifra font-medium">{ab.codigo}</TableCell>
-                      <TableCell>{ab.descripcion}</TableCell>
-                      <TableCell>
-                        <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${ab.material === "PVC" ? "bg-accent text-accent-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                          {ab.material}
-                        </span>
-                      </TableCell>
-                      <TableCell className="cifra text-right text-muted-foreground">{ab.ancho}×{ab.alto}</TableCell>
-                      <TableCell className="cifra text-right">{ab.cantidad}</TableCell>
-                    </TableRow>
-                  ))}
+                  {itemsPresupuesto.length > 0
+                    ? itemsPresupuesto.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="cifra font-medium">{item.codigo}</TableCell>
+                          <TableCell>
+                            <div>{item.descripcion}</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">{item.ambiente}{item.color ? ` · ${item.color}` : ""}</div>
+                          </TableCell>
+                          <TableCell><span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">{nombreTipoProducto(item.tipoProducto)}</span></TableCell>
+                          <TableCell className="cifra text-right text-muted-foreground">{item.ancho}×{item.alto}</TableCell>
+                          <TableCell className="cifra text-right">{item.cantidad}</TableCell>
+                        </TableRow>
+                      ))
+                    : p.aberturas.map((ab) => (
+                        <TableRow key={ab.codigo}>
+                          <TableCell className="cifra font-medium">{ab.codigo}</TableCell>
+                          <TableCell>{ab.descripcion}</TableCell>
+                          <TableCell>{ab.material}</TableCell>
+                          <TableCell className="cifra text-right text-muted-foreground">{ab.ancho}×{ab.alto}</TableCell>
+                          <TableCell className="cifra text-right">{ab.cantidad}</TableCell>
+                        </TableRow>
+                      ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -357,30 +400,33 @@ export default function ProyectoDetalle() {
           <Cronograma p={p} />
         </TabsContent>
 
-        {/* Seguimientos */}
-        {seguimientoPorProducto && (
-          <TabsContent value="seguimiento" className="mt-4">
-            <SeguimientoPorProductos productos={productosOperativos} puedeEditar={permisos.editarAvance(user.role)} />
-          </TabsContent>
-        )}
-        {!seguimientoPorProducto && !soloServicios && p.etapasFabricacionPremarcos.length > 0 && (
-          <TabsContent value="fabricacion-premarcos" className="mt-4">
-            <Seguimiento titulo="Fabricación de premarcos" icono={Ruler} etapasIniciales={p.etapasFabricacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />
-          </TabsContent>
-        )}
-        {!seguimientoPorProducto && !soloServicios && p.etapasInstalacionPremarcos.length > 0 && (
-          <TabsContent value="instalacion-premarcos" className="mt-4">
-            <Seguimiento titulo="Instalación de premarcos" icono={Hammer} etapasIniciales={p.etapasInstalacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />
-          </TabsContent>
-        )}
-        {!seguimientoPorProducto && !soloServicios && (
+        {/* Seguimiento generado por presupuesto, con compatibilidad para proyectos anteriores. */}
+        {!soloServicios && (
           <TabsContent value="fabrica" className="mt-4">
-            <Seguimiento titulo="Seguimiento de fábrica" icono={Factory} etapasIniciales={p.etapasFabrica} puedeEditar={permisos.editarAvance(user.role)} />
+            {seguimientoGenerado ? (
+              <SeguimientoPresupuesto proyecto={p} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} />
+            ) : seguimientoPorProducto ? (
+              <SeguimientoPorProductos productos={productosOperativos} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} />
+            ) : (
+              <div className="space-y-4">
+                {p.etapasFabricacionPremarcos.length > 0 && <Seguimiento titulo="Premarcos · fabricación" icono={Ruler} etapasIniciales={p.etapasFabricacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />}
+                <Seguimiento titulo="Producto · fabricación" icono={Factory} etapasIniciales={p.etapasFabrica} puedeEditar={permisos.editarAvance(user.role)} />
+              </div>
+            )}
           </TabsContent>
         )}
-        {!seguimientoPorProducto && !soloServicios && (
-          <TabsContent value="obra" className="mt-4">
-            <Seguimiento titulo="Seguimiento de obra" icono={HardHat} etapasIniciales={p.etapasObra} puedeEditar={permisos.editarAvance(user.role)} />
+        {!soloServicios && (
+          <TabsContent value="instalacion" className="mt-4">
+            {seguimientoGenerado ? (
+              <SeguimientoPresupuesto proyecto={p} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} />
+            ) : seguimientoPorProducto ? (
+              <SeguimientoPorProductos productos={productosOperativos} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} />
+            ) : (
+              <div className="space-y-4">
+                {p.etapasInstalacionPremarcos.length > 0 && <Seguimiento titulo="Premarcos · instalación" icono={Hammer} etapasIniciales={p.etapasInstalacionPremarcos} puedeEditar={permisos.editarAvance(user.role)} />}
+                <Seguimiento titulo="Producto · instalación" icono={HardHat} etapasIniciales={p.etapasObra} puedeEditar={permisos.editarAvance(user.role)} />
+              </div>
+            )}
           </TabsContent>
         )}
 
@@ -401,17 +447,17 @@ export default function ProyectoDetalle() {
                 </div>
                 {!soloServicios && <div>
                   <div className="senal senal-muted">Fábrica</div>
-                  <div className="cifra mt-1 text-3xl font-bold">{p.avanceFabrica}%</div>
+                  <div className="cifra mt-1 text-3xl font-bold">{avanceGrupo(p, ["fabricacion_premarcos", "fabrica"], p.avanceFabrica)}%</div>
                 </div>}
                 {!soloServicios && <div>
-                  <div className="senal senal-muted">Obra</div>
-                  <div className="cifra mt-1 text-3xl font-bold">{p.avanceObra}%</div>
+                  <div className="senal senal-muted">Instalación</div>
+                  <div className="cifra mt-1 text-3xl font-bold">{avanceGrupo(p, ["instalacion_premarcos", "instalacion"], p.avanceObra)}%</div>
                 </div>}
               </div>
               <p className="leading-relaxed text-muted-foreground">
                 {p.nombre} — {cliente?.nombre}. Inicio {formatFecha(p.fechaInicio)}
                 {!soloServicios && `, entrega estimada ${formatFecha(p.fechaFinEstimada)}`}.
-                {!soloServicios && ` ${totalAberturas} aberturas en ${p.aberturas.length} tipologías.`} {p.descripcion}
+                {!soloServicios && ` ${totalComponentes} unidades en ${itemsPresupuesto.length || p.aberturas.length} componentes.`} {p.descripcion}
               </p>
             </CardContent>
           </Card>
@@ -428,9 +474,9 @@ export default function ProyectoDetalle() {
                     <Upload className="size-3.5" /> Oferta PDF
                   </Button>
                 )}
-                {permisos.subirAbaco(user.role) && (
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => pendiente("Subir ábaco")}>
-                    <Upload className="size-3.5" /> Ábaco
+                {permisos.gestionarPresupuesto(user.role) && (
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => pendiente("Reemplazar presupuesto ejecutivo")}>
+                    <Upload className="size-3.5" /> Presupuesto ejecutivo
                   </Button>
                 )}
               </div>
@@ -438,7 +484,7 @@ export default function ProyectoDetalle() {
             <CardContent>
               <ul className="divide-y">
                 {p.documentos.map((d) => {
-                  const Icono = DOC_ICONOS[d.tipo];
+                  const Icono = DOC_ICONOS[d.tipo] ?? File;
                   return (
                     <li key={d.nombre} className="flex items-center gap-3 py-3 text-sm">
                       <Icono className="size-4.5 shrink-0 text-primary" strokeWidth={1.75} />

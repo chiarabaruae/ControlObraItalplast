@@ -1,13 +1,15 @@
 ---
 context_id: controlobra-decisions
 context_type: architecture_decisions
-last_updated: 2026-07-18
+last_updated: 2026-07-19
 tags:
   - decisions
   - product
   - architecture
   - permissions
   - documentation
+  - executive-budget
+  - task-evidence
 ---
 
 # Decisiones vigentes
@@ -62,7 +64,7 @@ tags:
 
 **Estado:** aceptada.
 
-**Decisión:** fabricación e instalación de premarcos son grupos opcionales independientes para cada producto. Fábrica y obra del producto son obligatorias, excepto para Servicios.
+**Decisión:** fabricación e instalación de premarcos son grupos opcionales independientes para cada producto. Fábrica e instalación del producto son obligatorias, excepto para Servicios.
 
 **Consecuencias:** se admiten premarcos existentes, fabricación sin instalación, instalación sin fabricación o ausencia completa de premarcos.
 
@@ -83,3 +85,41 @@ tags:
 **Decisión:** todo cambio material debe actualizar contexto, decisiones, registro de cambios y documentación especializada antes del commit/push.
 
 **Consecuencias:** `AGENTS.md` convierte esta revisión en una regla obligatoria. Los documentos usan metadatos y secciones preparadas para recuperación semántica, sin afirmar que ya existe una base vectorial.
+
+## D-009 — Presupuesto ejecutivo obligatorio y fuente de componentes
+
+**Estado:** aceptada.
+
+**Contexto:** el seguimiento operativo debe nacer de la última versión aprobada del presupuesto y no de una planilla paralela con otra denominación.
+
+**Decisión:** todo proyecto exige un presupuesto ejecutivo PDF. El concepto anterior de planilla de aberturas se retira del modelo y la interfaz activos. Los componentes verificados del presupuesto son la fuente para generar el seguimiento.
+
+**Consecuencias:** el alta no termina sin PDF y al menos una fila válida. Servicios también conserva el presupuesto aunque no genere etapas. El backend futuro deberá versionar el archivo y su revisión.
+
+## D-010 — Extracción liviana de texto con revisión humana
+
+**Estado:** aceptada.
+
+**Contexto:** los tres formatos reales evaluados contienen texto embebido y una precisión absoluta no es requisito.
+
+**Decisión:** usar PDF.js en el navegador, heurísticas por formato y una tabla editable obligatoria. No incorporar OCR en esta fase.
+
+**Consecuencias:** se evita procesamiento pesado en backend, pero los PDFs escaneados o formatos nuevos requieren filas manuales hasta agregar otro parser. El resultado extraído nunca se considera confirmado sin revisión del usuario.
+
+## D-011 — Matriz de tareas con evidencia y avance derivado
+
+**Estado:** aceptada.
+
+**Contexto:** el proceso actual marca cada componente por etapa y necesita trazabilidad para considerar un trabajo terminado.
+
+**Decisión:** generar una tarea por `componente × etapa`; exigir imagen para completar, permitir observación opcional y derivar todos los porcentajes desde tareas completadas.
+
+**Consecuencias:** desaparece el ajuste manual de porcentaje en proyectos nuevos. Las evidencias se comprimen en Fase 2, pero el backend deberá almacenarlas como archivos auditables y no como datos en el navegador.
+
+## D-012 — Premarcos anidados en Fábrica e Instalación
+
+**Estado:** aceptada.
+
+**Decisión:** usar dos pestañas operativas: Fábrica agrupa premarcos/fabricación y producto/fabricación; Instalación agrupa premarcos/instalación y producto/instalación. Cada producto conserva matrices independientes.
+
+**Consecuencias:** se evita multiplicar pestañas por producto y se representa el flujo tal como trabaja cada equipo.

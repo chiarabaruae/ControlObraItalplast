@@ -26,6 +26,7 @@ Vite sirve normalmente la aplicación en `http://localhost:5173`.
 ```bash
 npm run build
 npm run lint
+npm run diagnostico:presupuestos -- /ruta/presupuesto.pdf
 ```
 
 El lint puede reportar advertencias preexistentes de Fast Refresh en componentes UI y `context/auth.tsx`.
@@ -34,5 +35,8 @@ El lint puede reportar advertencias preexistentes de Fast Refresh en componentes
 
 - La interfaz usa datos mock y `localStorage` para proyectos creados.
 - El modelo permite varios tipos de producto con etapas independientes.
+- El alta exige presupuesto ejecutivo PDF, revisión de componentes y asignación por producto.
+- Los proyectos nuevos generan matrices de tareas con evidencia y avance automático.
+- PDF.js procesa texto embebido en el navegador; no hay OCR en esta fase.
 - El backend Express/PostgreSQL todavía no cubre el flujo React completo.
 - La fuente vigente de limitaciones y próximos pasos es `../../docs/project-context.md`.

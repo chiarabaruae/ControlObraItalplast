@@ -68,9 +68,62 @@ export interface HitoCronograma {
 
 export interface Documento {
   nombre: string;
-  tipo: "oferta" | "abaco" | "plano" | "otro";
+  tipo: "oferta" | "presupuesto" | "plano" | "otro";
   fecha: string;
   tamano: string;
+}
+
+export type FormatoPresupuesto = "tabla_excel" | "preference" | "preference_mercosul" | "desconocido";
+
+export interface ItemPresupuesto {
+  id: string;
+  posicion: string;
+  codigo: string;
+  ambiente: string;
+  cantidad: number;
+  ancho: number;
+  alto: number;
+  descripcion: string;
+  serie: string;
+  color: string;
+  vidrio: string;
+  tipoProducto: TipoProducto;
+}
+
+export interface PresupuestoEjecutivo {
+  nombreArchivo: string;
+  tamano: number;
+  formato: FormatoPresupuesto;
+  numero: string;
+  fecha: string;
+  importadoEn: string;
+  items: ItemPresupuesto[];
+}
+
+export type GrupoTareaPresupuesto =
+  | "fabricacion_premarcos"
+  | "instalacion_premarcos"
+  | "fabrica"
+  | "instalacion";
+
+export interface EvidenciaTarea {
+  nombre: string;
+  tipo: string;
+  tamano: number;
+  dataUrl: string;
+}
+
+export interface TareaPresupuesto {
+  id: string;
+  itemId: string;
+  tipoProducto: TipoProducto;
+  grupo: GrupoTareaPresupuesto;
+  etapa: string;
+  completada: boolean;
+  evidencia?: EvidenciaTarea;
+  observaciones?: string;
+  completadaEn?: string;
+  completadaPorId?: string;
 }
 
 export interface ConfiguracionProductoProyecto {
@@ -103,6 +156,8 @@ export interface Proyecto {
   aberturas: Abertura[];
   cronograma: HitoCronograma[];
   documentos: Documento[];
+  presupuestoEjecutivo?: PresupuestoEjecutivo;
+  tareasPresupuesto?: TareaPresupuesto[];
   descripcion: string;
 }
 
@@ -199,7 +254,7 @@ export const proyectos: Proyecto[] = [
     ],
     documentos: [
       { nombre: "Oferta 2026-041 Torre Aviadores.pdf", tipo: "oferta", fecha: "2026-04-18", tamano: "2,4 MB" },
-      { nombre: "Ábaco de aberturas rev3.xlsx", tipo: "abaco", fecha: "2026-04-27", tamano: "310 KB" },
+      { nombre: "Presupuesto ejecutivo rev3.pdf", tipo: "presupuesto", fecha: "2026-04-27", tamano: "310 KB" },
       { nombre: "Planos vanos torre A.pdf", tipo: "plano", fecha: "2026-05-06", tamano: "8,1 MB" }
     ],
     descripcion: "98 aberturas PVC y ALU para torre residencial de 14 pisos. Incluye mamparas de hall y barandas de balcón."
@@ -230,7 +285,7 @@ export const proyectos: Proyecto[] = [
     ],
     documentos: [
       { nombre: "Oferta 2026-058 Ykua Sati.pdf", tipo: "oferta", fecha: "2026-05-29", tamano: "1,8 MB" },
-      { nombre: "Ábaco 10 duplex.xlsx", tipo: "abaco", fecha: "2026-06-05", tamano: "204 KB" }
+      { nombre: "Presupuesto ejecutivo 10 dúplex.pdf", tipo: "presupuesto", fecha: "2026-06-05", tamano: "204 KB" }
     ],
     descripcion: "40 aberturas para 10 dúplex. Producción por tandas de 2 unidades."
   },
@@ -316,7 +371,17 @@ export function proyectoPorId(id: string) {
   return obtenerProyectos().find((p) => p.id === id);
 }
 export function avanceGeneral(p: Proyecto): number {
+  if (p.tareasPresupuesto?.length) {
+    const completadas = p.tareasPresupuesto.filter((tarea) => tarea.completada).length;
+    return Math.round((completadas / p.tareasPresupuesto.length) * 100);
+  }
   return Math.round(p.avanceFabrica * 0.5 + p.avanceObra * 0.5);
+}
+
+export function avanceGrupo(p: Proyecto, grupos: GrupoTareaPresupuesto[], respaldo: number): number {
+  const tareas = p.tareasPresupuesto?.filter((tarea) => grupos.includes(tarea.grupo)) ?? [];
+  if (tareas.length === 0) return respaldo;
+  return Math.round((tareas.filter((tarea) => tarea.completada).length / tareas.length) * 100);
 }
 
 const PROYECTOS_STORAGE_KEY = "control-obras-proyectos";
@@ -341,12 +406,20 @@ export function obtenerProyectos(): Proyecto[] {
                 etapasObra: proyecto.etapasObra ?? []
               }]
             : []);
+          const documentos = (proyecto.documentos ?? []).map((documento) => {
+            const tiposVigentes = ["oferta", "presupuesto", "plano", "otro"];
+            return tiposVigentes.includes(String(documento.tipo))
+              ? documento
+              : { ...documento, nombre: "Presupuesto ejecutivo (documento migrado)", tipo: "presupuesto" as const };
+          });
 
           return {
             ...proyecto,
             productos,
+            documentos,
             etapasFabricacionPremarcos,
-            etapasInstalacionPremarcos
+            etapasInstalacionPremarcos,
+            tareasPresupuesto: proyecto.tareasPresupuesto ?? []
           };
         })
       : proyectos;
@@ -357,4 +430,11 @@ export function obtenerProyectos(): Proyecto[] {
 
 export function guardarProyectos(lista: Proyecto[]) {
   window.localStorage.setItem(PROYECTOS_STORAGE_KEY, JSON.stringify(lista));
+}
+
+export function guardarProyecto(proyectoActualizado: Proyecto) {
+  const lista = obtenerProyectos().map((proyecto) =>
+    proyecto.id === proyectoActualizado.id ? proyectoActualizado : proyecto
+  );
+  guardarProyectos(lista);
 }
