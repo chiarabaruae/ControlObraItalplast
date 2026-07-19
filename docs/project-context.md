@@ -13,6 +13,7 @@ tags:
   - executive-budget
   - pdf-parsing
   - evidence
+  - user-management
 ---
 
 # Contexto vigente del proyecto
@@ -66,6 +67,17 @@ La fuente de rutas es `src/frontend/src/App.tsx`.
 - `viewer`, mostrado como **Usuario**: consulta y tareas propias.
 
 La matriz funcional completa está en `docs/flujo-roles.md`. La implementación frontend está centralizada en `src/frontend/src/lib/roles.ts`.
+
+## Gestión de usuarios
+
+- La ruta `/usuarios` continúa restringida a administradores.
+- La tabla presenta Usuario, Área, Rol y Acciones. Bajo Acciones agrupa los íconos de editar, cambiar contraseña y archivar/reactivar.
+- Editar usa un ícono de lápiz y abre una ventana con nombre, área, rol, correo y número de teléfono.
+- Nuevo usuario reutiliza la misma ventana. Nombre, área y rol son obligatorios; correo y teléfono son opcionales.
+- Cambiar contraseña se representa en cada fila únicamente con un ícono de llave y conserva una etiqueta accesible.
+- En Fase 2, altas y modificaciones viven en el estado local de la pantalla; la persistencia y la creación de credenciales reales quedan pendientes del backend.
+
+La fuente principal es `src/frontend/src/pages/Usuarios.tsx`; el tipo mock vive en `src/frontend/src/mocks/data.ts`.
 
 ## Creación de proyectos multiproducto
 
@@ -158,6 +170,7 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 - No se modelan cantidades, lotes o partidas independientes de un mismo tipo de producto.
 - El dashboard todavía se apoya principalmente en datos mock estáticos.
 - El flujo de recuperación de contraseña y Check for updates es demostrativo.
+- Las altas y ediciones de usuarios no persisten al recargar ni crean credenciales reales hasta conectar el backend.
 - No existe una base vectorial ni indexación automática; los documentos están preparados para incorporarla posteriormente.
 
 ## Validación esperada antes de publicar

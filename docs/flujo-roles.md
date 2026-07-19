@@ -10,6 +10,7 @@ tags:
   - password-recovery
   - executive-budget
   - task-evidence
+  - user-management
 ---
 
 # Flujo por rol — Gestión de proyectos Italplast
@@ -104,12 +105,19 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Acción | administrator |
 |---|---|
 | Listar usuarios con rol, área, estado | ✅ |
-| Alta / baja (activar-desactivar) | ✅ |
-| Asignar rol | ✅ |
-| Resetear contraseña | ✅ |
+| Crear y editar nombre, área y rol | ✅ |
+| Registrar correo y teléfono opcionales | ✅ |
+| Archivar / reactivar | ✅ |
+| Solicitar cambio de contraseña | ✅ |
 
-*Hoy la única forma de gestionar usuarios es el script `db:seed-users`. Se
-diseña ya en Fase 2 con mocks; se conecta en Fase 4.*
+*La pantalla permite gestionar usuarios mock en Fase 2. La única forma de
+persistir usuarios y credenciales reales continúa siendo el script
+`db:seed-users`; la interfaz se conecta al backend en Fase 4.*
+
+La tabla usa los encabezados Usuario, Área, Rol y Acciones. Bajo Acciones se
+alinean el lápiz, la llave y archivar/reactivar; cada ícono conserva su etiqueta
+accesible. El alta usa la misma ventana. Nombre, área y rol son obligatorios;
+correo y número de teléfono son opcionales.
 
 ### Login y recuperación de contraseña
 

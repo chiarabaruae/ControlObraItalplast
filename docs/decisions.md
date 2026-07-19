@@ -10,6 +10,7 @@ tags:
   - documentation
   - executive-budget
   - task-evidence
+  - user-management
 ---
 
 # Decisiones vigentes
@@ -123,3 +124,13 @@ tags:
 **Decisión:** usar dos pestañas operativas: Fábrica agrupa premarcos/fabricación y producto/fabricación; Instalación agrupa premarcos/instalación y producto/instalación. Cada producto conserva matrices independientes.
 
 **Consecuencias:** se evita multiplicar pestañas por producto y se representa el flujo tal como trabaja cada equipo.
+
+## D-013 — Alta y edición de usuarios en una ventana dedicada
+
+**Estado:** aceptada.
+
+**Contexto:** la tabla debe permitir administrar los datos de una persona sin mezclar edición directa de campos con las acciones de contraseña y archivo.
+
+**Decisión:** usar una misma ventana para crear y editar usuarios. Nombre, área y rol son obligatorios; correo y número de teléfono son opcionales. La tabla agrupa bajo el encabezado Acciones los íconos independientes de lápiz, llave y archivar/reactivar.
+
+**Consecuencias:** el rol deja de modificarse directamente desde la celda y se edita junto con el resto del perfil. En Fase 2 los cambios son locales a la pantalla; el backend futuro deberá persistirlos y generar las credenciales de acceso.

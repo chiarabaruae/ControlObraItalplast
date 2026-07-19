@@ -9,11 +9,22 @@ tags:
   - project-context
   - executive-budget
   - diagnostics
+  - user-management
 ---
 
 # Registro contextual de cambios
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
+
+## 2026-07-19 — Alta y edición de usuarios
+
+**Alcance:** se organiza la tabla de usuarios y se incorpora una ventana compartida para alta y edición.
+
+**Impacto:** la edición permite actualizar nombre, área, rol, correo y teléfono; los tres primeros campos son obligatorios. La tabla muestra Usuario, Área, Rol y Acciones; bajo Acciones agrupa el lápiz, la llave y archivar/reactivar.
+
+**Archivos clave:** `src/frontend/src/pages/Usuarios.tsx`, `src/frontend/src/mocks/data.ts`, `docs/project-context.md`, `docs/decisions.md`, `docs/flujo-roles.md`.
+
+**Validación:** `npm run build`, `npm run lint` y simulación localhost de alta, validación de obligatorios, edición, cambio de rol, presencia de iconos y recarga sin errores nuevos en consola.
 
 ## 2026-07-19 — Presupuesto ejecutivo, tareas y evidencia
 

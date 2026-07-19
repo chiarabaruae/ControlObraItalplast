@@ -9,6 +9,8 @@ export interface Usuario {
   role: Role;
   department: string;
   positionTitle: string;
+  email?: string;
+  telefono?: string;
   isActive: boolean;
 }
 
