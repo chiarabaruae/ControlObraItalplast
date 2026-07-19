@@ -18,7 +18,7 @@ import {
 import { UserAvatar } from "@/components/app/UserAvatar";
 
 const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutGrid, visible: () => true },
+  { to: "/dashboard", label: "Inicio", icon: LayoutGrid, visible: () => true },
   { to: "/clientes", label: "Clientes", icon: Users, visible: (role: Role) => permisos.verClientes(role) },
   { to: "/proyectos", label: "Proyectos", icon: Building2, visible: () => true },
   { to: "/tareas", label: "Tareas", icon: ListTodo, visible: () => true },
@@ -26,14 +26,14 @@ const NAV = [
 ];
 
 const SETTINGS_ITEMS = [
-  { to: "/settings/account", label: "Account", description: "Tu perfil y avatar", icon: UserRound },
+  { to: "/settings/account", label: "Cuenta", description: "Tu perfil y avatar", icon: UserRound },
   { to: "/settings/appearance", label: "Personalizar", description: "Tema y colores", icon: Palette },
-  { to: "/settings/updates", label: "Updates", description: "Versión del sistema", icon: RefreshCw }
+  { to: "/settings/updates", label: "Actualizaciones", description: "Versión del sistema", icon: RefreshCw }
 ];
 
 const SUPPORT_ITEMS = [
-  { to: "/support/documentation", label: "Documentation", description: "Guías de uso", icon: BookOpen },
-  { to: "/support/contact", label: "Contact support", description: "Solicitar ayuda", icon: Headphones }
+  { to: "/support/documentation", label: "Documentación", description: "Guías de uso", icon: BookOpen },
+  { to: "/support/contact", label: "Contactar soporte", description: "Solicitar ayuda", icon: Headphones }
 ];
 
 function NavItems({ role, onNavigate }: { role: Role; onNavigate?: () => void }) {
@@ -148,7 +148,7 @@ function SidebarUtilities({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="space-y-1 px-3">
       <UtilityGroup
-        label="Settings"
+        label="Configuración"
         icon={Settings}
         items={SETTINGS_ITEMS}
         open={settingsOpen}
@@ -156,7 +156,7 @@ function SidebarUtilities({ onNavigate }: { onNavigate?: () => void }) {
         onNavigate={onNavigate}
       />
       <UtilityGroup
-        label="Support"
+        label="Soporte"
         icon={CircleHelp}
         items={SUPPORT_ITEMS}
         open={supportOpen}
@@ -248,7 +248,7 @@ export function AppShell() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate("/settings/account")}>
-                <UserRound className="size-4" /> Account
+                <UserRound className="size-4" /> Cuenta
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/settings/appearance")}>
                 <Palette className="size-4" /> Personalizar

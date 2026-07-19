@@ -117,15 +117,34 @@ export interface EvidenciaTarea {
 
 export interface TareaPresupuesto {
   id: string;
+  /** Vacío en tareas manuales agregadas por el supervisor. */
   itemId: string;
   tipoProducto: TipoProducto;
   grupo: GrupoTareaPresupuesto;
   etapa: string;
+  /** Nombre visible editable; si falta se arma con etapa + código del ítem. */
+  titulo?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
+  /** true cuando la agregó una persona (no nació del presupuesto). */
+  manual?: boolean;
   completada: boolean;
   evidencia?: EvidenciaTarea;
   observaciones?: string;
   completadaEn?: string;
   completadaPorId?: string;
+}
+
+export interface RegistroPausa {
+  fecha: string;
+  usuarioId: string;
+  motivo: string;
+}
+
+export interface RegistroCierre {
+  fecha: string;
+  usuarioId: string;
+  evidenciaGeneral?: EvidenciaTarea;
 }
 
 export interface ConfiguracionProductoProyecto {
@@ -160,6 +179,10 @@ export interface Proyecto {
   documentos: Documento[];
   presupuestoEjecutivo?: PresupuestoEjecutivo;
   tareasPresupuesto?: TareaPresupuesto[];
+  /** Historial de pausas: cada cambio a "pausada" exige un motivo. */
+  pausas?: RegistroPausa[];
+  /** Registro del cierre manual desde el tablero (avances al 100%). */
+  cierre?: RegistroCierre;
   descripcion: string;
 }
 
@@ -384,6 +407,40 @@ export function avanceGrupo(p: Proyecto, grupos: GrupoTareaPresupuesto[], respal
   const tareas = p.tareasPresupuesto?.filter((tarea) => grupos.includes(tarea.grupo)) ?? [];
   if (tareas.length === 0) return respaldo;
   return Math.round((tareas.filter((tarea) => tarea.completada).length / tareas.length) * 100);
+}
+
+/** Nombre visible de una tarea de seguimiento (editable por el supervisor). */
+export function tituloTarea(tarea: TareaPresupuesto, p?: Proyecto): string {
+  if (tarea.titulo?.trim()) return tarea.titulo;
+  const item = p?.presupuestoEjecutivo?.items.find((actual) => actual.id === tarea.itemId);
+  const referencia = item ? (item.codigo || `Pos. ${item.posicion}`) : "";
+  return referencia ? `${tarea.etapa} — ${referencia}` : tarea.etapa;
+}
+
+export function proyectoTieneAvance(p: Proyecto): boolean {
+  return (p.tareasPresupuesto?.some((tarea) => tarea.completada) ?? false) || avanceGeneral(p) > 0;
+}
+
+export function contarEvidencias(p: Proyecto): number {
+  const enTareas = p.tareasPresupuesto?.filter((tarea) => tarea.evidencia).length ?? 0;
+  return enTareas + (p.cierre?.evidenciaGeneral ? 1 : 0);
+}
+
+/**
+ * Aplica el cambio de una tarea de seguimiento y las reglas de estado:
+ * un proyecto planificado pasa solo a "en progreso" con su primer avance.
+ */
+export function aplicarCambioTarea(p: Proyecto, tareaActualizada: TareaPresupuesto): Proyecto {
+  const actualizado: Proyecto = {
+    ...p,
+    tareasPresupuesto: (p.tareasPresupuesto ?? []).map((tarea) =>
+      tarea.id === tareaActualizada.id ? tareaActualizada : tarea
+    )
+  };
+  if (actualizado.estado === "planificada" && proyectoTieneAvance(actualizado)) {
+    actualizado.estado = "en_progreso";
+  }
+  return actualizado;
 }
 
 const PROYECTOS_STORAGE_KEY = "control-obras-proyectos";

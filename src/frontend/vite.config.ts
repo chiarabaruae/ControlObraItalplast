@@ -10,5 +10,9 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src")
     }
+  },
+  optimizeDeps: {
+    // pdf.js cuelga el optimizador de Vite; se sirve sin pre-bundlear.
+    exclude: ["pdfjs-dist"]
   }
 });

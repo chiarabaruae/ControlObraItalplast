@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-project-context
 context_type: current_project_state
-last_updated: 2026-07-19
+last_updated: 2026-07-20
 branch: feature/frontend-react-migration
 tags:
   - italplast
@@ -40,8 +40,8 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 - El logo Italplast aparece en login, favicon y parte superior del sidebar.
 - El login solicita Documento y Contraseña; no permite seleccionar roles manualmente.
 - Existe un flujo mock de recuperación de contraseña por documento.
-- Settings contiene Account, Personalizar y Updates.
-- Support contiene Documentation y Contact support.
+- Configuración contiene Cuenta, Personalizar y Actualizaciones.
+- Soporte contiene Documentación y Contactar soporte.
 - Los paneles Settings y Support usan popovers animados y suaves.
 
 ## Navegación activa
@@ -119,12 +119,12 @@ Cada subetapa puede seleccionarse, renombrarse, eliminarse o agregarse antes de 
 
 Servicios no genera etapas de premarcos, fábrica o instalación, pero puede coexistir con otros productos que sí las tengan.
 
-El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de premarcos y del producto; **Instalación** reúne instalación de premarcos y del producto. Dentro de cada pestaña, las matrices siguen separadas por producto.
+El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de premarcos y del producto; **Instalación** reúne instalación de premarcos y del producto. Dentro de cada pestaña, las tareas se muestran como lista con fechas de inicio/entrega, separadas por producto y bloque; el supervisor puede agregar, renombrar, refechar o eliminar tareas.
 
 ## Tareas, evidencia y avance automático
 
 - Al crear el proyecto se genera una tarea por combinación `componente × etapa activa` del producto asignado.
-- Las matrices de Fábrica e Instalación reemplazan la carga manual de porcentaje en proyectos nuevos.
+- Las listas de tareas de Fábrica e Instalación reemplazan la carga manual de porcentaje en proyectos nuevos; la sección Tareas del menú refleja el seguimiento de todos los proyectos.
 - Completar una celda exige una evidencia de imagen; la observación es opcional.
 - La imagen se redimensiona a un máximo de 1280 px y se comprime a JPEG antes de guardarse localmente.
 - Cada cierre conserva usuario, fecha, evidencia y observación; una tarea completada puede consultarse o reabrirse.
@@ -138,7 +138,7 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 - Los proyectos mock se guardan bajo la clave `control-obras-proyectos` en `localStorage`.
 - El modelo nuevo usa `productos`, con una configuración de etapas por tipo.
 - `tipoProducto` se conserva temporalmente para migrar proyectos creados con el modelo anterior.
-- `presupuestoEjecutivo` conserva metadata e ítems revisados; `tareasPresupuesto` conserva la matriz y sus cierres.
+- `presupuestoEjecutivo` conserva metadata e ítems revisados; `tareasPresupuesto` conserva las tareas (con fechas y manuales) y sus cierres; `pausas` y `cierre` registran las transiciones de estado.
 - Las etapas agregadas al proyecto también se consolidan en las listas superiores de fábrica e instalación para mantener compatibles las tarjetas y métricas existentes.
 
 La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
@@ -148,7 +148,7 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 - `src/frontend/src/pages/Proyectos.tsx`: alta multiproducto, presupuesto obligatorio y edición local de etapas.
 - `src/frontend/src/pages/ProyectoDetalle.tsx`: resumen de componentes y pestañas Fábrica/Instalación.
 - `src/frontend/src/components/proyectos/PresupuestoUploader.tsx`: carga y revisión del PDF.
-- `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`: matrices y cierre con evidencia.
+- `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`: lista de tareas y cierre con evidencia. `TableroProyectos.tsx`: tablero por estado con transiciones condicionadas.
 - `src/frontend/src/lib/presupuesto-parser.ts`: detección y parsing de los tres formatos.
 - `src/frontend/scripts/diagnostico-presupuestos.ts`: prueba repetible con PDFs reales provistos externamente.
 - `src/frontend/src/mocks/data.ts`: tipos, defaults, mocks, migración local y persistencia.

@@ -8,8 +8,8 @@ import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
   proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, guardarProyecto, tareasIniciales,
-  nombreTipoProducto, type ConfiguracionProductoProyecto, type EtapaSeguimiento, type Proyecto, type Tarea,
-  type TareaPresupuesto
+  nombreTipoProducto, aplicarCambioTarea, type ConfiguracionProductoProyecto, type EtapaSeguimiento,
+  type Proyecto, type Tarea, type TareaPresupuesto
 } from "@/mocks/data";
 import { formatFecha, formatFechaCorta } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
@@ -230,15 +230,10 @@ export default function ProyectoDetalle() {
   if (!user) return null;
   if (!p) return <Navigate to="/proyectos" replace />;
 
-  const actualizarTareaPresupuesto = (tareaActualizada: TareaPresupuesto) => {
+  const persistir = (transformar: (actual: Proyecto) => Proyecto) => {
     setProyecto((actual) => {
       if (!actual) return actual;
-      const actualizado = {
-        ...actual,
-        tareasPresupuesto: (actual.tareasPresupuesto ?? []).map((tarea) =>
-          tarea.id === tareaActualizada.id ? tareaActualizada : tarea
-        )
-      };
+      const actualizado = transformar(actual);
       try {
         guardarProyecto(actualizado);
       } catch {
@@ -249,6 +244,24 @@ export default function ProyectoDetalle() {
       }
       return actualizado;
     });
+  };
+
+  const actualizarTareaPresupuesto = (tareaActualizada: TareaPresupuesto) => {
+    persistir((actual) => aplicarCambioTarea(actual, tareaActualizada));
+  };
+
+  const agregarTareaPresupuesto = (nueva: TareaPresupuesto) => {
+    persistir((actual) => ({
+      ...actual,
+      tareasPresupuesto: [...(actual.tareasPresupuesto ?? []), nueva]
+    }));
+  };
+
+  const eliminarTareaPresupuesto = (tarea: TareaPresupuesto) => {
+    persistir((actual) => ({
+      ...actual,
+      tareasPresupuesto: (actual.tareasPresupuesto ?? []).filter((existente) => existente.id !== tarea.id)
+    }));
   };
 
   const cliente = clientePorId(p.clienteId);
@@ -404,7 +417,7 @@ export default function ProyectoDetalle() {
         {!soloServicios && (
           <TabsContent value="fabrica" className="mt-4">
             {seguimientoGenerado ? (
-              <SeguimientoPresupuesto proyecto={p} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} />
+              <SeguimientoPresupuesto proyecto={p} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} alAgregar={agregarTareaPresupuesto} alEliminarTarea={eliminarTareaPresupuesto} />
             ) : seguimientoPorProducto ? (
               <SeguimientoPorProductos productos={productosOperativos} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} />
             ) : (
@@ -418,7 +431,7 @@ export default function ProyectoDetalle() {
         {!soloServicios && (
           <TabsContent value="instalacion" className="mt-4">
             {seguimientoGenerado ? (
-              <SeguimientoPresupuesto proyecto={p} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} />
+              <SeguimientoPresupuesto proyecto={p} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} alAgregar={agregarTareaPresupuesto} alEliminarTarea={eliminarTareaPresupuesto} />
             ) : seguimientoPorProducto ? (
               <SeguimientoPorProductos productos={productosOperativos} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} />
             ) : (

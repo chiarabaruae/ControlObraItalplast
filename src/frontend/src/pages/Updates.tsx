@@ -7,8 +7,8 @@ export default function Updates() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
-        <div className="senal">Settings</div>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Updates</h1>
+        <div className="senal">Configuración</div>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Actualizaciones</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Consultá la versión instalada y actualizá la aplicación cuando sea necesario.
         </p>
@@ -49,7 +49,7 @@ export default function Updates() {
               <p className="text-xs text-muted-foreground">La comprobación recarga la página y obtiene la última versión disponible.</p>
             </div>
             <Button className="gap-2" onClick={() => window.location.reload()}>
-              <RefreshCw className="size-4" /> Check for updates
+              <RefreshCw className="size-4" /> Buscar actualizaciones
             </Button>
           </div>
 

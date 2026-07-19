@@ -134,3 +134,27 @@ tags:
 **Decisión:** usar una misma ventana para crear y editar usuarios. Nombre, área y rol son obligatorios; correo y número de teléfono son opcionales. La tabla agrupa bajo el encabezado Acciones los íconos independientes de lápiz, llave y archivar/reactivar.
 
 **Consecuencias:** el rol deja de modificarse directamente desde la celda y se edita junto con el resto del perfil. En Fase 2 los cambios son locales a la pantalla; el backend futuro deberá persistirlos y generar las credenciales de acceso.
+
+## D-014 — Tareas de seguimiento en lista con fechas, no en matriz
+
+**Estado:** aceptada (reemplaza la presentación matricial de D-011; la generación ítem × etapa se mantiene).
+
+**Decisión:** cada bloque muestra sus tareas como lista ordenada por fecha de entrega. El supervisor puede agregar tareas manuales, renombrar, cambiar fechas de inicio/entrega y eliminar. La sección Tareas del menú lateral refleja el seguimiento de todos los proyectos y completa con el mismo diálogo de evidencia.
+
+**Consecuencias:** el seguimiento se opera como gestor de tareas con vencimientos; las tareas manuales conviven con las generadas desde el presupuesto (`titulo`, `fechaInicio`, `fechaFin`, `manual` en `TareaPresupuesto`).
+
+## D-015 — Tablero por estado con transiciones condicionadas
+
+**Estado:** aceptada.
+
+**Decisión:** Proyectos suma vista Tablero (Planificadas / En progreso / Pausadas / Finalizadas). Pasar a En progreso solo ocurre con avance registrado (automático con el primer avance); pausar exige motivo que queda en el historial (`pausas`); finalizar advierte que los avances se guardan al 100%, exige al menos una evidencia (existente o adjuntada como evidencia general) y registra el cierre (`cierre`).
+
+**Consecuencias:** los estados dejan de ser un campo editable a mano y pasan a reflejar reglas operativas trazables.
+
+## D-016 — Interfaz íntegramente en español
+
+**Estado:** aceptada.
+
+**Decisión:** todo texto visible para la persona usuaria va en español (Configuración, Soporte, Cuenta, Actualizaciones, Documentación, Contactar soporte, Inicio, Buscar actualizaciones). Los identificadores de código y rutas pueden permanecer en inglés.
+
+**Consecuencias:** los rótulos ingleses previos quedan prohibidos en UI; el criterio aplica a toda pantalla nueva.

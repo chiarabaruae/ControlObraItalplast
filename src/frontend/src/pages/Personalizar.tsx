@@ -28,7 +28,7 @@ export default function Personalizar() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
-        <div className="senal">Settings</div>
+        <div className="senal">Configuración</div>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Personalizar</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Preferencias locales de este equipo. No cambian datos de obra.

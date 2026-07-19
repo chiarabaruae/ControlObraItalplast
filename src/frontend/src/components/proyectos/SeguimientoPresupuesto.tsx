@@ -1,103 +1,120 @@
+// Seguimiento por presupuesto en modo LISTA (no matriz):
+// cada bloque (premarcos / producto) muestra sus tareas como filas con
+// fechas de entrega. El supervisor puede agregar tareas nuevas, renombrar,
+// cambiar fechas o eliminar. Completar exige evidencia fotográfica.
 import { useMemo, useState } from "react";
-import { Camera, Check, Factory, HardHat, ImageIcon, RotateCcw } from "lucide-react";
+import { CalendarDays, Camera, Check, Factory, HardHat, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { prepararEvidencia } from "@/lib/evidencias";
 import { ETIQUETAS_GRUPO, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
+import { formatFechaCorta } from "@/lib/format";
 import {
-  nombreTipoProducto,
-  type GrupoTareaPresupuesto,
-  type Proyecto,
-  type TareaPresupuesto
+  nombreTipoProducto, tituloTarea,
+  type GrupoTareaPresupuesto, type Proyecto, type TareaPresupuesto, type TipoProducto
 } from "@/mocks/data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 
 const GRUPOS_FABRICA: GrupoTareaPresupuesto[] = ["fabricacion_premarcos", "fabrica"];
 const GRUPOS_INSTALACION: GrupoTareaPresupuesto[] = ["instalacion_premarcos", "instalacion"];
 
-function MatrizGrupo({
+interface FormularioTarea {
+  id?: string;
+  grupo: GrupoTareaPresupuesto;
+  tipoProducto: TipoProducto;
+  titulo: string;
+  itemId: string;
+  fechaInicio: string;
+  fechaFin: string;
+}
+
+function FilaTarea({
   proyecto,
-  grupo,
-  tipoProducto,
-  puedeEditar,
-  alSeleccionar
+  tarea,
+  puedeCompletar,
+  puedeGestionar,
+  alSeleccionar,
+  alEditar,
+  alEliminar
 }: {
   proyecto: Proyecto;
-  grupo: GrupoTareaPresupuesto;
-  tipoProducto: TareaPresupuesto["tipoProducto"];
-  puedeEditar: boolean;
+  tarea: TareaPresupuesto;
+  puedeCompletar: boolean;
+  puedeGestionar: boolean;
   alSeleccionar: (tarea: TareaPresupuesto) => void;
+  alEditar: (tarea: TareaPresupuesto) => void;
+  alEliminar: (tarea: TareaPresupuesto) => void;
 }) {
-  const tareas = proyecto.tareasPresupuesto?.filter(
-    (tarea) => tarea.grupo === grupo && tarea.tipoProducto === tipoProducto
-  ) ?? [];
-  const etapas = [...new Set(tareas.map((tarea) => tarea.etapa))];
-  const idsItems = [...new Set(tareas.map((tarea) => tarea.itemId))];
-  const items = idsItems.flatMap((id) => {
-    const item = proyecto.presupuestoEjecutivo?.items.find((actual) => actual.id === id);
-    return item ? [item] : [];
-  });
-  if (tareas.length === 0) return null;
+  const item = proyecto.presupuestoEjecutivo?.items.find((actual) => actual.id === tarea.itemId);
+  const titulo = tituloTarea(tarea, proyecto);
+  const rangoFechas = tarea.fechaInicio || tarea.fechaFin
+    ? `${tarea.fechaInicio ? formatFechaCorta(tarea.fechaInicio) : "…"} → ${tarea.fechaFin ? formatFechaCorta(tarea.fechaFin) : "…"}`
+    : null;
 
   return (
-    <Card>
-      <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="font-heading text-base">{ETIQUETAS_GRUPO[grupo]}</CardTitle>
-          <span className="cifra text-sm font-semibold">{porcentajeTareas(tareas)}%</span>
+    <li className={`flex items-center gap-3 px-4 py-2.5 ${tarea.completada ? "opacity-60" : ""}`}>
+      <Button
+        type="button"
+        variant={tarea.completada ? "default" : "outline"}
+        size="icon"
+        className="size-8 shrink-0 rounded-full"
+        onClick={() => alSeleccionar(tarea)}
+        disabled={!puedeCompletar && !tarea.completada}
+        aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${titulo}`}
+      >
+        {tarea.completada ? <Check className="size-4" /> : <Camera className="size-4" />}
+      </Button>
+
+      <div className="min-w-0 flex-1">
+        <div className={`truncate text-sm font-medium ${tarea.completada ? "line-through" : ""}`}>{titulo}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+          {item && (
+            <span className="truncate">
+              {item.ambiente || item.descripcion} · {item.cantidad} un.
+            </span>
+          )}
+          {tarea.manual && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">Agregada</span>}
         </div>
-        <Progress value={porcentajeTareas(tareas)} />
-      </CardHeader>
-      <CardContent className="px-0">
-        <div className="overflow-x-auto">
-          <Table className="min-w-max">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 z-10 min-w-52 bg-card">Componente</TableHead>
-                {etapas.map((etapa) => <TableHead key={etapa} className="min-w-36 text-center">{etapa}</TableHead>)}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="sticky left-0 z-10 bg-card">
-                    <div className="font-medium">{item.codigo || `Pos. ${item.posicion}`}</div>
-                    <div className="mt-0.5 max-w-48 truncate text-xs text-muted-foreground">
-                      {item.ambiente || item.descripcion} · {item.cantidad} un.
-                    </div>
-                  </TableCell>
-                  {etapas.map((etapa) => {
-                    const tarea = tareas.find((actual) => actual.itemId === item.id && actual.etapa === etapa);
-                    if (!tarea) return <TableCell key={etapa} className="text-center text-muted-foreground">—</TableCell>;
-                    return (
-                      <TableCell key={etapa} className="text-center">
-                        <Button
-                          type="button"
-                          variant={tarea.completada ? "default" : "outline"}
-                          size="icon"
-                          className="size-9"
-                          onClick={() => alSeleccionar(tarea)}
-                          disabled={!puedeEditar}
-                          aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${etapa} para ${item.codigo}`}
-                        >
-                          {tarea.completada ? <Check className="size-4" /> : <Camera className="size-4" />}
-                        </Button>
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {rangoFechas && (
+        <span className="cifra hidden shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+          <CalendarDays className="size-3.5" /> {rangoFechas}
+        </span>
+      )}
+
+      {puedeGestionar && (
+        <span className="flex shrink-0 gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={() => alEditar(tarea)}
+            aria-label={`Editar ${titulo}`}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 text-muted-foreground hover:text-destructive"
+            onClick={() => alEliminar(tarea)}
+            aria-label={`Eliminar ${titulo}`}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </span>
+      )}
+    </li>
   );
 }
 
@@ -106,73 +123,77 @@ export function SeguimientoPresupuesto({
   lado,
   puedeEditar,
   usuarioId,
-  alActualizar
+  alActualizar,
+  alAgregar,
+  alEliminarTarea
 }: {
   proyecto: Proyecto;
   lado: "fabrica" | "instalacion";
   puedeEditar: boolean;
   usuarioId: string;
   alActualizar: (tarea: TareaPresupuesto) => void;
+  alAgregar: (tarea: TareaPresupuesto) => void;
+  alEliminarTarea: (tarea: TareaPresupuesto) => void;
 }) {
   const grupos = lado === "fabrica" ? GRUPOS_FABRICA : GRUPOS_INSTALACION;
   const Icono = lado === "fabrica" ? Factory : HardHat;
   const [seleccionada, setSeleccionada] = useState<TareaPresupuesto>();
-  const [archivo, setArchivo] = useState<File>();
-  const [observaciones, setObservaciones] = useState("");
-  const [guardando, setGuardando] = useState(false);
+  const [formulario, setFormulario] = useState<FormularioTarea>();
   const productos = useMemo(
     () => proyecto.productos?.filter((producto) => producto.tipo !== "servicios") ?? [],
     [proyecto.productos]
   );
+  const tareas = proyecto.tareasPresupuesto ?? [];
 
-  const abrir = (tarea: TareaPresupuesto) => {
-    setSeleccionada(tarea);
-    setArchivo(undefined);
-    setObservaciones(tarea.observaciones ?? "");
-  };
-
-  const cerrar = () => {
-    setSeleccionada(undefined);
-    setArchivo(undefined);
-    setObservaciones("");
-  };
-
-  const completar = async () => {
-    if (!seleccionada || (!archivo && !seleccionada.evidencia)) return;
-    setGuardando(true);
-    try {
-      const evidencia = archivo ? await prepararEvidencia(archivo) : seleccionada.evidencia;
-      if (!evidencia) return;
-      alActualizar({
-        ...seleccionada,
-        completada: true,
-        evidencia,
-        observaciones: observaciones.trim(),
-        completadaEn: new Date().toISOString(),
-        completadaPorId: usuarioId
-      });
-      toast("Tarea completada", { description: `${seleccionada.etapa} · evidencia guardada.` });
-      cerrar();
-    } catch (error) {
-      toast("No se pudo guardar la evidencia", {
-        description: error instanceof Error ? error.message : "Probá con otra imagen."
-      });
-    } finally {
-      setGuardando(false);
+  const guardarFormulario = () => {
+    if (!formulario) return;
+    const titulo = formulario.titulo.trim();
+    if (!titulo) {
+      toast("Falta el nombre", { description: "Escribí qué hay que hacer en esta tarea." });
+      return;
     }
+    if (formulario.fechaInicio && formulario.fechaFin && formulario.fechaFin < formulario.fechaInicio) {
+      toast("Revisá las fechas", { description: "La fecha de entrega no puede ser anterior al inicio." });
+      return;
+    }
+
+    if (formulario.id) {
+      const original = tareas.find((tarea) => tarea.id === formulario.id);
+      if (!original) return;
+      alActualizar({
+        ...original,
+        titulo,
+        itemId: formulario.itemId,
+        fechaInicio: formulario.fechaInicio || undefined,
+        fechaFin: formulario.fechaFin || undefined
+      });
+      toast("Tarea actualizada", { description: titulo });
+    } else {
+      alAgregar({
+        id: `manual-${Date.now()}`,
+        itemId: formulario.itemId,
+        tipoProducto: formulario.tipoProducto,
+        grupo: formulario.grupo,
+        etapa: "Tarea agregada",
+        titulo,
+        fechaInicio: formulario.fechaInicio || undefined,
+        fechaFin: formulario.fechaFin || undefined,
+        manual: true,
+        completada: false
+      });
+      toast("Tarea agregada", { description: titulo });
+    }
+    setFormulario(undefined);
   };
 
-  const reabrir = () => {
-    if (!seleccionada) return;
-    alActualizar({
-      ...seleccionada,
-      completada: false,
-      completadaEn: undefined,
-      completadaPorId: undefined
-    });
-    toast("Tarea reabierta", { description: seleccionada.etapa });
-    cerrar();
+  const eliminar = (tarea: TareaPresupuesto) => {
+    alEliminarTarea(tarea);
+    toast("Tarea eliminada", { description: tituloTarea(tarea, proyecto) });
   };
+
+  const etiquetaSeleccionada = seleccionada
+    ? `${tituloTarea(seleccionada, proyecto)} · ${ETIQUETAS_GRUPO[seleccionada.grupo]}`
+    : "";
 
   return (
     <div className="space-y-6">
@@ -181,84 +202,177 @@ export function SeguimientoPresupuesto({
           <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary"><Icono className="size-5" /></div>
           <div>
             <h2 className="font-heading font-semibold">Seguimiento de {lado === "fabrica" ? "fábrica" : "instalación"}</h2>
-            <p className="text-xs text-muted-foreground">Cada celda requiere evidencia para quedar completada.</p>
+            <p className="text-xs text-muted-foreground">Cada tarea exige evidencia fotográfica para quedar completada.</p>
           </div>
         </div>
         <div className="text-right">
-          <div className="cifra text-xl font-bold">{porcentajeTareas(proyecto.tareasPresupuesto ?? [], grupos)}%</div>
+          <div className="cifra text-xl font-bold">{porcentajeTareas(tareas, grupos)}%</div>
           <div className="text-xs text-muted-foreground">avance automático</div>
         </div>
       </div>
 
       {productos.map((producto) => {
-        const tieneTareas = proyecto.tareasPresupuesto?.some(
-          (tarea) => tarea.tipoProducto === producto.tipo && grupos.includes(tarea.grupo)
+        const gruposDelProducto = grupos.filter((grupo) =>
+          tareas.some((tarea) => tarea.tipoProducto === producto.tipo && tarea.grupo === grupo)
         );
-        if (!tieneTareas) return null;
+        if (gruposDelProducto.length === 0) return null;
+
         return (
           <section key={producto.tipo} className="space-y-3">
             <div>
               <div className="senal">Producto</div>
               <h3 className="mt-1 font-heading text-lg font-semibold">{nombreTipoProducto(producto.tipo)}</h3>
             </div>
-            {grupos.map((grupo) => (
-              <MatrizGrupo
-                key={`${producto.tipo}-${grupo}`}
-                proyecto={proyecto}
-                grupo={grupo}
-                tipoProducto={producto.tipo}
-                puedeEditar={puedeEditar}
-                alSeleccionar={abrir}
-              />
-            ))}
+
+            {gruposDelProducto.map((grupo) => {
+              const tareasGrupo = tareas
+                .filter((tarea) => tarea.tipoProducto === producto.tipo && tarea.grupo === grupo)
+                .sort((a, b) => (a.fechaFin ?? "9999").localeCompare(b.fechaFin ?? "9999"));
+              const pendientes = tareasGrupo.filter((tarea) => !tarea.completada);
+              const hechas = tareasGrupo.filter((tarea) => tarea.completada);
+
+              return (
+                <Card key={`${producto.tipo}-${grupo}`}>
+                  <CardHeader className="gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <CardTitle className="font-heading text-base">{ETIQUETAS_GRUPO[grupo]}</CardTitle>
+                      <div className="flex items-center gap-3">
+                        <span className="cifra text-sm font-semibold">{porcentajeTareas(tareasGrupo)}%</span>
+                        {puedeEditar && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => setFormulario({
+                              grupo,
+                              tipoProducto: producto.tipo,
+                              titulo: "",
+                              itemId: "",
+                              fechaInicio: "",
+                              fechaFin: ""
+                            })}
+                          >
+                            <Plus className="size-3.5" /> Agregar tarea
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <Progress value={porcentajeTareas(tareasGrupo)} />
+                  </CardHeader>
+                  <CardContent className="px-0">
+                    <ul className="divide-y">
+                      {[...pendientes, ...hechas].map((tarea) => (
+                        <FilaTarea
+                          key={tarea.id}
+                          proyecto={proyecto}
+                          tarea={tarea}
+                          puedeCompletar={puedeEditar}
+                          puedeGestionar={puedeEditar}
+                          alSeleccionar={setSeleccionada}
+                          alEditar={(actual) => setFormulario({
+                            id: actual.id,
+                            grupo: actual.grupo,
+                            tipoProducto: actual.tipoProducto,
+                            titulo: tituloTarea(actual, proyecto),
+                            itemId: actual.itemId,
+                            fechaInicio: actual.fechaInicio ?? "",
+                            fechaFin: actual.fechaFin ?? ""
+                          })}
+                          alEliminar={eliminar}
+                        />
+                      ))}
+                    </ul>
+                    {tareasGrupo.length === 0 && (
+                      <p className="px-4 py-6 text-sm text-muted-foreground">Sin tareas en este bloque.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </section>
         );
       })}
 
-      <Dialog open={Boolean(seleccionada)} onOpenChange={(abierto) => !abierto && cerrar()}>
+      {/* Completar / ver evidencia */}
+      <DialogoCompletarTarea
+        tarea={seleccionada}
+        etiqueta={etiquetaSeleccionada}
+        alCerrar={() => setSeleccionada(undefined)}
+        alGuardar={(tarea) => alActualizar({ ...tarea, completadaPorId: tarea.completada ? usuarioId : undefined })}
+        puedeReabrir={puedeEditar}
+      />
+
+      {/* Alta / edición de tarea */}
+      <Dialog open={Boolean(formulario)} onOpenChange={(abierto) => !abierto && setFormulario(undefined)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{seleccionada?.completada ? "Evidencia de la tarea" : "Completar tarea"}</DialogTitle>
+            <DialogTitle>{formulario?.id ? "Editar tarea" : "Nueva tarea de seguimiento"}</DialogTitle>
             <DialogDescription>
-              {seleccionada ? `${seleccionada.etapa} · ${ETIQUETAS_GRUPO[seleccionada.grupo]}` : ""}
+              {formulario ? `${ETIQUETAS_GRUPO[formulario.grupo]} · ${nombreTipoProducto(formulario.tipoProducto)}` : ""}
             </DialogDescription>
           </DialogHeader>
-
-          {seleccionada?.completada && seleccionada.evidencia ? (
-            <div className="space-y-3">
-              <img src={seleccionada.evidencia.dataUrl} alt={`Evidencia de ${seleccionada.etapa}`} className="max-h-72 w-full rounded-lg border object-contain" />
-              <div className="rounded-lg bg-muted p-3 text-sm">
-                <div className="flex items-center gap-2 font-medium"><ImageIcon className="size-4" /> {seleccionada.evidencia.nombre}</div>
-                <p className="mt-2 text-muted-foreground">{seleccionada.observaciones || "Sin observaciones."}</p>
-              </div>
-            </div>
-          ) : (
+          {formulario && (
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="evidencia-tarea">Evidencia fotográfica *</Label>
-                <Input id="evidencia-tarea" type="file" accept="image/*" onChange={(e) => setArchivo(e.target.files?.[0])} />
-                <p className="text-xs text-muted-foreground">Se comprime localmente antes de guardarse. Máximo 12 MB.</p>
+                <Label htmlFor="titulo-tarea">Nombre de la tarea *</Label>
+                <Input
+                  id="titulo-tarea"
+                  value={formulario.titulo}
+                  onChange={(evento) => setFormulario({ ...formulario, titulo: evento.target.value })}
+                  placeholder="Ej. Verificar plomo de premarcos piso 3"
+                  autoFocus
+                />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="observaciones-tarea">Observaciones (opcional)</Label>
-                <Textarea id="observaciones-tarea" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} placeholder="Detalles, medidas o incidencias relevantes…" />
+                <Label>Componente del presupuesto (opcional)</Label>
+                <Select
+                  value={formulario.itemId || "ninguno"}
+                  onValueChange={(valor) => setFormulario({ ...formulario, itemId: valor === "ninguno" ? "" : valor })}
+                >
+                  <SelectTrigger className="w-full" aria-label="Componente del presupuesto">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ninguno">Sin componente asociado</SelectItem>
+                    {(proyecto.presupuestoEjecutivo?.items ?? [])
+                      .filter((item) => item.tipoProducto === formulario.tipoProducto)
+                      .map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {(item.codigo || `Pos. ${item.posicion}`)} · {item.ambiente || item.descripcion}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="fecha-inicio-tarea">Fecha de inicio</Label>
+                  <Input
+                    id="fecha-inicio-tarea"
+                    type="date"
+                    value={formulario.fechaInicio}
+                    onChange={(evento) => setFormulario({ ...formulario, fechaInicio: evento.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fecha-fin-tarea">Fecha de entrega</Label>
+                  <Input
+                    id="fecha-fin-tarea"
+                    type="date"
+                    value={formulario.fechaFin}
+                    onChange={(evento) => setFormulario({ ...formulario, fechaFin: evento.target.value })}
+                  />
+                </div>
               </div>
             </div>
           )}
-
           <DialogFooter>
-            <Button variant="outline" onClick={cerrar}>Cerrar</Button>
-            {seleccionada?.completada ? (
-              <Button variant="outline" className="gap-2" onClick={reabrir}><RotateCcw className="size-4" /> Reabrir tarea</Button>
-            ) : (
-              <Button className="gap-2" onClick={() => void completar()} disabled={guardando || (!archivo && !seleccionada?.evidencia)}>
-                <Check className="size-4" /> {guardando ? "Guardando…" : "Marcar como lista"}
-              </Button>
-            )}
+            <Button variant="outline" onClick={() => setFormulario(undefined)}>Cancelar</Button>
+            <Button onClick={guardarFormulario}>{formulario?.id ? "Guardar cambios" : "Agregar tarea"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
-

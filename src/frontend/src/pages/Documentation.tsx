@@ -12,8 +12,8 @@ export default function Documentation() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
-        <div className="senal">Support</div>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Documentation</h1>
+        <div className="senal">Soporte</div>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Documentación</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Guías breves para resolver dudas y aprovechar las herramientas del sistema.
         </p>

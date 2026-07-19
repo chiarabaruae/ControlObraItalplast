@@ -1,10 +1,20 @@
+// Tareas — vista macro: junta las tareas internas del equipo con TODAS las
+// tareas de seguimiento que nacen del presupuesto de cada proyecto.
+// Completar una tarea de seguimiento acá abre el mismo diálogo de evidencia
+// que en el detalle del proyecto, y actualiza el avance en todos lados.
 import { useState } from "react";
-import { Plus, Check, RotateCcw, Trash2, Pencil } from "lucide-react";
+import { Link } from "react-router";
+import { Plus, Check, RotateCcw, Trash2, Pencil, Camera, ClipboardList } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
-import { tareasIniciales, proyectoPorId, usuarioPorId, type Tarea } from "@/mocks/data";
+import { ETIQUETAS_GRUPO } from "@/lib/seguimiento-presupuesto";
+import {
+  tareasIniciales, proyectoPorId, usuarioPorId, obtenerProyectos, guardarProyecto,
+  aplicarCambioTarea, tituloTarea, type Proyecto, type Tarea, type TareaPresupuesto
+} from "@/mocks/data";
 import { formatFecha } from "@/lib/format";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
+import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,22 +22,41 @@ import { toast } from "sonner";
 
 type Filtro = "todas" | "pendientes" | "finalizadas";
 
+interface SeleccionSeguimiento {
+  proyecto: Proyecto;
+  tarea: TareaPresupuesto;
+}
+
 export default function Todo() {
   const { user } = useAuth();
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales);
+  const [proyectos, setProyectos] = useState<Proyecto[]>(() => obtenerProyectos());
   const [filtro, setFiltro] = useState<Filtro>("todas");
+  const [seleccion, setSeleccion] = useState<SeleccionSeguimiento>();
   if (!user) return null;
 
   const esViewer = user.role === "viewer";
-  // Viewer: solo sus tareas asignadas. Admin/supervisor: todas.
-  const propias = esViewer ? tareas.filter((t) => t.responsableId === user.id) : tareas;
-  const visibles = propias.filter((t) => {
+  const puedeAvance = permisos.editarAvance(user.role);
+
+  // Tareas internas: el rol Usuario ve solo las suyas.
+  const internas = esViewer ? tareas.filter((t) => t.responsableId === user.id) : tareas;
+  const internasVisibles = internas.filter((t) => {
     if (filtro === "pendientes") return t.estado !== "finalizada";
     if (filtro === "finalizadas") return t.estado === "finalizada";
     return true;
   });
 
-  const alternar = (t: Tarea) => {
+  // Tareas de seguimiento de todos los proyectos activos.
+  const seguimiento = proyectos.flatMap((proyecto) =>
+    (proyecto.tareasPresupuesto ?? []).map((tarea) => ({ proyecto, tarea }))
+  );
+  const seguimientoVisibles = seguimiento.filter(({ tarea }) => {
+    if (filtro === "pendientes") return !tarea.completada;
+    if (filtro === "finalizadas") return tarea.completada;
+    return true;
+  });
+
+  const alternarInterna = (t: Tarea) => {
     const finalizada = t.estado === "finalizada";
     setTareas((prev) =>
       prev.map((x) => (x.id === t.id ? { ...x, estado: finalizada ? "pendiente" : "finalizada" } : x))
@@ -35,9 +64,26 @@ export default function Todo() {
     toast(finalizada ? "Tarea reabierta" : "Tarea completada", { description: t.titulo });
   };
 
-  const eliminar = (t: Tarea) => {
+  const eliminarInterna = (t: Tarea) => {
     setTareas((prev) => prev.filter((x) => x.id !== t.id));
     toast("Tarea eliminada", { description: t.titulo });
+  };
+
+  const guardarSeguimiento = (tareaActualizada: TareaPresupuesto) => {
+    if (!seleccion) return;
+    const actualizado = aplicarCambioTarea(seleccion.proyecto, {
+      ...tareaActualizada,
+      completadaPorId: tareaActualizada.completada ? user.id : undefined
+    });
+    try {
+      guardarProyecto(actualizado);
+    } catch {
+      toast("No se pudo guardar el avance", {
+        description: "El almacenamiento local está lleno. Probá con una imagen más pequeña."
+      });
+      return;
+    }
+    setProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
   };
 
   return (
@@ -46,9 +92,11 @@ export default function Todo() {
         <div>
           <div className="senal">Tareas</div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Tareas</h1>
-          {esViewer && (
-            <p className="mt-1 text-sm text-muted-foreground">Tus tareas asignadas. Marcá cada una al terminarla.</p>
-          )}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {esViewer
+              ? "Tus tareas asignadas. Marcá cada una al terminarla."
+              : "Tareas internas del equipo y tareas de seguimiento de todos los proyectos."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border p-0.5">
@@ -66,81 +114,158 @@ export default function Todo() {
             ))}
           </div>
           {permisos.crearTarea(user.role) && (
-            <Button className="gap-2" onClick={() => toast("Nueva tarea", { description: "Se conecta al backend en la Fase 4." })}>
+            <Button className="gap-2" onClick={() => toast("Nueva tarea", { description: "Se conecta a la API en la Fase 4." })}>
               <Plus className="size-4" /> Nueva tarea
             </Button>
           )}
         </div>
       </header>
 
-      <Card>
-        <CardContent className="px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10" />
-                <TableHead>Tarea</TableHead>
-                <TableHead>Proyecto</TableHead>
-                <TableHead>Responsable</TableHead>
-                <TableHead>Vence</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead className="w-20" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visibles.map((t) => {
-                const finalizada = t.estado === "finalizada";
-                const esPropia = t.responsableId === user.id;
-                const puedeCompletar = permisos.completarTarea(user.role, esPropia);
-                return (
-                  <TableRow key={t.id} className={finalizada ? "opacity-55" : ""}>
+      {/* Seguimiento de proyectos */}
+      <section className="space-y-2">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="size-4 text-primary" />
+          <h2 className="font-heading text-sm font-semibold">Seguimiento de proyectos</h2>
+          <span className="cifra text-xs text-muted-foreground">
+            {seguimiento.filter(({ tarea }) => !tarea.completada).length} pendientes
+          </span>
+        </div>
+        <Card>
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10" />
+                  <TableHead>Tarea</TableHead>
+                  <TableHead>Proyecto</TableHead>
+                  <TableHead>Bloque</TableHead>
+                  <TableHead>Entrega</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {seguimientoVisibles.slice(0, 30).map(({ proyecto, tarea }) => (
+                  <TableRow key={tarea.id} className={tarea.completada ? "opacity-55" : ""}>
                     <TableCell>
-                      {puedeCompletar && (
-                        <Button
-                          variant={finalizada ? "ghost" : "outline"}
-                          size="icon"
-                          className="size-7 rounded-full"
-                          aria-label={finalizada ? "Reabrir tarea" : "Completar tarea"}
-                          onClick={() => alternar(t)}
-                        >
-                          {finalizada ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5" />}
-                        </Button>
-                      )}
+                      <Button
+                        variant={tarea.completada ? "default" : "outline"}
+                        size="icon"
+                        className="size-7 rounded-full"
+                        aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${tituloTarea(tarea, proyecto)}`}
+                        onClick={() => setSeleccion({ proyecto, tarea })}
+                        disabled={!puedeAvance && !tarea.completada}
+                      >
+                        {tarea.completada ? <Check className="size-3.5" /> : <Camera className="size-3.5" />}
+                      </Button>
                     </TableCell>
-                    <TableCell className={`font-medium ${finalizada ? "line-through" : ""}`}>{t.titulo}</TableCell>
-                    <TableCell className="text-muted-foreground">{proyectoPorId(t.proyectoId)?.nombre}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {usuarioPorId(t.responsableId)?.displayName}
-                      {esPropia && <span className="ml-1.5 rounded bg-accent px-1 py-0.5 text-[10px] font-semibold text-accent-foreground">vos</span>}
+                    <TableCell className={`font-medium ${tarea.completada ? "line-through" : ""}`}>
+                      {tituloTarea(tarea, proyecto)}
                     </TableCell>
-                    <TableCell className="cifra text-xs">{formatFecha(t.fechaFin)}</TableCell>
-                    <TableCell><PrioridadBadge prioridad={t.prioridad} /></TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1">
-                        {permisos.editarTarea(user.role) && (
-                          <Button variant="ghost" size="icon" className="size-7" aria-label="Editar tarea" onClick={() => toast("Editar tarea", { description: "Se conecta al backend en la Fase 4." })}>
-                            <Pencil className="size-3.5" />
-                          </Button>
-                        )}
-                        {permisos.eliminarTarea(user.role) && (
-                          <Button variant="ghost" size="icon" className="size-7 text-destructive" aria-label="Eliminar tarea" onClick={() => eliminar(t)}>
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        )}
-                      </div>
+                      <Link to={`/proyectos/${proyecto.id}`} className="text-primary hover:underline">
+                        {proyecto.nombre}
+                      </Link>
                     </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{ETIQUETAS_GRUPO[tarea.grupo]}</TableCell>
+                    <TableCell className="cifra text-xs">{tarea.fechaFin ? formatFecha(tarea.fechaFin) : "—"}</TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          {visibles.length === 0 && (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {esViewer ? "No tenés tareas asignadas con este filtro." : "No hay tareas con este filtro."}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </TableBody>
+            </Table>
+            {seguimientoVisibles.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">No hay tareas de seguimiento con este filtro.</p>
+            )}
+            {seguimientoVisibles.length > 30 && (
+              <p className="border-t px-4 py-2.5 text-xs text-muted-foreground">
+                Mostrando 30 de {seguimientoVisibles.length}. Entrá a cada proyecto para ver su lista completa.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Tareas internas */}
+      <section className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Check className="size-4 text-primary" />
+          <h2 className="font-heading text-sm font-semibold">Tareas internas</h2>
+        </div>
+        <Card>
+          <CardContent className="px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10" />
+                  <TableHead>Tarea</TableHead>
+                  <TableHead>Proyecto</TableHead>
+                  <TableHead>Responsable</TableHead>
+                  <TableHead>Vence</TableHead>
+                  <TableHead>Prioridad</TableHead>
+                  <TableHead className="w-20" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {internasVisibles.map((t) => {
+                  const finalizada = t.estado === "finalizada";
+                  const esPropia = t.responsableId === user.id;
+                  const puedeCompletar = permisos.completarTarea(user.role, esPropia);
+                  return (
+                    <TableRow key={t.id} className={finalizada ? "opacity-55" : ""}>
+                      <TableCell>
+                        {puedeCompletar && (
+                          <Button
+                            variant={finalizada ? "ghost" : "outline"}
+                            size="icon"
+                            className="size-7 rounded-full"
+                            aria-label={finalizada ? "Reabrir tarea" : "Completar tarea"}
+                            onClick={() => alternarInterna(t)}
+                          >
+                            {finalizada ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5" />}
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell className={`font-medium ${finalizada ? "line-through" : ""}`}>{t.titulo}</TableCell>
+                      <TableCell className="text-muted-foreground">{proyectoPorId(t.proyectoId)?.nombre}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {usuarioPorId(t.responsableId)?.displayName}
+                        {esPropia && <span className="ml-1.5 rounded bg-accent px-1 py-0.5 text-[10px] font-semibold text-accent-foreground">vos</span>}
+                      </TableCell>
+                      <TableCell className="cifra text-xs">{formatFecha(t.fechaFin)}</TableCell>
+                      <TableCell><PrioridadBadge prioridad={t.prioridad} /></TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          {permisos.editarTarea(user.role) && (
+                            <Button variant="ghost" size="icon" className="size-7" aria-label="Editar tarea" onClick={() => toast("Editar tarea", { description: "Se conecta a la API en la Fase 4." })}>
+                              <Pencil className="size-3.5" />
+                            </Button>
+                          )}
+                          {permisos.eliminarTarea(user.role) && (
+                            <Button variant="ghost" size="icon" className="size-7 text-destructive" aria-label="Eliminar tarea" onClick={() => eliminarInterna(t)}>
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {internasVisibles.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {esViewer ? "No tenés tareas asignadas con este filtro." : "No hay tareas internas con este filtro."}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <DialogoCompletarTarea
+        tarea={seleccion?.tarea}
+        etiqueta={seleccion ? `${tituloTarea(seleccion.tarea, seleccion.proyecto)} · ${seleccion.proyecto.nombre}` : ""}
+        alCerrar={() => setSeleccion(undefined)}
+        alGuardar={guardarSeguimiento}
+        puedeReabrir={puedeAvance}
+      />
     </div>
   );
 }

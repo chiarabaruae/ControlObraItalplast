@@ -46,8 +46,8 @@ export default function Account() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
-        <div className="senal">Settings</div>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Account</h1>
+        <div className="senal">Configuración</div>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Cuenta</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Consultá los datos de tu cuenta y elegí cómo querés verte en el sistema.
         </p>

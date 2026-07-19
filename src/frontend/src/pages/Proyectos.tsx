@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Check, Factory, Hammer, HardHat, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
+import { Check, Columns3, Factory, Hammer, HardHat, LayoutGrid, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
   clientes, usuarios, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, etapas,
   ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
   ETAPAS_FABRICACION_PREMARCOS, ETAPAS_INSTALACION_PREMARCOS,
-  TIPOS_PRODUCTO, nombreTipoProducto, obtenerProyectos, guardarProyectos,
+  TIPOS_PRODUCTO, nombreTipoProducto, obtenerProyectos, guardarProyectos, guardarProyecto,
   type ConfiguracionProductoProyecto, type EstadoObra, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
@@ -15,6 +15,7 @@ import { formatFecha } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
 import { EstadoBadge } from "@/components/app/EstadoBadge";
 import { PresupuestoUploader } from "@/components/proyectos/PresupuestoUploader";
+import { TableroProyectos } from "@/components/proyectos/TableroProyectos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -220,7 +221,25 @@ export default function Proyectos() {
   );
   const [fechaInicio, setFechaInicio] = useState(hoy);
   const [presupuesto, setPresupuesto] = useState<PresupuestoEjecutivo>();
+  const [vista, setVista] = useState<"tarjetas" | "tablero">(
+    () => (localStorage.getItem("co-vista-proyectos") === "tablero" ? "tablero" : "tarjetas")
+  );
   if (!user) return null;
+
+  const cambiarVista = (nueva: "tarjetas" | "tablero") => {
+    setVista(nueva);
+    localStorage.setItem("co-vista-proyectos", nueva);
+  };
+
+  const actualizarProyecto = (actualizado: Proyecto) => {
+    try {
+      guardarProyecto(actualizado);
+    } catch {
+      toast("No se pudo guardar", { description: "El almacenamiento local está lleno. Probá con una imagen más pequeña." });
+      return;
+    }
+    setListaProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
+  };
 
   const visibles = listaProyectos.filter((proyecto) => filtro === "todas" || proyecto.estado === filtro);
   const responsables = usuarios.filter((usuario) => usuario.isActive && (usuario.role === "administrator" || usuario.role === "supervisor"));
@@ -427,17 +446,41 @@ export default function Proyectos() {
           <div className="senal">Obras</div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Proyectos</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={filtro} onValueChange={(valor) => setFiltro(valor as EstadoObra | "todas")}>
-            <SelectTrigger className="w-40" aria-label="Filtrar por estado">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FILTROS.map((opcion) => (
-                <SelectItem key={opcion.valor} value={opcion.valor}>{opcion.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border p-0.5" role="group" aria-label="Cambiar vista">
+            <button
+              type="button"
+              onClick={() => cambiarVista("tarjetas")}
+              aria-pressed={vista === "tarjetas"}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                vista === "tarjetas" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <LayoutGrid className="size-3.5" /> Tarjetas
+            </button>
+            <button
+              type="button"
+              onClick={() => cambiarVista("tablero")}
+              aria-pressed={vista === "tablero"}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                vista === "tablero" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Columns3 className="size-3.5" /> Tablero
+            </button>
+          </div>
+          {vista === "tarjetas" && (
+            <Select value={filtro} onValueChange={(valor) => setFiltro(valor as EstadoObra | "todas")}>
+              <SelectTrigger className="w-40" aria-label="Filtrar por estado">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FILTROS.map((opcion) => (
+                  <SelectItem key={opcion.valor} value={opcion.valor}>{opcion.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {permisos.crearProyecto(user.role) && (
             <Button className="gap-2" onClick={() => setModalAbierto(true)}>
               <Plus className="size-4" /> Nuevo proyecto
@@ -445,6 +488,15 @@ export default function Proyectos() {
           )}
         </div>
       </header>
+
+      {vista === "tablero" && (
+        <TableroProyectos
+          proyectos={listaProyectos}
+          puedeMover={permisos.editarAvance(user.role)}
+          usuarioId={user.id}
+          alGuardar={actualizarProyecto}
+        />
+      )}
 
       <Dialog open={modalAbierto} onOpenChange={cambiarModal}>
         <DialogContent className="sm:max-w-5xl">
@@ -608,7 +660,7 @@ export default function Proyectos() {
         </DialogContent>
       </Dialog>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      {vista === "tarjetas" && <section className="grid gap-4 md:grid-cols-2">
         {visibles.map((proyecto) => {
           const lider = usuarioPorId(proyecto.liderId);
           const productosProyecto = proyecto.productos?.length
@@ -686,9 +738,9 @@ export default function Proyectos() {
             </Link>
           );
         })}
-      </section>
+      </section>}
 
-      {visibles.length === 0 && (
+      {vista === "tarjetas" && visibles.length === 0 && (
         <Card className="py-14">
           <CardContent className="text-center text-sm text-muted-foreground">
             No hay proyectos con este estado. Cambiá el filtro para ver el resto.

@@ -16,6 +16,18 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-20 — Tareas en lista, tablero por estado e interfaz 100% en español
+
+**Alcance:** el seguimiento por presupuesto deja la matriz y pasa a lista de tareas con fechas; Proyectos suma vista Tablero con transiciones condicionadas; toda la interfaz queda en español.
+
+**Impacto:** cada tarea muestra fecha de inicio/entrega editables y el supervisor puede agregar, renombrar o eliminar tareas por bloque. La sección Tareas del menú junta las tareas internas con el seguimiento de todos los proyectos y completa con el mismo diálogo de evidencia. En el tablero: pasar a En progreso exige avance previo (el cambio es automático con el primer avance), pausar exige motivo registrado y finalizar advierte que todo queda al 100% y exige al menos una evidencia. Configuración/Soporte/Cuenta/Actualizaciones/Documentación/Contactar soporte/Inicio reemplazan los rótulos en inglés. `vite.config.ts` excluye `pdfjs-dist` del optimizador (colgaba el arranque del dev server).
+
+**Archivos clave:** `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`, `src/frontend/src/components/proyectos/DialogoCompletarTarea.tsx`, `src/frontend/src/components/proyectos/TableroProyectos.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/frontend/src/pages/Proyectos.tsx`, `src/frontend/src/mocks/data.ts`, `src/frontend/src/components/app/AppShell.tsx`, `src/frontend/vite.config.ts`.
+
+**Validaciones:** `tsc -b` y `npm run lint` limpios; recorrida en navegador de lista de tareas, Tareas global, tablero y los tres diálogos de transición.
+
+**Pendiente:** lógica de estimación de fechas del cronograma (Excel de referencia a incorporar).
+
 ## 2026-07-19 — Alta y edición de usuarios
 
 **Alcance:** se organiza la tabla de usuarios y se incorpora una ventana compartida para alta y edición.
