@@ -11,6 +11,8 @@ tags:
   - executive-budget
   - task-evidence
   - user-management
+  - task-management
+  - kanban
 ---
 
 # Flujo por rol — Gestión de proyectos Italplast
@@ -51,8 +53,8 @@ tags:
 | Proyectos | ✅ | ✅ | ✅ lectura |
 | Tareas | ✅ | ✅ | ✅ (sus tareas) |
 | Usuarios *(pantalla nueva)* | ✅ | ❌ | ❌ |
-| Settings / Personalizar | ✅ | ✅ | ✅ |
-| Support | ✅ | ✅ | ✅ |
+| Configuración / Personalizar | ✅ | ✅ | ✅ |
+| Soporte | ✅ | ✅ | ✅ |
 
 ## Matriz pantalla × rol
 
@@ -72,10 +74,11 @@ tags:
 *Racional: un encargado de cuadrilla a veces necesita el teléfono del cliente
 para coordinar en obra; un operario no necesita la cartera de clientes.*
 
-### Proyectos (lista — vistas lista/tarjetas/kanban/gantt)
+### Proyectos (vistas Tarjetas y Tablero)
 | Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
-| Ver todos los proyectos en todas las vistas | ✅ | ✅ | ✅ |
+| Ver todos los proyectos en Tarjetas y Tablero | ✅ | ✅ | ✅ |
+| Solicitar cambio de estado desde el tablero | ✅ | ✅ | ❌ |
 | Crear proyecto | ✅ | ❌ | ❌ |
 | Editar datos del proyecto | ✅ | ❌ | ❌ |
 | Eliminar proyecto | ✅ | ❌ | ❌ |
@@ -87,6 +90,7 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Subir oferta PDF → generar cronograma | ✅ | ❌ (comercial) | ❌ |
 | Reemplazar presupuesto ejecutivo | ✅ | ✅ | ❌ |
 | Generar seguimientos (fábrica/instalación) | ✅ | ✅ | ❌ |
+| Agregar, renombrar, refechar o eliminar tareas de seguimiento | ✅ | ✅ | ❌ |
 | **Completar tareas de etapa con evidencia** | ✅ | ✅ *(su función principal)* | ❌ en Fase 2 |
 | Comentarios / hitos | ✅ | ✅ | ❌ |
 
@@ -99,7 +103,9 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Eliminar tarea | ✅ | ❌ | ❌ |
 
 *Nota Fase 3: "sus tareas" requiere agregar asignación por usuario
-(`tareas_obra.responsable` hoy es texto libre, no FK a `app_users`).*
+(`tareas_obra.responsable` hoy es texto libre, no FK a `app_users`). Las tareas
+de seguimiento aún no tienen responsable y la implementación Fase 2 las muestra
+en lectura al rol Usuario; debe filtrarse antes de producción.*
 
 ### Usuarios (pantalla nueva, admin-only)
 | Acción | administrator |
@@ -193,6 +199,11 @@ correo y número de teléfono son opcionales.
 - La pestaña Fábrica contiene `Premarcos · fabricación` y
   `Producto · fabricación`. La pestaña Instalación contiene
   `Premarcos · instalación` y `Producto · instalación`.
+- Cada bloque se presenta como lista ordenada por fecha de entrega, no como matriz.
+- Administradores y supervisores pueden agregar tareas manuales, renombrarlas,
+  cambiar sus fechas de inicio/entrega o eliminarlas dentro del proyecto.
+- La sección Tareas reúne seguimiento de proyectos y tareas internas. Cerrar una
+  tarea de seguimiento desde cualquiera de las dos vistas usa el mismo diálogo.
 - Marcar una tarea como lista exige una imagen. Observaciones es opcional.
 - Se registra quién y cuándo completó la tarea. La evidencia se puede consultar
   y la tarea se puede reabrir.
@@ -201,11 +212,27 @@ correo y número de teléfono son opcionales.
 - En Fase 2, administradores y supervisores pueden cerrar estas tareas. La
   asignación por persona para habilitar a Usuario (`viewer`) queda pendiente del
   modelo real de responsables.
-### Settings y Support
 
-Disponibles para los 3 roles. Settings reúne Account, Personalizar y Updates;
-Support reúne Documentation y Contact support. Las preferencias visuales son
-locales y no modifican datos operativos.
+### Tablero de proyectos y transiciones
+
+- El tablero actual muestra Planificadas, En progreso, Pausadas y Finalizadas.
+- Administradores y supervisores pueden mover mediante un menú; Usuario solo consulta.
+- En progreso exige avance registrado; sin avance se informa el bloqueo y se
+  deriva a las tareas. Con avance ya existente, el cambio actual es directo.
+- Pausada exige motivo y conserva el historial de pausas.
+- Finalizada exige evidencia y lleva las tareas pendientes al 100%.
+- El retorno a Planificada es directo, aunque el proyecto tenga avance.
+- El estado `cancelada` existe en el tipo `EstadoObra`, pero no tiene columna ni flujo.
+- Reanudar una Pausada no registra todavía el cierre de la pausa. Reabrir una
+  Finalizada no define cómo revertir `cierre`, evidencia o tareas completadas.
+- El arrastre y la confirmación de todos los movimientos quedan pendientes para
+  la siguiente iteración del tablero.
+
+### Configuración y Soporte
+
+Disponibles para los 3 roles. Configuración reúne Cuenta, Personalizar y
+Actualizaciones; Soporte reúne Documentación y Contactar soporte. Las
+preferencias visuales son locales y no modifican datos operativos.
 
 ## Decisiones tomadas (con fecha)
 
@@ -228,6 +255,12 @@ locales y no modifican datos operativos.
 6. **2026-07-19 — Presupuesto ejecutivo como fuente del seguimiento**: el PDF
    es obligatorio, sus componentes se revisan antes del alta y generan las
    matrices de tareas con evidencia y avance automático.
+7. **2026-07-19 — Seguimiento como lista de tareas con fechas**: se mantiene la
+   generación componente × etapa, pero la operación se presenta como listas
+   editables y se integra con Tareas.
+8. **2026-07-19 — Tablero por estado condicionado**: pausa y cierre exigen datos
+   auditables; antes del arrastre deben definirse cancelación, reapertura,
+   reanudación y retorno a Planificada.
 
 ## Implicancias para Fase 2 (React + mocks)
 

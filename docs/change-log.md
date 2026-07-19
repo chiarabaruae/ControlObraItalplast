@@ -16,7 +16,17 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
-## 2026-07-20 — Tareas en lista, tablero por estado e interfaz 100% en español
+## 2026-07-19 — Auditoría contextual de tareas y tablero
+
+**Alcance:** se verificó el commit `e294af1` ya publicado y se completó la documentación especializada que faltaba.
+
+**Impacto:** se documentan la lista de tareas con fechas, la integración con Tareas, permisos y reglas actuales del tablero. También quedan explícitos los pendientes de cancelación, reanudación, reapertura, retorno a Planificada, arrastre y visibilidad de seguimiento para Usuario.
+
+**Archivos clave:** `docs/context-index.md`, `docs/project-context.md`, `docs/decisions.md`, `docs/flujo-roles.md`, `docs/change-log.md`.
+
+**Validaciones:** `npm run build`, `npm run lint`, revisión del commit y recorrida localhost de Tarjetas/Tablero, cambio directo, restauración del estado de prueba, diálogo de pausa, diálogo de cierre y Tareas global.
+
+## 2026-07-19 — Tareas en lista, tablero por estado e interfaz 100% en español
 
 **Alcance:** el seguimiento por presupuesto deja la matriz y pasa a lista de tareas con fechas; Proyectos suma vista Tablero con transiciones condicionadas; toda la interfaz queda en español.
 

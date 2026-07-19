@@ -8,6 +8,8 @@ tags:
   - documentation
   - semantic-retrieval
   - user-management
+  - task-management
+  - kanban
 ---
 
 # Índice de contexto para agentes
@@ -27,7 +29,8 @@ Este archivo es el punto de entrada para recuperar contexto sin revisar todo el 
 |---|---|
 | Entender qué aplicación está activa hoy | `docs/project-context.md` |
 | Crear o modificar proyectos y etapas | `docs/project-context.md` + `docs/flujo-roles.md` |
-| Entender presupuestos PDF, tareas y evidencia | `docs/project-context.md` + decisiones D-009 a D-012 |
+| Entender presupuestos PDF, tareas y evidencia | `docs/project-context.md` + decisiones D-009 a D-014 |
+| Revisar tablero y cambios de estado | `docs/project-context.md` + decisión D-015 + `docs/flujo-roles.md` |
 | Revisar permisos por rol | `docs/flujo-roles.md` + `src/frontend/src/lib/roles.ts` |
 | Crear o editar usuarios | `docs/project-context.md` + `docs/flujo-roles.md` + `src/frontend/src/pages/Usuarios.tsx` |
 | Comprender por qué se eligió una solución | `docs/decisions.md` |

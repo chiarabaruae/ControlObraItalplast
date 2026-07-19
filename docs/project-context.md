@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-project-context
 context_type: current_project_state
-last_updated: 2026-07-20
+last_updated: 2026-07-19
 branch: feature/frontend-react-migration
 tags:
   - italplast
@@ -14,6 +14,8 @@ tags:
   - pdf-parsing
   - evidence
   - user-management
+  - task-management
+  - kanban
 ---
 
 # Contexto vigente del proyecto
@@ -42,7 +44,7 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 - Existe un flujo mock de recuperación de contraseña por documento.
 - Configuración contiene Cuenta, Personalizar y Actualizaciones.
 - Soporte contiene Documentación y Contactar soporte.
-- Los paneles Settings y Support usan popovers animados y suaves.
+- Los paneles Configuración y Soporte usan popovers animados y suaves.
 
 ## Navegación activa
 
@@ -125,13 +127,27 @@ El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de pre
 
 - Al crear el proyecto se genera una tarea por combinación `componente × etapa activa` del producto asignado.
 - Las listas de tareas de Fábrica e Instalación reemplazan la carga manual de porcentaje en proyectos nuevos; la sección Tareas del menú refleja el seguimiento de todos los proyectos.
-- Completar una celda exige una evidencia de imagen; la observación es opcional.
+- Completar una tarea exige una evidencia de imagen; la observación es opcional.
 - La imagen se redimensiona a un máximo de 1280 px y se comprime a JPEG antes de guardarse localmente.
 - Cada cierre conserva usuario, fecha, evidencia y observación; una tarea completada puede consultarse o reabrirse.
 - El avance de grupo, Fábrica, Instalación y proyecto se calcula como `tareas completadas / tareas totales`.
 - Los proyectos anteriores sin tareas generadas mantienen el seguimiento porcentual legado para compatibilidad.
 
 Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `src/frontend/src/lib/evidencias.ts` y `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`.
+
+## Tablero de proyectos y cambios de estado
+
+- Proyectos permite alternar entre Tarjetas y Tablero.
+- El tablero vigente agrupa en Planificadas, En progreso, Pausadas y Finalizadas.
+- Administradores y supervisores pueden solicitar un cambio de estado mediante el menú de cada tarjeta; el arrastre todavía no está implementado.
+- Pasar a En progreso se bloquea si no existe avance. Con avance existente, el cambio es directo.
+- Pasar a Pausada exige motivo y agrega un registro a `pausas`.
+- Pasar a Finalizada advierte que las tareas pendientes quedarán completas, exige al menos una evidencia y registra `cierre`.
+- Volver a Planificada es directo en la implementación actual, incluso cuando existe avance.
+- El modelo admite `cancelada`, pero ese estado no aparece en el tablero.
+- Una tarjeta Finalizada puede ofrecer destinos anteriores, pero todavía no existe una política segura para revertir el cierre ni las tareas llevadas al 100%.
+
+La fuente principal es `src/frontend/src/components/proyectos/TableroProyectos.tsx`.
 
 ## Persistencia y compatibilidad
 
@@ -148,7 +164,8 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 - `src/frontend/src/pages/Proyectos.tsx`: alta multiproducto, presupuesto obligatorio y edición local de etapas.
 - `src/frontend/src/pages/ProyectoDetalle.tsx`: resumen de componentes y pestañas Fábrica/Instalación.
 - `src/frontend/src/components/proyectos/PresupuestoUploader.tsx`: carga y revisión del PDF.
-- `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`: lista de tareas y cierre con evidencia. `TableroProyectos.tsx`: tablero por estado con transiciones condicionadas.
+- `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`: lista de tareas y cierre con evidencia.
+- `src/frontend/src/components/proyectos/TableroProyectos.tsx`: tablero por estado y transiciones condicionadas.
 - `src/frontend/src/lib/presupuesto-parser.ts`: detección y parsing de los tres formatos.
 - `src/frontend/scripts/diagnostico-presupuestos.ts`: prueba repetible con PDFs reales provistos externamente.
 - `src/frontend/src/mocks/data.ts`: tipos, defaults, mocks, migración local y persistencia.
@@ -165,6 +182,10 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 - Las evidencias viven temporalmente como imágenes comprimidas en `localStorage`; el límite de cuota del navegador impide usarlo como repositorio definitivo.
 - Las tareas se generan por componente presupuestado y etapa, no por cada unidad individual cuando `cantidad > 1`.
 - Las tareas generadas todavía no tienen responsable; en Fase 2 las completan administradores o supervisores.
+- La vista Tareas muestra el seguimiento global también al rol Usuario, aunque sus controles estén deshabilitados; debe filtrarse por responsabilidad antes de producción.
+- El tablero todavía usa un menú para mover proyectos; no admite arrastre.
+- `cancelada` existe en el modelo, pero no tiene columna, motivo ni flujo de reactivación.
+- Reanudar una pausa, regresar a Planificada o reabrir una Finalizada no tiene todavía reglas completas de auditoría y reversión.
 - No existe administración global de plantillas de productos y etapas.
 - Las futuras plantillas globales solo deben ser modificables por administradores y supervisores autorizados.
 - No se modelan cantidades, lotes o partidas independientes de un mismo tipo de producto.

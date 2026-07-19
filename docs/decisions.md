@@ -11,6 +11,8 @@ tags:
   - executive-budget
   - task-evidence
   - user-management
+  - task-management
+  - kanban
 ---
 
 # Decisiones vigentes
@@ -149,7 +151,7 @@ tags:
 
 **Decisión:** Proyectos suma vista Tablero (Planificadas / En progreso / Pausadas / Finalizadas). Pasar a En progreso solo ocurre con avance registrado (automático con el primer avance); pausar exige motivo que queda en el historial (`pausas`); finalizar advierte que los avances se guardan al 100%, exige al menos una evidencia (existente o adjuntada como evidencia general) y registra el cierre (`cierre`).
 
-**Consecuencias:** los estados dejan de ser un campo editable a mano y pasan a reflejar reglas operativas trazables.
+**Consecuencias:** los estados dejan de ser un campo editable a mano y pasan a reflejar reglas operativas trazables. La implementación inicial usa un menú; el arrastre, la confirmación de todos los movimientos y las políticas para cancelación, reapertura y retorno a Planificada requieren una definición adicional antes de ampliarla.
 
 ## D-016 — Interfaz íntegramente en español
 
