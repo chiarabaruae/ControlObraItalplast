@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, KeyRound, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Archive, ArchiveRestore } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { usuarios as usuariosMock, type Usuario } from "@/mocks/data";
@@ -31,6 +31,12 @@ export default function Usuarios() {
     toast(u.isActive ? "Usuario archivado" : "Usuario reactivado", { description: u.displayName });
   };
 
+  const solicitarCambioContrasena = (u: Usuario) => {
+    toast("Cambio de contraseña", {
+      description: `En una próxima versión se enviará un link de restablecimiento al correo asociado a ${u.displayName}.`
+    });
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -53,10 +59,9 @@ export default function Usuarios() {
             <TableHeader>
               <TableRow>
                 <TableHead>Usuario</TableHead>
-                <TableHead>Documento</TableHead>
                 <TableHead>Área</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead className="w-28" />
+                <TableHead className="w-52" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -71,11 +76,9 @@ export default function Usuarios() {
                       </Avatar>
                       <div>
                         <div className="font-medium">{u.displayName}</div>
-                        <div className="text-xs text-muted-foreground">{u.positionTitle}</div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="cifra text-xs">{u.username}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{u.department}</TableCell>
                   <TableCell>
                     <Select value={u.role} onValueChange={(v) => cambiarRol(u, v as Role)}>
@@ -91,8 +94,8 @@ export default function Usuarios() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="size-7" aria-label={`Resetear contraseña de ${u.displayName}`} onClick={() => toast("Resetear contraseña", { description: "Se conecta al backend en la Fase 4." })}>
-                        <KeyRound className="size-3.5" />
+                      <Button variant="ghost" size="sm" aria-label={`Cambiar contraseña de ${u.displayName}`} onClick={() => solicitarCambioContrasena(u)}>
+                        Cambiar contraseña
                       </Button>
                       <Button variant="ghost" size="icon" className="size-7" aria-label={u.isActive ? `Archivar a ${u.displayName}` : `Reactivar a ${u.displayName}`} onClick={() => alternarActivo(u)}>
                         {u.isActive ? <Archive className="size-3.5" /> : <ArchiveRestore className="size-3.5" />}

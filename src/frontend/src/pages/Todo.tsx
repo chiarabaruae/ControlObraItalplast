@@ -45,7 +45,7 @@ export default function Todo() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="senal">Tareas</div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">To-Do</h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">Tareas</h1>
           {esViewer && (
             <p className="mt-1 text-sm text-muted-foreground">Tus tareas asignadas. Marcá cada una al terminarla.</p>
           )}

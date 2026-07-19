@@ -102,9 +102,9 @@ export default function Login() {
 
           <form onSubmit={onSubmit} className="mt-7 space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="usuario">Usuario</Label>
+              <Label htmlFor="documento">Documento</Label>
               <Input
-                id="usuario"
+                id="documento"
                 value={usuario}
                 onChange={(event) => { setUsuario(event.target.value); setError(""); }}
                 placeholder="Tu número de documento"

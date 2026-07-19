@@ -2,17 +2,17 @@ import { useState } from "react";
 import { Link, Navigate, useParams } from "react-router";
 import {
   ArrowLeft, MapPin, CalendarRange, Factory, HardHat, FileText,
-  Upload, FileSpreadsheet, File, Printer, Minus, Plus
+  Upload, FileSpreadsheet, File, Printer, Minus, Plus, ListTodo
 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
-  proyectoPorId, clientePorId, usuarioPorId, avanceGeneral,
-  type EtapaSeguimiento, type Proyecto
+  proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, tareasIniciales,
+  type EtapaSeguimiento, type Proyecto, type Tarea
 } from "@/mocks/data";
 import { formatFecha, formatFechaCorta } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
-import { EstadoBadge } from "@/components/app/EstadoBadge";
+import { EstadoBadge, PrioridadBadge } from "@/components/app/EstadoBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -80,7 +80,7 @@ function Seguimiento({ titulo, icono: Icono, etapasIniciales, puedeEditar }: {
 // ── Cronograma: barras sobre el rango total del proyecto ────────
 function Cronograma({ p }: { p: Proyecto }) {
   const inicio = new Date(`${p.fechaInicio}T00:00:00`).getTime();
-  const fin = new Date(`${p.fechaFinEstimada}T00:00:00`).getTime();
+  const fin = new Date(`${p.fechaFinEstimada || p.fechaInicio}T00:00:00`).getTime();
   const rango = Math.max(fin - inicio, 1);
   const pos = (iso: string) => ((new Date(`${iso}T00:00:00`).getTime() - inicio) / rango) * 100;
 
@@ -121,6 +121,55 @@ function Cronograma({ p }: { p: Proyecto }) {
   );
 }
 
+function TareasProyecto({ tareas }: { tareas: Tarea[] }) {
+  const porHacer = tareas.filter((t) => t.estado !== "finalizada");
+  const hechas = tareas.filter((t) => t.estado === "finalizada");
+
+  const TablaTareas = ({ titulo, items }: { titulo: string; items: Tarea[] }) => (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2 font-heading text-base">
+          <ListTodo className="size-4.5 text-primary" strokeWidth={1.75} /> {titulo}
+        </CardTitle>
+        <span className="cifra text-xs text-muted-foreground">{items.length}</span>
+      </CardHeader>
+      <CardContent className="px-0">
+        {items.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tarea</TableHead>
+                <TableHead>Responsable</TableHead>
+                <TableHead>Vence</TableHead>
+                <TableHead>Prioridad</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((t) => (
+                <TableRow key={t.id} className={t.estado === "finalizada" ? "opacity-60" : ""}>
+                  <TableCell className={`font-medium ${t.estado === "finalizada" ? "line-through" : ""}`}>{t.titulo}</TableCell>
+                  <TableCell className="text-muted-foreground">{usuarioPorId(t.responsableId)?.displayName ?? "Sin asignar"}</TableCell>
+                  <TableCell className="cifra text-xs">{formatFecha(t.fechaFin)}</TableCell>
+                  <TableCell><PrioridadBadge prioridad={t.prioridad} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="px-6 py-8 text-sm text-muted-foreground">No hay tareas en este estado.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <TablaTareas titulo="Por hacer" items={porHacer} />
+      <TablaTareas titulo="Hechas" items={hechas} />
+    </div>
+  );
+}
+
 const DOC_ICONOS = { oferta: FileText, abaco: FileSpreadsheet, plano: File, otro: File };
 
 export default function ProyectoDetalle() {
@@ -133,6 +182,7 @@ export default function ProyectoDetalle() {
   const cliente = clientePorId(p.clienteId);
   const lider = usuarioPorId(p.liderId);
   const totalAberturas = p.aberturas.reduce((a, ab) => a + ab.cantidad, 0);
+  const tareasDelProyecto = tareasIniciales.filter((t) => t.proyectoId === p.id);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -150,7 +200,7 @@ export default function ProyectoDetalle() {
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1"><MapPin className="size-3.5" /> {p.ubicacion}</span>
             <span>{cliente?.nombre}</span>
-            <span>Líder: <span className="font-medium text-foreground">{lider?.displayName}</span></span>
+            <span>Líder: <span className="font-medium text-foreground">{lider?.displayName ?? "Sin asignar"}</span></span>
           </div>
         </div>
         <div className="w-full sm:w-64">
@@ -165,6 +215,7 @@ export default function ProyectoDetalle() {
       <Tabs defaultValue="resumen">
         <TabsList className="flex-wrap">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="tareas">Tareas</TabsTrigger>
           <TabsTrigger value="cronograma">Cronograma</TabsTrigger>
           <TabsTrigger value="fabrica">Fábrica</TabsTrigger>
           <TabsTrigger value="obra">Obra</TabsTrigger>
@@ -211,6 +262,11 @@ export default function ProyectoDetalle() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tareas */}
+        <TabsContent value="tareas" className="mt-4">
+          <TareasProyecto tareas={tareasDelProyecto} />
         </TabsContent>
 
         {/* Cronograma */}

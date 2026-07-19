@@ -59,6 +59,7 @@ export interface Proyecto {
   ubicacion: string;
   liderId: string;
   estado: EstadoObra;
+  fechaCreacion?: string;
   fechaInicio: string;
   fechaFinEstimada: string;
   avanceFabrica: number;
@@ -112,9 +113,10 @@ export const clientes: Cliente[] = [
 
 // ── Etapas estándar ─────────────────────────────────────────────
 export const ETAPAS_FABRICA = ["Corte de perfiles", "Soldadura", "Limpieza", "Herrajes", "Vidriado", "Control y embalaje"];
+export const ETAPAS_FABRICA_OPCIONALES = ["Precorte"];
 export const ETAPAS_OBRA = ["Medición en obra", "Preparación de vanos", "Colocación de marcos", "Colocación de hojas", "Ajuste y sellado"];
 
-function etapas(nombres: string[], avances: number[]): EtapaSeguimiento[] {
+export function etapas(nombres: string[], avances: number[]): EtapaSeguimiento[] {
   return nombres.map((nombre, i) => ({ nombre, avance: avances[i] ?? 0 }));
 }
 
@@ -255,8 +257,27 @@ export function usuarioPorId(id: string) {
   return usuarios.find((u) => u.id === id);
 }
 export function proyectoPorId(id: string) {
-  return proyectos.find((p) => p.id === id);
+  return obtenerProyectos().find((p) => p.id === id);
 }
 export function avanceGeneral(p: Proyecto): number {
   return Math.round(p.avanceFabrica * 0.5 + p.avanceObra * 0.5);
+}
+
+const PROYECTOS_STORAGE_KEY = "control-obras-proyectos";
+
+export function obtenerProyectos(): Proyecto[] {
+  if (typeof window === "undefined") return proyectos;
+  const guardados = window.localStorage.getItem(PROYECTOS_STORAGE_KEY);
+  if (!guardados) return proyectos;
+
+  try {
+    const parsed = JSON.parse(guardados) as Proyecto[];
+    return Array.isArray(parsed) ? parsed : proyectos;
+  } catch {
+    return proyectos;
+  }
+}
+
+export function guardarProyectos(lista: Proyecto[]) {
+  window.localStorage.setItem(PROYECTOS_STORAGE_KEY, JSON.stringify(lista));
 }

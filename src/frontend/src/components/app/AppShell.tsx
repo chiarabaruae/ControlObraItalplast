@@ -21,7 +21,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutGrid, visible: () => true },
   { to: "/clientes", label: "Clientes", icon: Users, visible: (role: Role) => permisos.verClientes(role) },
   { to: "/proyectos", label: "Proyectos", icon: Building2, visible: () => true },
-  { to: "/tareas", label: "To-Do", icon: ListTodo, visible: () => true },
+  { to: "/tareas", label: "Tareas", icon: ListTodo, visible: () => true },
   { to: "/usuarios", label: "Usuarios", icon: UserCog, visible: (role: Role) => permisos.verUsuarios(role) }
 ];
 

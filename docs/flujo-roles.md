@@ -25,30 +25,30 @@
 |---|---|---|
 | `administrator` | Gerencia, Jefe de Proyectos | Control total + gestión de usuarios |
 | `supervisor` *(nuevo)* | Jefa de Obras, Encargados de Cuadrillas, Encargados de Producción PVC/ALU | Carga avances y gestiona tareas; no crea/borra proyectos ni toca datos comerciales |
-| `viewer` | Auxiliares de obra, operarios de producción, administración, comercial | Consulta estado y avances; solo puede completar sus propias tareas |
+| `viewer` *(se muestra como "Usuario")* | Auxiliares de obra, operarios de producción, administración, comercial | Consulta estado y avances; solo puede completar sus propias tareas |
 
 ## Navegación (sidebar) por rol
 
-| Sección | administrator | supervisor | viewer |
+| Sección | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | Dashboard | ✅ | ✅ | ✅ |
 | Clientes | ✅ CRUD | ✅ solo lectura | ❌ oculta |
 | Proyectos | ✅ | ✅ | ✅ lectura |
-| To-Do | ✅ | ✅ | ✅ (sus tareas) |
+| Tareas | ✅ | ✅ | ✅ (sus tareas) |
 | Usuarios *(pantalla nueva)* | ✅ | ❌ | ❌ |
 | Personalizar | ✅ | ✅ | ✅ |
 
 ## Matriz pantalla × rol
 
 ### Dashboard
-| | administrator | supervisor | viewer |
+| | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | KPIs (clientes, obras, tareas, avance promedio) | ✅ | ✅ (operativos) | ✅ (resumen) |
 | Distribución por estado | ✅ | ✅ | ✅ |
 | Lista de obras con acceso al detalle | ✅ | ✅ | ✅ |
 
 ### Clientes
-| Acción | administrator | supervisor | viewer |
+| Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | Ver tabla y contactos | ✅ | ✅ | — (sección oculta) |
 | Crear / editar / eliminar | ✅ | ❌ | — |
@@ -57,25 +57,25 @@
 para coordinar en obra; un operario no necesita la cartera de clientes.*
 
 ### Proyectos (lista — vistas lista/tarjetas/kanban/gantt)
-| Acción | administrator | supervisor | viewer |
+| Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | Ver todos los proyectos en todas las vistas | ✅ | ✅ | ✅ |
 | Crear proyecto | ✅ | ❌ | ❌ |
 | Editar datos del proyecto | ✅ | ❌ | ❌ |
 | Eliminar proyecto | ✅ | ❌ | ❌ |
 
-### Proyecto — detalle (tabs: Resumen · Cronograma · Seguimiento Fábrica · Seguimiento Obra · Informe de Avance · Documentos)
-| Acción | administrator | supervisor | viewer |
+### Proyecto — detalle (menú superior: Resumen · Tareas · Cronograma · Seguimiento Fábrica · Seguimiento Obra · Informe de Avance · Documentos)
+| Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
-| Ver las 6 tabs | ✅ | ✅ | ✅ |
+| Ver los módulos del proyecto | ✅ | ✅ | ✅ |
 | Subir oferta PDF → generar cronograma | ✅ | ❌ (comercial) | ❌ |
 | Subir ábaco de aberturas | ✅ | ✅ | ❌ |
 | Generar seguimientos (fábrica/obra) | ✅ | ✅ | ❌ |
 | **Editar avance de etapas** | ✅ | ✅ *(su función principal)* | ❌ |
 | Comentarios / hitos | ✅ | ✅ | ❌ |
 
-### To-Do (tareas por obra)
-| Acción | administrator | supervisor | viewer |
+### Tareas (antes To-Do)
+| Acción | administrator | supervisor | Usuario (`viewer`) |
 |---|---|---|---|
 | Ver tareas | ✅ todas | ✅ todas | ✅ las asignadas a él/ella |
 | Crear / editar tarea | ✅ | ✅ | ❌ |
@@ -88,7 +88,7 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 ### Usuarios (pantalla nueva, admin-only)
 | Acción | administrator |
 |---|---|
-| Listar usuarios con rol, departamento, estado | ✅ |
+| Listar usuarios con rol, área, estado | ✅ |
 | Alta / baja (activar-desactivar) | ✅ |
 | Asignar rol | ✅ |
 | Resetear contraseña | ✅ |
@@ -96,6 +96,35 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 *Hoy la única forma de gestionar usuarios es el script `db:seed-users`. Se
 diseña ya en Fase 2 con mocks; se conecta en Fase 4.*
 
+### Login y recuperación de contraseña
+
+- El login principal debe usar siempre el número de documento como identificador
+  visible del usuario. En backend puede seguir mapeándose al campo técnico
+  `username`, pero la interfaz debe nombrarlo como **Documento**.
+- La pantalla de gestión de usuarios no necesita mostrar la columna Documento,
+  porque ese dato es sensible y no aporta a la operación diaria del administrador.
+- El botón **Cambiar contraseña** debe terminar como un flujo de enlace por
+  correo: el administrador solicita el restablecimiento, el backend genera un
+  token de un solo uso con vencimiento corto y el usuario define una nueva
+  contraseña desde una URL segura.
+- Para usuarios de obra con bajo acceso a tecnología, el flujo debe evitar pasos
+  complejos: mensaje claro, enlace único, expiración visible y soporte para que
+  un supervisor confirme que la persona pudo recuperar acceso.
+
+### Creación de proyectos
+
+- En Fase 2, la creación queda resuelta en frontend/mock con persistencia temporal
+  en `localStorage`, porque todavía no hay base de datos ni endpoint confirmado
+  que permita validar trazabilidad real.
+- El alta de proyecto debe pedir nombre, cliente y fecha de inicio. La fecha de
+  creación se genera automáticamente y se muestra solo como dato de lectura.
+- La fecha fin estimada queda vacía al alta y debe poder editarse posteriormente.
+- El proyecto se crea con etapas seleccionables. Por defecto quedan tildadas las
+  etapas estándar de fábrica y obra; `Precorte` queda disponible como etapa
+  opcional no seleccionada.
+- Las etapas no seleccionadas no aparecen en seguimiento. La posibilidad de
+  agregar etapas luego de creado el proyecto queda como requerimiento futuro,
+  porque implica diseñar trazabilidad de cambios del alcance.
 ### Personalizar
 Disponible para los 3 roles (tema claro/oscuro/sistema + color de acento;
 preferencias locales, sin impacto en datos).
@@ -116,7 +145,7 @@ preferencias locales, sin impacto en datos).
 
 ## Implicancias para Fase 2 (React + mocks)
 
-- Selector "ver como" (admin / supervisor / viewer) en el login simulado para
+- Selector "ver como" (admin / supervisor / usuario) en el login simulado para
   recorrer los 3 flujos sin backend.
 - Guardas de ruta: `/usuarios` solo admin; `/clientes` admin+supervisor.
 - Renderizado condicional de acciones según la matriz de arriba (los botones
@@ -128,5 +157,8 @@ preferencias locales, sin impacto en datos).
   binario `requireAdmin`).
 - Abrir los GET de `proyectos-routes.js` a supervisor/viewer.
 - Permisos de escritura granulares según la matriz (ej. `PATCH /avance-etapas`
-  para supervisor; completar tarea propia para viewer con check de asignación).
+  para supervisor; completar tarea propia para Usuario (`viewer`) con check de
+  asignación).
 - Decidir si la tabla `roles` huérfana se usa de verdad o se elimina.
+- Implementar endpoint de recuperación de contraseña, por ejemplo
+  `POST /auth/password-reset/request`, sin revelar si el documento/correo existe.

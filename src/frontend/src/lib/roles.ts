@@ -6,7 +6,7 @@ export type Role = "administrator" | "supervisor" | "viewer";
 export const ROLE_LABELS: Record<Role, string> = {
   administrator: "Administrador",
   supervisor: "Supervisor",
-  viewer: "Visualizador"
+  viewer: "Usuario"
 };
 
 export const permisos = {

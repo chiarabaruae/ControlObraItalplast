@@ -1,4 +1,5 @@
 export function formatFecha(iso: string): string {
+  if (!iso) return "-";
   return new Date(`${iso}T00:00:00`).toLocaleDateString("es-PY", {
     day: "2-digit",
     month: "short",
@@ -7,6 +8,7 @@ export function formatFecha(iso: string): string {
 }
 
 export function formatFechaCorta(iso: string): string {
+  if (!iso) return "-";
   return new Date(`${iso}T00:00:00`).toLocaleDateString("es-PY", {
     day: "2-digit",
     month: "2-digit"

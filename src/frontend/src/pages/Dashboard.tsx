@@ -98,7 +98,7 @@ export default function Dashboard() {
               {misTareas.length > 0 ? "Tus tareas" : "Tareas del equipo"}
             </CardTitle>
             <Link to="/tareas" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-              To-Do <ArrowUpRight className="size-3.5" />
+              Tareas <ArrowUpRight className="size-3.5" />
             </Link>
           </CardHeader>
           <CardContent>
