@@ -56,6 +56,7 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 - `/proyectos/:id`
 - `/tareas`
 - `/usuarios`
+- `/reglas` (solo administradores; `/settings/planning` redirige acá)
 - `/settings/account`
 - `/settings/appearance`
 - `/settings/updates`
@@ -150,8 +151,16 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 - Cada producto operativo del alta puede cargar una **planificación opcional**: fecha comprometida de inicio de instalación, días de instalación, días de fábrica, días de fabricación de premarcos y días de instalación de premarcos (visible con ese grupo activo; si se carga, reemplaza a la brecha global entrega→ábaco).
 - Con esa ancla se calculan hacia atrás (backward) los hitos: fin de producción, inicio de fábrica, firma de ábaco, entrega de premarcos e inicio de fabricación de premarcos, usando tres **brechas configurables** (predeterminadas 3/1/3 días).
 - Las tareas generadas desde el presupuesto nacen con `fechaInicio`/`fechaFin` según el bloque; siguen siendo editables tarea por tarea. Sin planificación cargada, nacen sin fechas como antes.
-- Las brechas se editan solo por administradores en **Configuración → Planificación** (`/settings/planning`, permiso `configurarPlanificacion`) y persisten en `localStorage` (`control-obras-planificacion`). Cambiarlas no recalcula tareas existentes.
-- Fuentes: `src/frontend/src/lib/planificacion.ts` (cálculo y persistencia), `src/frontend/src/pages/Planificacion.tsx` (pantalla), integración en `src/frontend/src/lib/seguimiento-presupuesto.ts` y `src/frontend/src/pages/Proyectos.tsx`.
+- Las brechas se editan solo por administradores en **Reglas y catálogo** (`/reglas`; `/settings/planning` redirige ahí) y persisten en `localStorage` (`control-obras-planificacion`). Cambiarlas no recalcula tareas existentes.
+- Fuentes: `src/frontend/src/lib/planificacion.ts` (cálculo y persistencia), `src/frontend/src/pages/Reglas.tsx` (pantalla), integración en `src/frontend/src/lib/seguimiento-presupuesto.ts` y `src/frontend/src/pages/Proyectos.tsx`.
+
+## Reglas y catálogo (sección admin)
+
+- Nueva entrada del menú principal debajo de Usuarios, visible solo para administradores (permiso `gestionarReglasNegocio`).
+- Reúne las **brechas de planificación backward** y el **catálogo de productos**: los seis tipos estándar más los personalizados que agregue administración, cada uno con nombre y si **lleva premarcos**.
+- Los tipos personalizados persisten en `localStorage` (`control-obras-catalogo-productos`), aparecen de inmediato en el alta de proyectos (admin y supervisor) y pueden retirarse sin afectar proyectos existentes; los estándar no se eliminan.
+- Un producto sin premarcos no ofrece los grupos de fabricación/instalación de premarcos ni sus plazos de planificación. Servicios mantiene su regla especial.
+- Fuentes: `src/frontend/src/pages/Reglas.tsx` y el catálogo en `src/frontend/src/mocks/data.ts` (`obtenerCatalogoProductos`, `ProductoCatalogo`).
 
 ## Alta de tareas en cascada (sección Tareas)
 

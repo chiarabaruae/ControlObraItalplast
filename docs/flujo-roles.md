@@ -53,13 +53,16 @@ tags:
 | Proyectos | ✅ | ✅ | ✅ lectura |
 | Tareas | ✅ | ✅ | ✅ (sus tareas) |
 | Usuarios *(pantalla nueva)* | ✅ | ❌ | ❌ |
+| Reglas y catálogo *(brechas backward + catálogo de productos)* | ✅ | ❌ oculta | ❌ oculta |
 | Configuración / Personalizar | ✅ | ✅ | ✅ |
-| Configuración / Planificación (brechas backward) | ✅ | ❌ oculta | ❌ oculta |
 | Soporte | ✅ | ✅ | ✅ |
 
-*Las brechas del cálculo backward de fechas (fin producción→instalación, firma
-ábaco→fábrica, entrega premarcos→ábaco) son regla de negocio global: solo
-administración puede modificarlas (`permisos.configurarPlanificacion`).*
+*Reglas y catálogo (`/reglas`, permiso `gestionarReglasNegocio`) reúne las
+brechas del cálculo backward de fechas (fin producción→instalación, firma
+ábaco→fábrica, entrega premarcos→ábaco) y el catálogo de tipos de producto
+(alta de tipos nuevos indicando si llevan premarcos). Solo administración
+modifica estas reglas; los tipos agregados aparecen en el alta de proyectos
+para administradores y supervisores.*
 
 ## Matriz pantalla × rol
 

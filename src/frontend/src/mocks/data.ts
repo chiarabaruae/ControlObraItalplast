@@ -27,7 +27,7 @@ export interface Cliente {
 
 export type EstadoObra = "planificada" | "en_progreso" | "pausada" | "finalizada" | "cancelada";
 
-export type TipoProducto =
+export type TipoProductoBase =
   | "aberturas_aluminio"
   | "aberturas_pvc"
   | "mosquiteras"
@@ -35,17 +35,56 @@ export type TipoProducto =
   | "aberturas_velux"
   | "servicios";
 
-export const TIPOS_PRODUCTO: { valor: TipoProducto; label: string }[] = [
-  { valor: "aberturas_aluminio", label: "Aberturas de aluminio" },
-  { valor: "aberturas_pvc", label: "Aberturas de PVC" },
-  { valor: "mosquiteras", label: "Mosquiteras" },
-  { valor: "persianas", label: "Persianas" },
-  { valor: "aberturas_velux", label: "Aberturas Velux de techo" },
-  { valor: "servicios", label: "Servicios" }
+/** Admite además los slugs de productos personalizados del catálogo. */
+export type TipoProducto = TipoProductoBase | (string & {});
+
+export interface ProductoCatalogo {
+  valor: TipoProducto;
+  label: string;
+  /** Habilita los grupos opcionales de fabricación/instalación de premarcos. */
+  llevaPremarcos: boolean;
+  /** true en los productos estándar, que no pueden eliminarse del catálogo. */
+  base?: boolean;
+}
+
+export const TIPOS_PRODUCTO: ProductoCatalogo[] = [
+  { valor: "aberturas_aluminio", label: "Aberturas de aluminio", llevaPremarcos: true, base: true },
+  { valor: "aberturas_pvc", label: "Aberturas de PVC", llevaPremarcos: true, base: true },
+  { valor: "mosquiteras", label: "Mosquiteras", llevaPremarcos: true, base: true },
+  { valor: "persianas", label: "Persianas", llevaPremarcos: true, base: true },
+  { valor: "aberturas_velux", label: "Aberturas Velux de techo", llevaPremarcos: true, base: true },
+  { valor: "servicios", label: "Servicios", llevaPremarcos: false, base: true }
 ];
 
+const CATALOGO_STORAGE_KEY = "control-obras-catalogo-productos";
+
+export function obtenerProductosPersonalizados(): ProductoCatalogo[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(CATALOGO_STORAGE_KEY) ?? "[]") as ProductoCatalogo[];
+    return Array.isArray(parsed)
+      ? parsed.filter((producto) => producto.valor && producto.label).map((producto) => ({ ...producto, base: false }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function guardarProductosPersonalizados(productos: ProductoCatalogo[]) {
+  window.localStorage.setItem(CATALOGO_STORAGE_KEY, JSON.stringify(productos));
+}
+
+/** Catálogo completo: productos estándar más los personalizados por administración. */
+export function obtenerCatalogoProductos(): ProductoCatalogo[] {
+  return [...TIPOS_PRODUCTO, ...obtenerProductosPersonalizados()];
+}
+
+export function productoCatalogo(tipo?: TipoProducto): ProductoCatalogo | undefined {
+  return obtenerCatalogoProductos().find((opcion) => opcion.valor === tipo);
+}
+
 export function nombreTipoProducto(tipo?: TipoProducto) {
-  return TIPOS_PRODUCTO.find((opcion) => opcion.valor === tipo)?.label ?? "Producto no especificado";
+  return productoCatalogo(tipo)?.label ?? "Producto no especificado";
 }
 
 export interface EtapaSeguimiento {

@@ -44,6 +44,7 @@ export const permisos = {
   // Usuarios
   gestionarUsuarios: (r: Role) => r === "administrator",
 
-  // Planificación backward: las brechas de días son regla de negocio editable solo por administradores.
-  configurarPlanificacion: (r: Role) => r === "administrator"
+  // Reglas y catálogo: brechas backward y catálogo de productos, solo administradores.
+  configurarPlanificacion: (r: Role) => r === "administrator",
+  gestionarReglasNegocio: (r: Role) => r === "administrator"
 };

@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Sección "Reglas y catálogo" con catálogo dinámico de productos
+
+**Alcance:** nueva sección admin-only en el menú principal (debajo de Usuarios) que centraliza reglas de negocio editables (D-025).
+
+**Impacto:** `/reglas` reúne las brechas del cálculo backward (mudadas desde `/settings/planning`, que ahora redirige) y el catálogo de productos: administración puede agregar tipos nuevos indicando si llevan premarcos, y retirarlos (los estándar no se eliminan). Los tipos agregados aparecen de inmediato en el alta de proyectos para administradores y supervisores; un producto sin premarcos no ofrece esos grupos ni sus plazos. `TipoProducto` admite slugs personalizados y las etiquetas se resuelven desde el catálogo.
+
+**Archivos clave:** `src/frontend/src/pages/Reglas.tsx` (nueva), `src/frontend/src/mocks/data.ts` (catálogo y persistencia), `src/frontend/src/pages/Proyectos.tsx`, `src/frontend/src/lib/roles.ts` (`gestionarReglasNegocio`), `src/frontend/src/components/app/AppShell.tsx`, `src/frontend/src/App.tsx`; se elimina `src/frontend/src/pages/Planificacion.tsx`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador como administrador (alta de "Aberturas de madera" sin premarcos, persistencia, aparición en el alta sin grupos de premarcos) y como supervisor (sección oculta, `/reglas` redirige a dashboard, el producto nuevo sí aparece en su alta).
+
 ## 2026-07-22 — Plazo de instalación de premarcos en la planificación backward
 
 **Alcance:** la planificación por producto suma "Días de instalación de premarcos" (faltaba también en el Excel de referencia).

@@ -13,7 +13,7 @@ import Usuarios from "@/pages/Usuarios";
 import Personalizar from "@/pages/Personalizar";
 import Account from "@/pages/Account";
 import Updates from "@/pages/Updates";
-import Planificacion from "@/pages/Planificacion";
+import Reglas from "@/pages/Reglas";
 import Documentation from "@/pages/Documentation";
 import ContactSupport from "@/pages/ContactSupport";
 
@@ -42,10 +42,11 @@ export default function App() {
                 <Route path="/clientes" element={<Clientes />} />
               </Route>
 
-              {/* Usuarios y planificación: solo admin */}
+              {/* Usuarios y reglas de negocio: solo admin */}
               <Route element={<RequireRole roles={["administrator"]} />}>
                 <Route path="/usuarios" element={<Usuarios />} />
-                <Route path="/settings/planning" element={<Planificacion />} />
+                <Route path="/reglas" element={<Reglas />} />
+                <Route path="/settings/planning" element={<Navigate to="/reglas" replace />} />
               </Route>
             </Route>
           </Route>

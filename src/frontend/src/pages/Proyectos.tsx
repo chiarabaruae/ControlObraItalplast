@@ -7,7 +7,7 @@ import {
   clientes, usuarios, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, etapas,
   ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
   ETAPAS_FABRICACION_PREMARCOS, ETAPAS_INSTALACION_PREMARCOS,
-  TIPOS_PRODUCTO, nombreTipoProducto, obtenerProyectos, guardarProyectos, guardarProyecto,
+  obtenerCatalogoProductos, productoCatalogo, nombreTipoProducto, obtenerProyectos, guardarProyectos, guardarProyecto,
   type ConfiguracionProductoProyecto, type EstadoObra, type PlanificacionProducto, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
@@ -106,7 +106,7 @@ function planificacionDesdeFormulario(formulario: PlanificacionFormulario): Plan
 
 function crearMapaConfiguraciones() {
   return Object.fromEntries(
-    TIPOS_PRODUCTO.map((producto) => [producto.valor, crearConfiguracionProducto()])
+    obtenerCatalogoProductos().map((producto) => [producto.valor, crearConfiguracionProducto()])
   ) as Record<TipoProducto, ConfiguracionProductoFormulario>;
 }
 
@@ -406,6 +406,7 @@ export default function Proyectos() {
     setListaProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
   };
 
+  const catalogoProductos = obtenerCatalogoProductos();
   const visibles = listaProyectos.filter((proyecto) => filtro === "todas" || proyecto.estado === filtro);
   const responsables = usuarios.filter((usuario) => usuario.isActive && (usuario.role === "administrator" || usuario.role === "supervisor"));
   const productosConfigurables = tiposSeleccionados.filter((tipo) => tipo !== "servicios");
@@ -437,7 +438,12 @@ export default function Proyectos() {
 
   const cambiarModal = (abierto: boolean) => {
     setModalAbierto(abierto);
-    if (!abierto) reiniciarFormulario();
+    if (abierto) {
+      // Regenera el mapa por si administración agregó productos al catálogo.
+      setConfiguraciones(crearMapaConfiguraciones());
+    } else {
+      reiniciarFormulario();
+    }
   };
 
   const crearProyecto = () => {
@@ -717,7 +723,7 @@ export default function Proyectos() {
                   <p className="mt-1 text-xs text-muted-foreground">Podés seleccionar varios. Cada uno conserva sus propias etapas.</p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {TIPOS_PRODUCTO.map((producto) => {
+                  {catalogoProductos.map((producto) => {
                     const activo = tiposSeleccionados.includes(producto.valor);
                     return (
                       <button
@@ -766,6 +772,7 @@ export default function Proyectos() {
             {productosConfigurables.map((tipo) => {
               const configuracion = configuraciones[tipo];
               const etiquetaProducto = nombreTipoProducto(tipo);
+              const permitePremarcos = productoCatalogo(tipo)?.llevaPremarcos ?? true;
               return (
                 <section key={tipo} className="grid gap-4 rounded-2xl border border-primary/20 bg-primary/[0.025] p-4">
                   <div>
@@ -777,7 +784,7 @@ export default function Proyectos() {
                   </div>
 
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <EditorEtapas
+                    {permitePremarcos && <EditorEtapas
                       idBase={`${tipo}-fabricacion-premarcos`}
                       contexto={etiquetaProducto}
                       titulo="Fabricación de premarcos"
@@ -788,8 +795,8 @@ export default function Proyectos() {
                       opcional
                       habilitado={configuracion.fabricaraPremarcos}
                       alCambiarHabilitado={(valor) => actualizarConfiguracion(tipo, { fabricaraPremarcos: valor })}
-                    />
-                    <EditorEtapas
+                    />}
+                    {permitePremarcos && <EditorEtapas
                       idBase={`${tipo}-instalacion-premarcos`}
                       contexto={etiquetaProducto}
                       titulo="Instalación de premarcos"
@@ -800,7 +807,7 @@ export default function Proyectos() {
                       opcional
                       habilitado={configuracion.instalaraPremarcos}
                       alCambiarHabilitado={(valor) => actualizarConfiguracion(tipo, { instalaraPremarcos: valor })}
-                    />
+                    />}
                     <EditorEtapas
                       idBase={`${tipo}-fabrica`}
                       contexto={etiquetaProducto}

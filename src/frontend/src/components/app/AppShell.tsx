@@ -1,9 +1,9 @@
 import { useEffect, useId, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
-  BookOpen, Building2, CalendarClock, ChevronDown, CircleHelp, Headphones,
+  BookOpen, Building2, ChevronDown, CircleHelp, Headphones,
   LayoutGrid, ListTodo, LogOut, Menu, Palette, RefreshCw,
-  Settings, UserCog, UserRound, Users
+  Settings, SlidersHorizontal, UserCog, UserRound, Users
 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos, ROLE_LABELS, type Role } from "@/lib/roles";
@@ -22,7 +22,8 @@ const NAV = [
   { to: "/clientes", label: "Clientes", icon: Users, visible: (role: Role) => permisos.verClientes(role) },
   { to: "/proyectos", label: "Proyectos", icon: Building2, visible: () => true },
   { to: "/tareas", label: "Tareas", icon: ListTodo, visible: () => true },
-  { to: "/usuarios", label: "Usuarios", icon: UserCog, visible: (role: Role) => permisos.verUsuarios(role) }
+  { to: "/usuarios", label: "Usuarios", icon: UserCog, visible: (role: Role) => permisos.verUsuarios(role) },
+  { to: "/reglas", label: "Reglas y catálogo", icon: SlidersHorizontal, visible: (role: Role) => permisos.gestionarReglasNegocio(role) }
 ];
 
 interface UtilityItem {
@@ -36,7 +37,6 @@ interface UtilityItem {
 const SETTINGS_ITEMS: UtilityItem[] = [
   { to: "/settings/account", label: "Cuenta", description: "Tu perfil y avatar", icon: UserRound },
   { to: "/settings/appearance", label: "Personalizar", description: "Tema y colores", icon: Palette },
-  { to: "/settings/planning", label: "Planificación", description: "Brechas del cálculo de fechas", icon: CalendarClock, visible: (role: Role) => permisos.configurarPlanificacion(role) },
   { to: "/settings/updates", label: "Actualizaciones", description: "Versión del sistema", icon: RefreshCw }
 ];
 

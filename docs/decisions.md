@@ -240,3 +240,13 @@ tags:
 **Decisión:** `crearProyecto` pasa a incluir al rol `supervisor`. Editar, eliminar, cancelar, reactivar y reabrir proyectos siguen siendo exclusivos de administración.
 
 **Consecuencias:** el botón "Nuevo proyecto" y el alta completa (presupuesto ejecutivo incluido) quedan disponibles para supervisores. La matriz de `docs/flujo-roles.md` queda actualizada; el backend real deberá reflejar este permiso en sus rutas de escritura.
+
+## D-025 — Sección "Reglas y catálogo" para reglas de negocio editables
+
+**Estado:** aceptada.
+
+**Contexto:** las reglas operativas cambian con el tiempo: las brechas de días del cálculo backward pueden variar y pueden incorporarse nuevos tipos de producto (por ejemplo, aberturas de otro material). Esas configuraciones no deben requerir cambios de código.
+
+**Decisión:** nueva sección **Reglas y catálogo** (`/reglas`) en el menú principal, debajo de Usuarios, visible solo para administradores (permiso `gestionarReglasNegocio`). Reúne: (a) las **brechas de planificación backward**, que se mudan desde Configuración → Planificación (la ruta `/settings/planning` redirige a `/reglas`); y (b) el **catálogo de productos**: los seis tipos estándar más los personalizados que agregue administración, cada uno con nombre y un indicador de si **lleva premarcos**. Los personalizados persisten en `localStorage` (`control-obras-catalogo-productos`), aparecen automáticamente en el alta de proyectos para administradores y supervisores, y pueden retirarse del catálogo sin afectar proyectos existentes. `TipoProducto` se amplía para admitir slugs personalizados; `nombreTipoProducto` resuelve la etiqueta desde el catálogo completo.
+
+**Consecuencias:** un producto sin premarcos no ofrece los grupos de fabricación/instalación de premarcos ni sus plazos en la planificación. Servicios conserva su regla especial (sin etapas de seguimiento). Los productos estándar no pueden eliminarse. El backend futuro deberá persistir el catálogo y validar los slugs. Las plantillas de etapas por producto siguen pendientes (D-007) y podrán sumarse a esta sección.
