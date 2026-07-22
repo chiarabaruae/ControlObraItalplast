@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarClock, Package, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { CalendarClock, Check, Package, Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
 import {
   BUFFERS_PREDETERMINADOS,
   guardarBuffersPlanificacion,
@@ -127,6 +127,8 @@ function SeccionBrechas() {
 
         <p className="text-xs text-muted-foreground">
           Los cambios afectan solo a las estimaciones futuras; las fechas ya asignadas a tareas existentes no se recalculan.
+          Para una excepción puntual, ajustá los plazos dentro del proyecto: en la planificación del producto al crearlo,
+          o editando las fechas de sus tareas desde el seguimiento.
         </p>
       </CardContent>
     </Card>
@@ -137,7 +139,38 @@ function SeccionCatalogo() {
   const [personalizados, setPersonalizados] = useState<ProductoCatalogo[]>(() => obtenerProductosPersonalizados());
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [llevaPremarcos, setLlevaPremarcos] = useState(true);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [nombreEdicion, setNombreEdicion] = useState("");
+  const [premarcosEdicion, setPremarcosEdicion] = useState(true);
   const catalogo = obtenerCatalogoProductos();
+
+  const comenzarEdicion = (producto: ProductoCatalogo) => {
+    setEditando(String(producto.valor));
+    setNombreEdicion(producto.label);
+    setPremarcosEdicion(producto.llevaPremarcos);
+  };
+
+  const guardarEdicion = () => {
+    const label = nombreEdicion.trim();
+    if (!label) {
+      toast("Falta el nombre", { description: "El producto necesita un nombre." });
+      return;
+    }
+    const duplicado = catalogo.find(
+      (producto) => producto.valor !== editando && producto.label.toLocaleLowerCase() === label.toLocaleLowerCase()
+    );
+    if (duplicado) {
+      toast("Nombre duplicado", { description: `Ya existe "${duplicado.label}" en el catálogo.` });
+      return;
+    }
+    const nuevos = personalizados.map((producto) =>
+      producto.valor === editando ? { ...producto, label, llevaPremarcos: premarcosEdicion } : producto
+    );
+    guardarProductosPersonalizados(nuevos);
+    setPersonalizados(nuevos);
+    setEditando(null);
+    toast("Producto actualizado", { description: `"${label}" se aplicará así en los próximos proyectos.` });
+  };
 
   const agregar = () => {
     const label = nombreNuevo.trim();
@@ -194,28 +227,87 @@ function SeccionCatalogo() {
         <ul className="divide-y rounded-xl border">
           {catalogo.map((producto) => (
             <li key={producto.valor} className="flex items-center gap-3 px-4 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{producto.label}</div>
-                <div className="text-xs text-muted-foreground">
-                  {producto.base ? "Estándar" : "Personalizado"}
-                  {" · "}
-                  {producto.valor === "servicios"
-                    ? "Sin etapas de seguimiento"
-                    : producto.llevaPremarcos
-                      ? "Con premarcos opcionales"
-                      : "Sin premarcos"}
-                </div>
-              </div>
-              {!producto.base && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => eliminar(String(producto.valor))}
-                  aria-label={`Retirar ${producto.label} del catálogo`}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+              {editando === producto.valor ? (
+                <>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Input
+                      value={nombreEdicion}
+                      onChange={(evento) => setNombreEdicion(evento.target.value)}
+                      onKeyDown={(evento) => {
+                        if (evento.key === "Enter") {
+                          evento.preventDefault();
+                          guardarEdicion();
+                        }
+                        if (evento.key === "Escape") setEditando(null);
+                      }}
+                      aria-label={`Nuevo nombre de ${producto.label}`}
+                      autoFocus
+                    />
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id={`editar-premarcos-${producto.valor}`}
+                        checked={premarcosEdicion}
+                        onCheckedChange={setPremarcosEdicion}
+                      />
+                      <Label htmlFor={`editar-premarcos-${producto.valor}`} className="text-xs">Lleva premarcos</Label>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-primary"
+                    onClick={guardarEdicion}
+                    aria-label={`Guardar cambios de ${producto.label}`}
+                  >
+                    <Check className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-muted-foreground"
+                    onClick={() => setEditando(null)}
+                    aria-label={`Cancelar edición de ${producto.label}`}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{producto.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {producto.base ? "Estándar" : "Personalizado"}
+                      {" · "}
+                      {producto.valor === "servicios"
+                        ? "Sin etapas de seguimiento"
+                        : producto.llevaPremarcos
+                          ? "Con premarcos opcionales"
+                          : "Sin premarcos"}
+                    </div>
+                  </div>
+                  {!producto.base && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => comenzarEdicion(producto)}
+                        aria-label={`Editar ${producto.label}`}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => eliminar(String(producto.valor))}
+                        aria-label={`Retirar ${producto.label} del catálogo`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </>
+                  )}
+                </>
               )}
             </li>
           ))}

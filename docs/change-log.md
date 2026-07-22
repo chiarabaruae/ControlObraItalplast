@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Edición de productos del catálogo y aclaración de excepciones
+
+**Alcance:** los productos personalizados del catálogo suman edición inline; la nota de las brechas explica cómo manejar excepciones.
+
+**Impacto:** cada producto personalizado muestra lápiz (editar nombre y si lleva premarcos, conservando el slug para no romper proyectos existentes) y papelera. La nota bajo las brechas ahora aclara al administrador que, para una excepción puntual, los plazos se ajustan dentro del proyecto (planificación del producto al crearlo o fechas de sus tareas en el seguimiento). Los productos estándar siguen sin poder editarse ni eliminarse.
+
+**Archivos clave:** `src/frontend/src/pages/Reglas.tsx`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador (alta, renombrado con cambio de premarcos persistido con slug estable, eliminación y texto de excepciones visible).
+
 ## 2026-07-22 — Sección "Reglas y catálogo" con catálogo dinámico de productos
 
 **Alcance:** nueva sección admin-only en el menú principal (debajo de Usuarios) que centraliza reglas de negocio editables (D-025).
