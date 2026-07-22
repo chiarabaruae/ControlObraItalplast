@@ -4,8 +4,8 @@
 // cambiar fechas o eliminar. Completar exige evidencia fotográfica.
 // Mismos campos y condiciones por rol que la sección Tareas: prioridad
 // editable, auditoría solo para administradores, y el mismo diálogo de edición.
-import { useMemo, useState } from "react";
-import { CalendarDays, Check, Factory, HardHat, Pencil, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { CalendarDays, Check, Factory, HardHat, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { etiquetaBloque, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
 import { formatFechaCorta, formatFechaHora } from "@/lib/format";
@@ -44,6 +44,27 @@ interface FormularioAlta {
   responsableId?: string;
 }
 
+/** Etiqueta compacta para metadatos secundarios (ítem, responsable, auditoría). */
+function MetaChip({
+  icono: Icono,
+  children,
+  title
+}: {
+  icono?: typeof CalendarDays;
+  children: ReactNode;
+  title?: string;
+}) {
+  return (
+    <span
+      className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-normal text-muted-foreground"
+      title={title}
+    >
+      {Icono && <Icono className="size-3 shrink-0" />}
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
 function FilaTarea({
   proyecto,
   tarea,
@@ -75,13 +96,28 @@ function FilaTarea({
     ? `${tarea.fechaInicio ? formatFechaCorta(tarea.fechaInicio) : "…"} → ${tarea.fechaFin ? formatFechaCorta(tarea.fechaFin) : "…"}`
     : null;
 
+  const responsable = tarea.responsableId ? usuarioPorId(tarea.responsableId) : undefined;
+  const asignadaPor = tarea.asignadaPorId ? usuarioPorId(tarea.asignadaPorId)?.displayName : undefined;
+  const tituloResponsable = responsable
+    ? `Responsable: ${responsable.displayName}${asignadaPor ? ` · Asignada por ${asignadaPor}` : ""}`
+    : undefined;
+
+  const tituloAuditoria = verAuditoria
+    ? [
+        tarea.creadaEn ? `Creada ${formatFechaHora(tarea.creadaEn)}` : null,
+        tarea.modificadaEn
+          ? `Modificada ${formatFechaHora(tarea.modificadaEn)} por ${usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"}`
+          : null
+      ].filter(Boolean).join(" · ")
+    : undefined;
+
   return (
-    <li className={`flex flex-wrap items-center gap-3 px-4 py-2.5 ${tarea.completada ? "opacity-60" : ""}`}>
+    <li className={`grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5 px-4 py-3 ${tarea.completada ? "opacity-60" : ""}`}>
       <Button
         type="button"
         variant={tarea.completada ? "default" : "outline"}
         size="icon"
-        className="size-8 shrink-0 rounded-full"
+        className="row-span-2 size-8 shrink-0 self-start rounded-full"
         onClick={() => alSeleccionar(tarea)}
         disabled={!puedeCompletar && !tarea.completada}
         aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${titulo}`}
@@ -89,66 +125,33 @@ function FilaTarea({
         <Check className="size-4" />
       </Button>
 
-      <div className="min-w-0 flex-1">
-        <div className={`truncate text-sm font-medium ${tarea.completada ? "line-through" : ""}`}>{titulo}</div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-          {item && (
-            <span className="truncate">
-              {item.ambiente || item.descripcion} · {item.cantidad} un.
-            </span>
-          )}
-          {tarea.manual && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">Agregada</span>}
-          {verAuditoria && (
-            <span className="cifra">
-              Creada {tarea.creadaEn ? formatFechaHora(tarea.creadaEn) : "—"}
-              {tarea.modificadaEn && (
-                <> · Modificada {formatFechaHora(tarea.modificadaEn)} · {usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"} · v{tarea.version ?? 1}</>
-              )}
-            </span>
-          )}
-          {tarea.responsableId && (
-            <span className="flex items-center gap-1.5" title={`Responsable: ${usuarioPorId(tarea.responsableId)?.displayName ?? "—"}`}>
-              {usuarioConAvatarPorId(tarea.responsableId) && (
-                <UserAvatar
-                  user={usuarioConAvatarPorId(tarea.responsableId)!}
-                  className="size-6"
-                  fallbackClassName="text-[9px]"
-                />
-              )}
-              <span className="hidden lg:inline">{usuarioPorId(tarea.responsableId)?.displayName}</span>
-            </span>
-          )}
-          {tarea.asignadaPorId && (
-            <span title={`Asignada por ${usuarioPorId(tarea.asignadaPorId)?.displayName ?? "—"}`}>
-              · por {usuarioPorId(tarea.asignadaPorId)?.displayName ?? "—"}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {rangoFechas && (
-        <span className="cifra hidden shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-          <CalendarDays className="size-3.5" /> {rangoFechas}
+      {/* Fila 1: identidad de la tarea + controles primarios (prioridad, editar, eliminar). */}
+      <div className="flex min-w-0 items-center gap-2">
+        <span className={`min-w-0 truncate text-sm font-medium ${tarea.completada ? "line-through" : ""}`}>
+          {titulo}
         </span>
-      )}
+        {tarea.manual && (
+          <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">
+            Agregada
+          </span>
+        )}
 
-      {puedePrioridad ? (
-        <Select value={tarea.prioridad ?? "media"} onValueChange={(valor) => alCambiarPrioridad(tarea, valor as PrioridadTarea)}>
-          <SelectTrigger className="h-7 w-28 shrink-0 text-xs" aria-label={`Prioridad de ${titulo}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PRIORIDADES_TAREA.map((p) => (
-              <SelectItem key={p} value={p}><span className="capitalize">{p}</span></SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
-      )}
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {puedePrioridad ? (
+            <Select value={tarea.prioridad ?? "media"} onValueChange={(valor) => alCambiarPrioridad(tarea, valor as PrioridadTarea)}>
+              <SelectTrigger className="h-7 w-28 shrink-0 text-xs" aria-label={`Prioridad de ${titulo}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORIDADES_TAREA.map((p) => (
+                  <SelectItem key={p} value={p}><span className="capitalize">{p}</span></SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
+          )}
 
-      {(puedeEditar || puedeEliminar) && (
-        <span className="flex shrink-0 gap-0.5">
           {puedeEditar && (
             <Button
               type="button"
@@ -174,7 +177,37 @@ function FilaTarea({
             </Button>
           )}
         </span>
-      )}
+      </div>
+
+      {/* Fila 2: metadatos secundarios como chips + fechas, separados de los controles. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        {item && <MetaChip>{item.ambiente || item.descripcion} · {item.cantidad} un.</MetaChip>}
+        {responsable && (
+          <MetaChip title={tituloResponsable}>
+            <span className="inline-flex items-center gap-1">
+              {usuarioConAvatarPorId(tarea.responsableId!) && (
+                <UserAvatar
+                  user={usuarioConAvatarPorId(tarea.responsableId!)!}
+                  className="size-4"
+                  fallbackClassName="text-[8px]"
+                />
+              )}
+              {responsable.displayName}
+            </span>
+          </MetaChip>
+        )}
+        {verAuditoria && tarea.modificadaEn && (
+          <MetaChip icono={History} title={tituloAuditoria}>
+            v{tarea.version ?? 1} · {usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"}
+          </MetaChip>
+        )}
+
+        {rangoFechas && (
+          <span className="cifra ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <CalendarDays className="size-3.5" /> {rangoFechas}
+          </span>
+        )}
+      </div>
     </li>
   );
 }

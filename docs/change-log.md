@@ -18,6 +18,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Rediseño visual de la fila de tarea en Fábrica/Instalación
+
+**Alcance:** la fila de tarea del detalle de proyecto (`SeguimientoPresupuesto.tsx`) mezclaba título, info del ítem, auditoría completa, responsable, fechas, prioridad y acciones en un único contenedor `flex-wrap`, que se acomodaba de forma impredecible y se veía encimado con datos densos (varias asignaciones/ediciones).
+
+**Impacto:** la fila pasa a una grilla de 2 filas fijas: (1) identidad de la tarea + prioridad + editar/eliminar, siempre alineados a la derecha; (2) metadatos secundarios como chips consistentes (ítem, responsable con avatar, auditoría) + fechas alineadas a la derecha. El rastro de auditoría, antes un texto largo ("Creada... · Modificada... · Autor · vN"), se condensa en un chip compacto ("vN · Autor") con el detalle completo en tooltip nativo al pasar el mouse. Se verificó responsive hasta 420px: los chips hacen wrap a su propia línea sin romper el layout.
+
+**Archivos clave:** `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx` (`MetaChip`, `FilaTarea`).
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador en 1280px y 420px con una tarea con auditoría (v2), responsable asignado y fechas.
+
 ## 2026-07-22 — Simplificación de ramas y publicación a main
 
 **Alcance:** se retira `feature/frontend-react-migration` (local y remota) por quedar idéntica a `develop`, y se promueve todo el trabajo acumulado a `main` mediante fast-forward.
