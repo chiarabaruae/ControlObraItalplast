@@ -43,6 +43,7 @@ export default function Clientes() {
 
       <Card>
         <CardContent className="px-0">
+          <AvisoFiltros control={tabla} unidad="clientes" />
           <Table>
             <TableHeader>
               <TableRow>
@@ -95,7 +96,6 @@ export default function Clientes() {
               Ningún cliente coincide con el filtro aplicado.
             </p>
           )}
-          <AvisoFiltros control={tabla} unidad="clientes" />
         </CardContent>
       </Card>
     </div>

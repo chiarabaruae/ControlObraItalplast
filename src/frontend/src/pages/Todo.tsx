@@ -17,6 +17,7 @@ import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
+import { DialogoNuevaTarea } from "@/components/proyectos/DialogoNuevaTarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,6 +38,7 @@ export default function Todo() {
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [proyectoFiltro, setProyectoFiltro] = useState("todos");
   const [seleccion, setSeleccion] = useState<SeleccionSeguimiento>();
+  const [nuevaTareaAbierta, setNuevaTareaAbierta] = useState(false);
 
   const esViewer = user?.role === "viewer";
   const puedeAvance = user ? permisos.editarAvance(user.role) : false;
@@ -113,6 +115,22 @@ export default function Todo() {
     setProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
   };
 
+  const agregarTareaSeguimiento = (proyectoId: string, tarea: TareaPresupuesto) => {
+    const proyecto = proyectos.find((p) => p.id === proyectoId);
+    if (!proyecto) return;
+    const actualizado: Proyecto = {
+      ...proyecto,
+      tareasPresupuesto: [...(proyecto.tareasPresupuesto ?? []), tarea]
+    };
+    try {
+      guardarProyecto(actualizado);
+    } catch {
+      toast("No se pudo guardar la tarea", { description: "El almacenamiento local está lleno." });
+      return;
+    }
+    setProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -141,7 +159,7 @@ export default function Todo() {
             ))}
           </div>
           {permisos.crearTarea(user.role) && (
-            <Button className="gap-2" onClick={() => toast("Nueva tarea", { description: "Se conecta a la API en la Fase 4." })}>
+            <Button className="gap-2" onClick={() => setNuevaTareaAbierta(true)}>
               <Plus className="size-4" /> Nueva tarea
             </Button>
           )}
@@ -174,6 +192,12 @@ export default function Todo() {
         </div>
         <Card>
           <CardContent className="px-0">
+            <AvisoFiltros control={tablaSeguimiento} unidad="tareas" />
+            {tablaSeguimiento.filas.length > 30 && (
+              <p className="border-b px-4 py-2.5 text-xs text-muted-foreground">
+                Mostrando 30 de {tablaSeguimiento.filas.length}. Entrá a cada proyecto para ver su lista completa.
+              </p>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -216,12 +240,6 @@ export default function Todo() {
             {tablaSeguimiento.filas.length === 0 && (
               <p className="py-8 text-center text-sm text-muted-foreground">No hay tareas de seguimiento con este filtro.</p>
             )}
-            {tablaSeguimiento.filas.length > 30 && (
-              <p className="border-t px-4 py-2.5 text-xs text-muted-foreground">
-                Mostrando 30 de {tablaSeguimiento.filas.length}. Entrá a cada proyecto para ver su lista completa.
-              </p>
-            )}
-            <AvisoFiltros control={tablaSeguimiento} unidad="tareas" />
           </CardContent>
         </Card>
       </section>
@@ -234,6 +252,7 @@ export default function Todo() {
         </div>
         <Card>
           <CardContent className="px-0">
+            <AvisoFiltros control={tablaInternas} unidad="tareas" />
             <Table>
               <TableHeader>
                 <TableRow>
@@ -298,7 +317,6 @@ export default function Todo() {
                 {esViewer ? "No tenés tareas asignadas con este filtro." : "No hay tareas internas con este filtro."}
               </p>
             )}
-            <AvisoFiltros control={tablaInternas} unidad="tareas" />
           </CardContent>
         </Card>
       </section>
@@ -309,6 +327,13 @@ export default function Todo() {
         alCerrar={() => setSeleccion(undefined)}
         alGuardar={guardarSeguimiento}
         puedeReabrir={puedeAvance}
+      />
+
+      <DialogoNuevaTarea
+        abierto={nuevaTareaAbierta}
+        proyectos={proyectos}
+        alCerrar={() => setNuevaTareaAbierta(false)}
+        alAgregar={agregarTareaSeguimiento}
       />
     </div>
   );

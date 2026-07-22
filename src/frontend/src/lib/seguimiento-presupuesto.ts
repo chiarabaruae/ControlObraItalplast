@@ -5,7 +5,7 @@ import type {
   TareaPresupuesto
 } from "@/mocks/data";
 
-const gruposDeProducto = (producto: ConfiguracionProductoProyecto) => [
+export const gruposDeProducto = (producto: ConfiguracionProductoProyecto) => [
   { grupo: "fabricacion_premarcos" as const, etapas: producto.etapasFabricacionPremarcos },
   { grupo: "instalacion_premarcos" as const, etapas: producto.etapasInstalacionPremarcos },
   { grupo: "fabrica" as const, etapas: producto.etapasFabrica },

@@ -120,7 +120,7 @@ export function EncabezadoFiltrable<T>({
 export function AvisoFiltros<T>({ control, unidad = "filas" }: { control: ControlTabla<T>; unidad?: string }) {
   if (!control.hayFiltros) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-2 border-b bg-primary/[0.04] px-4 py-2 text-xs text-muted-foreground">
       <ListFilter className="size-3.5 text-primary" />
       Mostrando <span className="cifra font-semibold text-foreground">{control.filas.length}</span> de{" "}
       <span className="cifra">{control.total}</span> {unidad}.

@@ -149,6 +149,7 @@ export default function Usuarios() {
 
       <Card>
         <CardContent className="px-0">
+          <AvisoFiltros control={tabla} unidad="personas" />
           <Table>
             <TableHeader>
               <TableRow>
@@ -202,7 +203,6 @@ export default function Usuarios() {
               Ninguna persona coincide con el filtro aplicado.
             </p>
           )}
-          <AvisoFiltros control={tabla} unidad="personas" />
         </CardContent>
       </Card>
 

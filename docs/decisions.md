@@ -190,3 +190,13 @@ tags:
 **Decisión:** cada columna expone un menú con dos acciones: ordenar y filtrar por valores. El ordenamiento y la lista de valores respetan el tipo de dato (texto alfabético, números por magnitud, fechas cronológicas de más reciente a más antigua). La lógica vive en el hook reutilizable `useTablaFiltrable` y el encabezado `EncabezadoFiltrable`. El estado no se persiste entre sesiones.
 
 **Consecuencias:** cualquier tabla nueva puede sumar filtro y orden declarando sus columnas y el tipo de cada una. El selector de vista de Proyectos queda solo con íconos, apoyado en tooltip y texto accesible.
+
+## D-020 — Alta de tareas de seguimiento por selección en cascada
+
+**Estado:** aceptada.
+
+**Contexto:** una tarea de seguimiento pertenece a una etapa de un producto dentro de un proyecto de un cliente. Pedir todo junto en un formulario plano es propenso a combinaciones inválidas.
+
+**Decisión:** el alta desde "Nueva tarea" guía la elección en pasos dependientes: cliente → proyecto → producto → etapa (bloque) → nombre y fechas. Cada nivel ofrece solo las opciones válidas del nivel anterior y se habilita al resolverlo. Solo participan proyectos con seguimiento ya generado desde un presupuesto.
+
+**Consecuencias:** no se pueden crear tareas huérfanas ni en combinaciones inexistentes. El aviso de filtros y el de truncado de filas se ubican sobre la tabla para que el estado del listado sea visible antes de leer los datos.

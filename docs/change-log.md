@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-21 — Alta de tareas en cascada y avisos de filtro sobre la tabla
+
+**Alcance:** el botón "Nueva tarea" de la sección Tareas abre un panel de selección en cascada; los avisos de filtro y de truncado se muestran arriba de cada tabla en lugar de debajo.
+
+**Impacto:** para crear una tarea de seguimiento el usuario elige, paso a paso, cliente → proyecto → producto → etapa (bloque), y recién ahí completa nombre y fechas. Cada paso se habilita solo cuando el anterior está resuelto y ofrece únicamente las opciones válidas del nivel superior. La tarea nueva se guarda en `tareasPresupuesto` del proyecto y aparece de inmediato en el seguimiento. El aviso "Mostrando X de Y · Quitar filtros" y el de "Mostrando 30 de N" pasaron al tope de la tabla (con borde inferior) en Clientes, Usuarios y Tareas.
+
+**Archivos clave:** `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/frontend/src/components/app/EncabezadoFiltrable.tsx`, `src/frontend/src/lib/seguimiento-presupuesto.ts` (export de `gruposDeProducto`), `src/frontend/src/pages/Clientes.tsx`, `src/frontend/src/pages/Usuarios.tsx`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador del alta en cascada (cliente→proyecto→producto→etapa→nombre+fechas) con persistencia confirmada, y avisos ubicados arriba.
+
 ## 2026-07-21 — Filtro y orden por columna en las tablas, con etiquetas por tipo de dato
 
 **Alcance:** las tablas de Clientes, Usuarios y Tareas (seguimiento e internas) suman un ícono de filtro por columna, al estilo de una planilla.
