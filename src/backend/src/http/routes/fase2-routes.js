@@ -1,0 +1,368 @@
+// Rutas Fase 2 (/api/v2): esqueleto funcional del modelo vigente del frontend
+// React. Espeja la matriz de permisos de src/frontend/src/lib/roles.ts y el
+// esquema de migrations/015_fase2_modelo_seguimiento.sql.
+//
+// Estado: esqueleto parcial (D-027). Cubre catálogo de productos, reglas de
+// planificación, proyectos (lectura/alta) y tareas de seguimiento (lectura,
+// alta manual, edición, prioridad, completar/reabrir, borrado lógico).
+// Pendiente: carga de presupuesto PDF, evidencias como archivo, transiciones
+// de estado del tablero y generación de tareas desde el presupuesto.
+import { Router } from "express";
+import { randomUUID } from "node:crypto";
+import { requireAuth } from "../middlewares/require-auth.js";
+
+// --- Permisos: misma matriz que el frontend (docs/flujo-roles.md) ---
+const puede = {
+  crearProyecto: (rol) => rol === "administrator" || rol === "supervisor",
+  editarAvance: (rol) => rol === "administrator" || rol === "supervisor",
+  crearTarea: (rol) => rol === "administrator" || rol === "supervisor",
+  editarTarea: (rol) => rol === "administrator" || rol === "supervisor",
+  eliminarTarea: (rol) => rol === "administrator",
+  definirPrioridad: (rol) => rol === "administrator" || rol === "supervisor",
+  gestionarReglasNegocio: (rol) => rol === "administrator"
+};
+
+function exigir(permiso) {
+  return (request, response, next) => {
+    if (!puede[permiso](request.user?.role)) {
+      response.status(403).json({ error: "No autorizado para esta acción." });
+      return;
+    }
+    next();
+  };
+}
+
+export function createFase2Routes({ pool, env }) {
+  const router = Router();
+  router.use(requireAuth(env));
+
+  // ==========================================================================
+  // Catálogo de productos (D-025)
+  // ==========================================================================
+  router.get("/catalogo/productos", async (_request, response, next) => {
+    try {
+      const { rows } = await pool.query(
+        `select valor, label, nombre_corto, lleva_premarcos, es_base
+           from catalogo_productos where activo order by es_base desc, label`
+      );
+      response.json(rows);
+    } catch (error) { next(error); }
+  });
+
+  router.post("/catalogo/productos", exigir("gestionarReglasNegocio"), async (request, response, next) => {
+    try {
+      const { valor, label, nombreCorto, llevaPremarcos } = request.body ?? {};
+      if (!valor || !label) {
+        response.status(400).json({ error: "valor y label son obligatorios." });
+        return;
+      }
+      const { rows } = await pool.query(
+        `insert into catalogo_productos (valor, label, nombre_corto, lleva_premarcos)
+         values ($1, $2, $3, coalesce($4, true))
+         on conflict (valor) do nothing
+         returning valor`,
+        [valor, label, nombreCorto ?? null, llevaPremarcos]
+      );
+      if (rows.length === 0) {
+        response.status(409).json({ error: "Ya existe un producto con ese slug." });
+        return;
+      }
+      response.status(201).json({ valor });
+    } catch (error) { next(error); }
+  });
+
+  router.patch("/catalogo/productos/:valor", exigir("gestionarReglasNegocio"), async (request, response, next) => {
+    try {
+      const { label, nombreCorto, llevaPremarcos } = request.body ?? {};
+      const { rowCount } = await pool.query(
+        `update catalogo_productos
+            set label = coalesce($2, label),
+                nombre_corto = coalesce($3, nombre_corto),
+                lleva_premarcos = coalesce($4, lleva_premarcos),
+                actualizado_en = now()
+          where valor = $1 and not es_base`,
+        [request.params.valor, label ?? null, nombreCorto ?? null, llevaPremarcos ?? null]
+      );
+      if (rowCount === 0) {
+        response.status(404).json({ error: "Producto personalizado no encontrado (los estándar no se editan)." });
+        return;
+      }
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  router.delete("/catalogo/productos/:valor", exigir("gestionarReglasNegocio"), async (request, response, next) => {
+    try {
+      // Baja lógica: los proyectos existentes conservan la referencia.
+      const { rowCount } = await pool.query(
+        `update catalogo_productos set activo = false, actualizado_en = now()
+          where valor = $1 and not es_base`,
+        [request.params.valor]
+      );
+      if (rowCount === 0) {
+        response.status(404).json({ error: "Producto personalizado no encontrado (los estándar no se eliminan)." });
+        return;
+      }
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  // ==========================================================================
+  // Reglas de planificación backward (D-023)
+  // ==========================================================================
+  router.get("/reglas/planificacion", async (_request, response, next) => {
+    try {
+      const { rows } = await pool.query(
+        `select dias_produccion_a_instalacion, dias_abaco_a_fabrica, dias_premarcos_a_abaco
+           from reglas_planificacion where id = 1`
+      );
+      response.json(rows[0]);
+    } catch (error) { next(error); }
+  });
+
+  router.put("/reglas/planificacion", exigir("gestionarReglasNegocio"), async (request, response, next) => {
+    try {
+      const { diasProduccionAInstalacion, diasAbacoAFabrica, diasPremarcosAAbaco } = request.body ?? {};
+      const valores = [diasProduccionAInstalacion, diasAbacoAFabrica, diasPremarcosAAbaco];
+      if (valores.some((valor) => !Number.isInteger(valor) || valor < 0)) {
+        response.status(400).json({ error: "Las tres brechas deben ser enteros de 0 o más días." });
+        return;
+      }
+      await pool.query(
+        `update reglas_planificacion
+            set dias_produccion_a_instalacion = $1,
+                dias_abaco_a_fabrica = $2,
+                dias_premarcos_a_abaco = $3,
+                actualizado_en = now(),
+                actualizado_por_id = $4
+          where id = 1`,
+        [...valores, request.user.sub ?? null]
+      );
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  // ==========================================================================
+  // Proyectos (lectura y alta; transiciones de estado pendientes)
+  // ==========================================================================
+  router.get("/proyectos", async (_request, response, next) => {
+    try {
+      const { rows } = await pool.query(
+        `select p.id, p.nombre, p.estado, p.direccion, p.fecha_inicio, p.fecha_fin,
+                p.cliente_id, p.lider_usuario_id,
+                coalesce(t.total, 0) as tareas_totales,
+                coalesce(t.completadas, 0) as tareas_completadas
+           from proyectos p
+           left join lateral (
+             select count(*) as total,
+                    count(*) filter (where completada) as completadas
+               from tareas_seguimiento ts
+              where ts.proyecto_id = p.id and ts.eliminada_en is null
+           ) t on true
+          order by p.creado_en desc`
+      );
+      response.json(rows);
+    } catch (error) { next(error); }
+  });
+
+  router.get("/proyectos/:id", async (request, response, next) => {
+    try {
+      const [proyecto, productos, etapas, tareas] = await Promise.all([
+        pool.query(`select * from proyectos where id = $1`, [request.params.id]),
+        pool.query(`select * from proyecto_productos where proyecto_id = $1`, [request.params.id]),
+        pool.query(`select * from proyecto_etapas where proyecto_id = $1 order by grupo, orden`, [request.params.id]),
+        pool.query(
+          `select * from tareas_seguimiento where proyecto_id = $1 and eliminada_en is null
+            order by fecha_fin nulls last`,
+          [request.params.id]
+        )
+      ]);
+      if (proyecto.rows.length === 0) {
+        response.status(404).json({ error: "Proyecto no encontrado." });
+        return;
+      }
+      response.json({
+        ...proyecto.rows[0],
+        productos: productos.rows,
+        etapas: etapas.rows,
+        tareas: tareas.rows
+      });
+    } catch (error) { next(error); }
+  });
+
+  router.post("/proyectos", exigir("crearProyecto"), async (request, response, next) => {
+    const cliente = await pool.connect();
+    try {
+      const { nombre, clienteId, direccion, descripcion, liderUsuarioId, fechaInicio, fechaFin, productos } =
+        request.body ?? {};
+      if (!nombre || !Array.isArray(productos) || productos.length === 0) {
+        response.status(400).json({ error: "nombre y al menos un producto son obligatorios." });
+        return;
+      }
+      await cliente.query("begin");
+      const proyectoId = randomUUID();
+      await cliente.query(
+        `insert into proyectos (id, nombre, cliente_id, direccion, descripcion, lider_usuario_id,
+                                fecha_inicio, fecha_fin, creado_por_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [proyectoId, nombre, clienteId ?? null, direccion ?? null, descripcion ?? null,
+         liderUsuarioId ?? null, fechaInicio ?? null, fechaFin ?? null, request.user.sub ?? null]
+      );
+      for (const producto of productos) {
+        await cliente.query(
+          `insert into proyecto_productos (proyecto_id, tipo_producto, fabricara_premarcos, instalara_premarcos,
+                                           fecha_inicio_instalacion, dias_instalacion, dias_fabrica,
+                                           dias_fabricacion_premarcos, dias_instalacion_premarcos)
+           values ($1, $2, coalesce($3,false), coalesce($4,false), $5, $6, $7, $8, $9)`,
+          [proyectoId, producto.tipo, producto.fabricaraPremarcos, producto.instalaraPremarcos,
+           producto.fechaInicioInstalacion ?? null, producto.diasInstalacion ?? null,
+           producto.diasFabrica ?? null, producto.diasFabricacionPremarcos ?? null,
+           producto.diasInstalacionPremarcos ?? null]
+        );
+        for (const [grupo, etapas] of Object.entries(producto.etapas ?? {})) {
+          for (const [orden, nombreEtapa] of etapas.entries()) {
+            await cliente.query(
+              `insert into proyecto_etapas (id, proyecto_id, tipo_producto, grupo, nombre, orden)
+               values ($1, $2, $3, $4, $5, $6)`,
+              [randomUUID(), proyectoId, producto.tipo, grupo, nombreEtapa, orden]
+            );
+          }
+        }
+      }
+      await cliente.query("commit");
+      response.status(201).json({ id: proyectoId });
+    } catch (error) {
+      await cliente.query("rollback");
+      next(error);
+    } finally {
+      cliente.release();
+    }
+  });
+
+  // ==========================================================================
+  // Tareas de seguimiento (D-021/D-022/D-026)
+  // ==========================================================================
+  router.post("/proyectos/:id/tareas", exigir("crearTarea"), async (request, response, next) => {
+    try {
+      const { tipoProducto, grupo, titulo, itemId, fechaInicio, fechaFin, prioridad } = request.body ?? {};
+      if (!tipoProducto || !grupo || !titulo?.trim()) {
+        response.status(400).json({ error: "tipoProducto, grupo y titulo son obligatorios." });
+        return;
+      }
+      const id = randomUUID();
+      await pool.query(
+        `insert into tareas_seguimiento (id, proyecto_id, item_id, tipo_producto, grupo, etapa, titulo,
+                                         fecha_inicio, fecha_fin, manual, prioridad, creada_por_id)
+         values ($1, $2, $3, $4, $5, 'Tarea agregada', $6, $7, $8, true, coalesce($9,'media'), $10)`,
+        [id, request.params.id, itemId ?? null, tipoProducto, grupo, titulo.trim(),
+         fechaInicio ?? null, fechaFin ?? null, prioridad, request.user.sub ?? null]
+      );
+      response.status(201).json({ id });
+    } catch (error) { next(error); }
+  });
+
+  // Edición de nombre, componente, fechas y prioridad (sella auditoría, D-021).
+  router.patch("/tareas/:id", exigir("editarTarea"), async (request, response, next) => {
+    try {
+      const { titulo, itemId, fechaInicio, fechaFin, prioridad, resumen } = request.body ?? {};
+      const { rowCount } = await pool.query(
+        `update tareas_seguimiento
+            set titulo = coalesce($2, titulo),
+                item_id = coalesce($3, item_id),
+                fecha_inicio = coalesce($4, fecha_inicio),
+                fecha_fin = coalesce($5, fecha_fin),
+                prioridad = coalesce($6, prioridad),
+                version = version + 1,
+                modificada_en = now(),
+                modificada_por_id = $7
+          where id = $1 and eliminada_en is null`,
+        [request.params.id, titulo ?? null, itemId ?? null, fechaInicio ?? null,
+         fechaFin ?? null, prioridad ?? null, request.user.sub ?? null]
+      );
+      if (rowCount === 0) {
+        response.status(404).json({ error: "Tarea no encontrada." });
+        return;
+      }
+      await pool.query(
+        `insert into tarea_modificaciones (tarea_id, usuario_id, resumen) values ($1, $2, $3)`,
+        [request.params.id, request.user.sub ?? null, resumen ?? "Editó nombre, fechas o prioridad de la tarea"]
+      );
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  // Completar: exige evidencia previa registrada (columna evidencia_id).
+  router.post("/tareas/:id/completar", exigir("editarAvance"), async (request, response, next) => {
+    try {
+      const { evidenciaId, observaciones } = request.body ?? {};
+      if (!evidenciaId) {
+        response.status(400).json({ error: "Completar exige una evidencia (evidenciaId)." });
+        return;
+      }
+      const { rowCount } = await pool.query(
+        `update tareas_seguimiento
+            set completada = true, completada_en = now(), completada_por_id = $2,
+                evidencia_id = $3, observaciones = $4,
+                version = version + 1, modificada_en = now(), modificada_por_id = $2
+          where id = $1 and eliminada_en is null and not completada`,
+        [request.params.id, request.user.sub ?? null, evidenciaId, observaciones ?? null]
+      );
+      if (rowCount === 0) {
+        response.status(409).json({ error: "Tarea inexistente o ya completada." });
+        return;
+      }
+      await pool.query(
+        `insert into tarea_modificaciones (tarea_id, usuario_id, resumen) values ($1, $2, 'Completó la tarea')`,
+        [request.params.id, request.user.sub ?? null]
+      );
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  // Reabrir: motivo obligatorio para todos los roles (D-021).
+  router.post("/tareas/:id/reabrir", async (request, response, next) => {
+    try {
+      const { motivo } = request.body ?? {};
+      if (!motivo?.trim()) {
+        response.status(400).json({ error: "Reabrir exige un motivo obligatorio." });
+        return;
+      }
+      const { rowCount } = await pool.query(
+        `update tareas_seguimiento
+            set completada = false, completada_en = null, completada_por_id = null,
+                evidencia_id = null, observaciones = null,
+                version = version + 1, modificada_en = now(), modificada_por_id = $2
+          where id = $1 and eliminada_en is null and completada`,
+        [request.params.id, request.user.sub ?? null]
+      );
+      if (rowCount === 0) {
+        response.status(409).json({ error: "Tarea inexistente o no completada." });
+        return;
+      }
+      await pool.query(
+        `insert into tarea_reaperturas (tarea_id, usuario_id, motivo) values ($1, $2, $3)`,
+        [request.params.id, request.user.sub ?? null, motivo.trim()]
+      );
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  // Borrado lógico (D-021): la tarea queda auditada, ninguna vista la muestra.
+  router.delete("/tareas/:id", exigir("eliminarTarea"), async (request, response, next) => {
+    try {
+      const { rowCount } = await pool.query(
+        `update tareas_seguimiento
+            set eliminada_en = now(), eliminada_por_id = $2
+          where id = $1 and eliminada_en is null`,
+        [request.params.id, request.user.sub ?? null]
+      );
+      if (rowCount === 0) {
+        response.status(404).json({ error: "Tarea no encontrada." });
+        return;
+      }
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  return router;
+}

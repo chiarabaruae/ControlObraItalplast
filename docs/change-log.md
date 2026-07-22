@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Esquema PostgreSQL Fase 2 y rutas /api/v2 (esqueleto backend)
+
+**Alcance:** el modelo vigente del frontend gana su espejo en base de datos y un esqueleto de API con permisos (D-027).
+
+**Impacto:** la migración `015_fase2_modelo_seguimiento.sql` crea con terminología nueva: catálogo de productos (seed de los seis estándar), reglas de planificación backward, proyectos con productos/planificación/etapas, presupuestos ejecutivos versionados con ítems, evidencias como archivos referenciados, tareas de seguimiento con prioridad/auditoría/borrado lógico (más `tarea_modificaciones` y `tarea_reaperturas`) y las transiciones de estado. `/api/v2` (JWT + matriz de permisos de `roles.ts`) expone catálogo, reglas, proyectos y tareas; el servidor valida evidencia obligatoria al completar y motivo obligatorio al reabrir. Las tablas legadas quedan intactas para migrar datos y retirar después.
+
+**Archivos clave:** `src/backend/migrations/015_fase2_modelo_seguimiento.sql`, `src/backend/src/http/routes/fase2-routes.js`, `src/backend/src/server.js`.
+
+**Validaciones:** `node --check` de rutas y server sin errores. Pendiente ejecutar `npm run db:migrate` contra PostgreSQL real y conectar el frontend (hoy sigue en `localStorage`).
+
 ## 2026-07-22 — Tareas y detalle de proyecto con los mismos campos, filtros y permisos
 
 **Alcance:** unifica la vista de tareas de seguimiento entre la sección Tareas (global) y las pestañas Fábrica/Instalación del detalle de proyecto (D-026).

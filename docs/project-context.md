@@ -35,6 +35,7 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 - Versión visible: `AppWebb v0.2.0`.
 - La Fase 2 usa datos mock y persistencia temporal en `localStorage`.
 - El backend Express/PostgreSQL permanece en el repositorio, pero el nuevo frontend React todavía no está conectado a todas sus rutas reales.
+- Existe el esqueleto Fase 2 del backend (D-027): migración `src/backend/migrations/015_fase2_modelo_seguimiento.sql` (esquema con terminología vigente: catálogo, reglas backward, proyectos, presupuesto ejecutivo, tareas con auditoría, evidencias, transiciones) y rutas `/api/v2` en `src/backend/src/http/routes/fase2-routes.js` con JWT y la matriz de permisos de `roles.ts`. Falta: subir PDF/evidencias como archivos, transiciones de estado, generación de tareas server-side y conectar el frontend.
 - Comandos principales desde `src/frontend`: `npm run dev`, `npm run build` y `npm run lint`.
 - Diagnóstico de lectores PDF: `npm run diagnostico:presupuestos -- <archivo-1.pdf> <archivo-2.pdf>`.
 
