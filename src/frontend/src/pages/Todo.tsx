@@ -6,13 +6,13 @@
 // Columnas Creación y Modificación: visibles solo para administradores.
 import { useState } from "react";
 import { Link } from "react-router";
-import { Plus, Check, ClipboardList } from "lucide-react";
+import { Plus, Check, ClipboardList, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
-import { ETIQUETAS_GRUPO } from "@/lib/seguimiento-presupuesto";
+import { etiquetaBloque } from "@/lib/seguimiento-presupuesto";
 import {
-  usuarioPorId, obtenerProyectos, guardarProyecto, aplicarCambioTarea, tituloTarea,
+  usuarioPorId, obtenerProyectos, guardarProyecto, aplicarCambioTarea, eliminarTareaConAuditoria, tituloTarea,
   registrarModificacionTarea, PRIORIDADES_TAREA,
   type PrioridadTarea, type Proyecto, type TareaPresupuesto
 } from "@/mocks/data";
@@ -21,6 +21,7 @@ import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
+import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 import { DialogoNuevaTarea } from "@/components/proyectos/DialogoNuevaTarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,10 +41,13 @@ export default function Todo() {
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [proyectoFiltro, setProyectoFiltro] = useState("todos");
   const [seleccion, setSeleccion] = useState<SeleccionSeguimiento>();
+  const [edicion, setEdicion] = useState<SeleccionSeguimiento>();
   const [nuevaTareaAbierta, setNuevaTareaAbierta] = useState(false);
 
   const esViewer = user?.role === "viewer";
   const puedeAvance = user ? permisos.editarAvance(user.role) : false;
+  const puedeEditarTarea = user ? permisos.editarTarea(user.role) : false;
+  const puedeEliminarTarea = user ? permisos.eliminarTarea(user.role) : false;
   const puedePrioridad = user ? permisos.definirPrioridadTarea(user.role) : false;
   const verAuditoria = user ? permisos.verAuditoriaTareas(user.role) : false;
 
@@ -63,7 +67,7 @@ export default function Todo() {
   const tablaSeguimiento = useTablaFiltrable(seguimientoVisibles, {
     tarea: ({ proyecto, tarea }) => tituloTarea(tarea, proyecto),
     proyecto: ({ proyecto }) => proyecto.nombre,
-    bloque: ({ tarea }) => ETIQUETAS_GRUPO[tarea.grupo],
+    bloque: ({ tarea }) => etiquetaBloque(tarea.grupo, tarea.tipoProducto),
     entrega: {
       valor: ({ tarea }) => (tarea.fechaFin ? formatFecha(tarea.fechaFin) : "Sin fecha"),
       orden: ({ tarea }) => tarea.fechaFin ?? "9999-12-31",
@@ -121,6 +125,16 @@ export default function Todo() {
       ...proyecto,
       tareasPresupuesto: [...(proyecto.tareasPresupuesto ?? []), tarea]
     });
+  };
+
+  const guardarEdicion = (tareaActualizada: TareaPresupuesto) => {
+    if (!edicion) return;
+    persistir(aplicarCambioTarea(edicion.proyecto, tareaActualizada));
+  };
+
+  const eliminarTarea = (proyecto: Proyecto, tarea: TareaPresupuesto) => {
+    persistir(eliminarTareaConAuditoria(proyecto, tarea, user.id));
+    toast("Tarea eliminada", { description: tituloTarea(tarea, proyecto) });
   };
 
   return (
@@ -205,6 +219,7 @@ export default function Todo() {
                       <EncabezadoFiltrable columna="modificacion" control={tablaSeguimiento}>Modificación</EncabezadoFiltrable>
                     </>
                   )}
+                  {(puedeEditarTarea || puedeEliminarTarea) && <TableHead className="w-20">Acciones</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -230,7 +245,7 @@ export default function Todo() {
                         {proyecto.nombre}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{ETIQUETAS_GRUPO[tarea.grupo]}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{etiquetaBloque(tarea.grupo, tarea.tipoProducto)}</TableCell>
                     <TableCell className="cifra text-xs">{tarea.fechaFin ? formatFecha(tarea.fechaFin) : "—"}</TableCell>
                     <TableCell>
                       {puedePrioridad ? (
@@ -274,6 +289,36 @@ export default function Todo() {
                         </TableCell>
                       </>
                     )}
+                    {(puedeEditarTarea || puedeEliminarTarea) && (
+                      <TableCell>
+                        <span className="flex shrink-0 gap-0.5">
+                          {puedeEditarTarea && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              onClick={() => setEdicion({ proyecto, tarea })}
+                              aria-label={`Editar ${tituloTarea(tarea, proyecto)}`}
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+                          )}
+                          {puedeEliminarTarea && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => eliminarTarea(proyecto, tarea)}
+                              aria-label={`Eliminar ${tituloTarea(tarea, proyecto)}`}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          )}
+                        </span>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -292,6 +337,14 @@ export default function Todo() {
         alCerrar={() => setSeleccion(undefined)}
         alGuardar={guardarSeguimiento}
         puedeReabrir={puedeAvance}
+      />
+
+      <DialogoEditarTarea
+        proyecto={edicion?.proyecto}
+        tarea={edicion?.tarea}
+        usuarioId={user.id}
+        alCerrar={() => setEdicion(undefined)}
+        alGuardar={guardarEdicion}
       />
 
       <DialogoNuevaTarea

@@ -1,8 +1,10 @@
-import type {
-  ConfiguracionProductoProyecto,
-  GrupoTareaPresupuesto,
-  ItemPresupuesto,
-  TareaPresupuesto
+import {
+  nombreCortoTipoProducto,
+  type ConfiguracionProductoProyecto,
+  type GrupoTareaPresupuesto,
+  type ItemPresupuesto,
+  type TareaPresupuesto,
+  type TipoProducto
 } from "@/mocks/data";
 import { calcularFechasBackward, type BuffersPlanificacion } from "@/lib/planificacion";
 
@@ -49,10 +51,19 @@ export function porcentajeTareas(tareas: TareaPresupuesto[], grupos?: GrupoTarea
   return Math.round((filtradas.filter((tarea) => tarea.completada).length / filtradas.length) * 100);
 }
 
-export const ETIQUETAS_GRUPO: Record<GrupoTareaPresupuesto, string> = {
+const SUFIJOS_BLOQUE: Record<GrupoTareaPresupuesto, string> = {
   fabricacion_premarcos: "Premarcos · fabricación",
   instalacion_premarcos: "Premarcos · instalación",
-  fabrica: "Producto · fabricación",
-  instalacion: "Producto · instalación"
+  fabrica: "Fabricación",
+  instalacion: "Instalación"
 };
+
+/**
+ * Etiqueta de bloque con el producto real (ej. "PVC · Fabricación") en vez del
+ * genérico "Producto · fabricación", para distinguir tareas de distintos
+ * productos dentro del mismo proyecto multiproducto.
+ */
+export function etiquetaBloque(grupo: GrupoTareaPresupuesto, tipoProducto: TipoProducto) {
+  return `${nombreCortoTipoProducto(tipoProducto)} · ${SUFIJOS_BLOQUE[grupo]}`;
+}
 

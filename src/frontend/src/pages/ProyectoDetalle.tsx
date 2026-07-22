@@ -326,7 +326,18 @@ export default function ProyectoDetalle() {
         {!soloServicios && (
           <TabsContent value="fabrica" className="mt-4">
             {seguimientoGenerado ? (
-              <SeguimientoPresupuesto proyecto={p} lado="fabrica" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} alAgregar={agregarTareaPresupuesto} alEliminarTarea={eliminarTareaPresupuesto} />
+              <SeguimientoPresupuesto
+                proyecto={p}
+                lado="fabrica"
+                puedeEditar={permisos.editarTarea(user.role)}
+                puedeEliminar={permisos.eliminarTarea(user.role)}
+                puedePrioridad={permisos.definirPrioridadTarea(user.role)}
+                verAuditoria={permisos.verAuditoriaTareas(user.role)}
+                usuarioId={user.id}
+                alActualizar={actualizarTareaPresupuesto}
+                alAgregar={agregarTareaPresupuesto}
+                alEliminarTarea={eliminarTareaPresupuesto}
+              />
             ) : (
               <SeguimientoPendiente />
             )}
@@ -335,7 +346,18 @@ export default function ProyectoDetalle() {
         {!soloServicios && (
           <TabsContent value="instalacion" className="mt-4">
             {seguimientoGenerado ? (
-              <SeguimientoPresupuesto proyecto={p} lado="instalacion" puedeEditar={permisos.editarAvance(user.role)} usuarioId={user.id} alActualizar={actualizarTareaPresupuesto} alAgregar={agregarTareaPresupuesto} alEliminarTarea={eliminarTareaPresupuesto} />
+              <SeguimientoPresupuesto
+                proyecto={p}
+                lado="instalacion"
+                puedeEditar={permisos.editarTarea(user.role)}
+                puedeEliminar={permisos.eliminarTarea(user.role)}
+                puedePrioridad={permisos.definirPrioridadTarea(user.role)}
+                verAuditoria={permisos.verAuditoriaTareas(user.role)}
+                usuarioId={user.id}
+                alActualizar={actualizarTareaPresupuesto}
+                alAgregar={agregarTareaPresupuesto}
+                alEliminarTarea={eliminarTareaPresupuesto}
+              />
             ) : (
               <SeguimientoPendiente />
             )}

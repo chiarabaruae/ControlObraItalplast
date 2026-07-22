@@ -41,6 +41,8 @@ export type TipoProducto = TipoProductoBase | (string & {});
 export interface ProductoCatalogo {
   valor: TipoProducto;
   label: string;
+  /** Nombre breve para columnas y etiquetas de bloque (ej. "PVC", "Aluminio"). Si falta, se usa `label`. */
+  nombreCorto?: string;
   /** Habilita los grupos opcionales de fabricación/instalación de premarcos. */
   llevaPremarcos: boolean;
   /** true en los productos estándar, que no pueden eliminarse del catálogo. */
@@ -48,11 +50,11 @@ export interface ProductoCatalogo {
 }
 
 export const TIPOS_PRODUCTO: ProductoCatalogo[] = [
-  { valor: "aberturas_aluminio", label: "Aberturas de aluminio", llevaPremarcos: true, base: true },
-  { valor: "aberturas_pvc", label: "Aberturas de PVC", llevaPremarcos: true, base: true },
+  { valor: "aberturas_aluminio", label: "Aberturas de aluminio", nombreCorto: "Aluminio", llevaPremarcos: true, base: true },
+  { valor: "aberturas_pvc", label: "Aberturas de PVC", nombreCorto: "PVC", llevaPremarcos: true, base: true },
   { valor: "mosquiteras", label: "Mosquiteras", llevaPremarcos: true, base: true },
   { valor: "persianas", label: "Persianas", llevaPremarcos: true, base: true },
-  { valor: "aberturas_velux", label: "Aberturas Velux de techo", llevaPremarcos: true, base: true },
+  { valor: "aberturas_velux", label: "Aberturas Velux de techo", nombreCorto: "Velux", llevaPremarcos: true, base: true },
   { valor: "servicios", label: "Servicios", llevaPremarcos: false, base: true }
 ];
 
@@ -85,6 +87,12 @@ export function productoCatalogo(tipo?: TipoProducto): ProductoCatalogo | undefi
 
 export function nombreTipoProducto(tipo?: TipoProducto) {
   return productoCatalogo(tipo)?.label ?? "Producto no especificado";
+}
+
+/** Nombre breve del producto para columnas y etiquetas de bloque (ej. "PVC" en vez de "Aberturas de PVC"). */
+export function nombreCortoTipoProducto(tipo?: TipoProducto) {
+  const producto = productoCatalogo(tipo);
+  return producto?.nombreCorto ?? producto?.label ?? "Producto";
 }
 
 export interface EtapaSeguimiento {

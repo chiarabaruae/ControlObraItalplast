@@ -2,13 +2,15 @@
 // cada bloque (premarcos / producto) muestra sus tareas como filas con
 // fechas de entrega. El supervisor puede agregar tareas nuevas, renombrar,
 // cambiar fechas o eliminar. Completar exige evidencia fotográfica.
+// Mismos campos y condiciones por rol que la sección Tareas: prioridad
+// editable, auditoría solo para administradores, y el mismo diálogo de edición.
 import { useMemo, useState } from "react";
 import { CalendarDays, Check, Factory, HardHat, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ETIQUETAS_GRUPO, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
-import { formatFechaCorta } from "@/lib/format";
+import { etiquetaBloque, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
+import { formatFechaCorta, formatFechaHora } from "@/lib/format";
 import {
-  nombreTipoProducto, tituloTarea, registrarModificacionTarea, PRIORIDADES_TAREA,
+  nombreTipoProducto, registrarModificacionTarea, tituloTarea, usuarioPorId, PRIORIDADES_TAREA,
   type GrupoTareaPresupuesto, type PrioridadTarea, type Proyecto, type TareaPresupuesto, type TipoProducto
 } from "@/mocks/data";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
@@ -22,12 +24,12 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
+import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 
 const GRUPOS_FABRICA: GrupoTareaPresupuesto[] = ["fabricacion_premarcos", "fabrica"];
 const GRUPOS_INSTALACION: GrupoTareaPresupuesto[] = ["instalacion_premarcos", "instalacion"];
 
-interface FormularioTarea {
-  id?: string;
+interface FormularioAlta {
   grupo: GrupoTareaPresupuesto;
   tipoProducto: TipoProducto;
   titulo: string;
@@ -41,18 +43,26 @@ function FilaTarea({
   proyecto,
   tarea,
   puedeCompletar,
-  puedeGestionar,
+  puedeEditar,
+  puedeEliminar,
+  puedePrioridad,
+  verAuditoria,
   alSeleccionar,
   alEditar,
-  alEliminar
+  alEliminar,
+  alCambiarPrioridad
 }: {
   proyecto: Proyecto;
   tarea: TareaPresupuesto;
   puedeCompletar: boolean;
-  puedeGestionar: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+  puedePrioridad: boolean;
+  verAuditoria: boolean;
   alSeleccionar: (tarea: TareaPresupuesto) => void;
   alEditar: (tarea: TareaPresupuesto) => void;
   alEliminar: (tarea: TareaPresupuesto) => void;
+  alCambiarPrioridad: (tarea: TareaPresupuesto, prioridad: PrioridadTarea) => void;
 }) {
   const item = proyecto.presupuestoEjecutivo?.items.find((actual) => actual.id === tarea.itemId);
   const titulo = tituloTarea(tarea, proyecto);
@@ -61,7 +71,7 @@ function FilaTarea({
     : null;
 
   return (
-    <li className={`flex items-center gap-3 px-4 py-2.5 ${tarea.completada ? "opacity-60" : ""}`}>
+    <li className={`flex flex-wrap items-center gap-3 px-4 py-2.5 ${tarea.completada ? "opacity-60" : ""}`}>
       <Button
         type="button"
         variant={tarea.completada ? "default" : "outline"}
@@ -83,7 +93,14 @@ function FilaTarea({
             </span>
           )}
           {tarea.manual && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">Agregada</span>}
-          <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
+          {verAuditoria && (
+            <span className="cifra">
+              Creada {tarea.creadaEn ? formatFechaHora(tarea.creadaEn) : "—"}
+              {tarea.modificadaEn && (
+                <> · Modificada {formatFechaHora(tarea.modificadaEn)} · {usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"} · v{tarea.version ?? 1}</>
+              )}
+            </span>
+          )}
         </div>
       </div>
 
@@ -93,28 +110,47 @@ function FilaTarea({
         </span>
       )}
 
-      {puedeGestionar && (
+      {puedePrioridad ? (
+        <Select value={tarea.prioridad ?? "media"} onValueChange={(valor) => alCambiarPrioridad(tarea, valor as PrioridadTarea)}>
+          <SelectTrigger className="h-7 w-28 shrink-0 text-xs" aria-label={`Prioridad de ${titulo}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PRIORIDADES_TAREA.map((p) => (
+              <SelectItem key={p} value={p}><span className="capitalize">{p}</span></SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
+      )}
+
+      {(puedeEditar || puedeEliminar) && (
         <span className="flex shrink-0 gap-0.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={() => alEditar(tarea)}
-            aria-label={`Editar ${titulo}`}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7 text-muted-foreground hover:text-destructive"
-            onClick={() => alEliminar(tarea)}
-            aria-label={`Eliminar ${titulo}`}
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
+          {puedeEditar && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={() => alEditar(tarea)}
+              aria-label={`Editar ${titulo}`}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          )}
+          {puedeEliminar && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 text-muted-foreground hover:text-destructive"
+              onClick={() => alEliminar(tarea)}
+              aria-label={`Eliminar ${titulo}`}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          )}
         </span>
       )}
     </li>
@@ -125,6 +161,9 @@ export function SeguimientoPresupuesto({
   proyecto,
   lado,
   puedeEditar,
+  puedeEliminar,
+  puedePrioridad,
+  verAuditoria,
   usuarioId,
   alActualizar,
   alAgregar,
@@ -133,6 +172,9 @@ export function SeguimientoPresupuesto({
   proyecto: Proyecto;
   lado: "fabrica" | "instalacion";
   puedeEditar: boolean;
+  puedeEliminar: boolean;
+  puedePrioridad: boolean;
+  verAuditoria: boolean;
   usuarioId: string;
   alActualizar: (tarea: TareaPresupuesto) => void;
   alAgregar: (tarea: TareaPresupuesto) => void;
@@ -141,14 +183,15 @@ export function SeguimientoPresupuesto({
   const grupos = lado === "fabrica" ? GRUPOS_FABRICA : GRUPOS_INSTALACION;
   const Icono = lado === "fabrica" ? Factory : HardHat;
   const [seleccionada, setSeleccionada] = useState<TareaPresupuesto>();
-  const [formulario, setFormulario] = useState<FormularioTarea>();
+  const [enEdicion, setEnEdicion] = useState<TareaPresupuesto>();
+  const [formulario, setFormulario] = useState<FormularioAlta>();
   const productos = useMemo(
     () => proyecto.productos?.filter((producto) => producto.tipo !== "servicios") ?? [],
     [proyecto.productos]
   );
   const tareas = proyecto.tareasPresupuesto ?? [];
 
-  const guardarFormulario = () => {
+  const guardarAlta = () => {
     if (!formulario) return;
     const titulo = formulario.titulo.trim();
     if (!titulo) {
@@ -159,37 +202,22 @@ export function SeguimientoPresupuesto({
       toast("Revisá las fechas", { description: "La fecha de entrega no puede ser anterior al inicio." });
       return;
     }
-
-    if (formulario.id) {
-      const original = tareas.find((tarea) => tarea.id === formulario.id);
-      if (!original) return;
-      alActualizar(registrarModificacionTarea({
-        ...original,
-        titulo,
-        itemId: formulario.itemId,
-        fechaInicio: formulario.fechaInicio || undefined,
-        fechaFin: formulario.fechaFin || undefined,
-        prioridad: formulario.prioridad
-      }, usuarioId, "Editó nombre, fechas o prioridad de la tarea"));
-      toast("Tarea actualizada", { description: titulo });
-    } else {
-      alAgregar({
-        id: `manual-${Date.now()}`,
-        itemId: formulario.itemId,
-        tipoProducto: formulario.tipoProducto,
-        grupo: formulario.grupo,
-        etapa: "Tarea agregada",
-        titulo,
-        fechaInicio: formulario.fechaInicio || undefined,
-        fechaFin: formulario.fechaFin || undefined,
-        manual: true,
-        prioridad: formulario.prioridad,
-        creadaEn: new Date().toISOString(),
-        version: 1,
-        completada: false
-      });
-      toast("Tarea agregada", { description: titulo });
-    }
+    alAgregar({
+      id: `manual-${Date.now()}`,
+      itemId: formulario.itemId,
+      tipoProducto: formulario.tipoProducto,
+      grupo: formulario.grupo,
+      etapa: "Tarea agregada",
+      titulo,
+      fechaInicio: formulario.fechaInicio || undefined,
+      fechaFin: formulario.fechaFin || undefined,
+      manual: true,
+      prioridad: formulario.prioridad,
+      creadaEn: new Date().toISOString(),
+      version: 1,
+      completada: false
+    });
+    toast("Tarea agregada", { description: titulo });
     setFormulario(undefined);
   };
 
@@ -198,8 +226,13 @@ export function SeguimientoPresupuesto({
     toast("Tarea eliminada", { description: tituloTarea(tarea, proyecto) });
   };
 
+  const cambiarPrioridad = (tarea: TareaPresupuesto, prioridad: PrioridadTarea) => {
+    if (prioridad === (tarea.prioridad ?? "media")) return;
+    alActualizar(registrarModificacionTarea({ ...tarea, prioridad }, usuarioId, `Cambió la prioridad a ${prioridad}`));
+  };
+
   const etiquetaSeleccionada = seleccionada
-    ? `${tituloTarea(seleccionada, proyecto)} · ${ETIQUETAS_GRUPO[seleccionada.grupo]}`
+    ? `${tituloTarea(seleccionada, proyecto)} · ${etiquetaBloque(seleccionada.grupo, seleccionada.tipoProducto)}`
     : "";
 
   return (
@@ -242,7 +275,7 @@ export function SeguimientoPresupuesto({
                 <Card key={`${producto.tipo}-${grupo}`}>
                   <CardHeader className="gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <CardTitle className="font-heading text-base">{ETIQUETAS_GRUPO[grupo]}</CardTitle>
+                      <CardTitle className="font-heading text-base">{etiquetaBloque(grupo, producto.tipo)}</CardTitle>
                       <div className="flex items-center gap-3">
                         <span className="cifra text-sm font-semibold">{porcentajeTareas(tareasGrupo)}%</span>
                         {puedeEditar && (
@@ -276,19 +309,14 @@ export function SeguimientoPresupuesto({
                           proyecto={proyecto}
                           tarea={tarea}
                           puedeCompletar={puedeEditar}
-                          puedeGestionar={puedeEditar}
+                          puedeEditar={puedeEditar}
+                          puedeEliminar={puedeEliminar}
+                          puedePrioridad={puedePrioridad}
+                          verAuditoria={verAuditoria}
                           alSeleccionar={setSeleccionada}
-                          alEditar={(actual) => setFormulario({
-                            id: actual.id,
-                            grupo: actual.grupo,
-                            tipoProducto: actual.tipoProducto,
-                            titulo: tituloTarea(actual, proyecto),
-                            itemId: actual.itemId,
-                            fechaInicio: actual.fechaInicio ?? "",
-                            fechaFin: actual.fechaFin ?? "",
-                            prioridad: actual.prioridad ?? "media"
-                          })}
+                          alEditar={setEnEdicion}
                           alEliminar={eliminar}
+                          alCambiarPrioridad={cambiarPrioridad}
                         />
                       ))}
                     </ul>
@@ -313,13 +341,22 @@ export function SeguimientoPresupuesto({
         puedeReabrir={puedeEditar}
       />
 
-      {/* Alta / edición de tarea */}
+      {/* Edición de una tarea existente: mismo diálogo que la sección Tareas */}
+      <DialogoEditarTarea
+        proyecto={proyecto}
+        tarea={enEdicion}
+        usuarioId={usuarioId}
+        alCerrar={() => setEnEdicion(undefined)}
+        alGuardar={alActualizar}
+      />
+
+      {/* Alta de tarea manual dentro del bloque */}
       <Dialog open={Boolean(formulario)} onOpenChange={(abierto) => !abierto && setFormulario(undefined)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{formulario?.id ? "Editar tarea" : "Nueva tarea de seguimiento"}</DialogTitle>
+            <DialogTitle>Nueva tarea de seguimiento</DialogTitle>
             <DialogDescription>
-              {formulario ? `${ETIQUETAS_GRUPO[formulario.grupo]} · ${nombreTipoProducto(formulario.tipoProducto)}` : ""}
+              {formulario ? etiquetaBloque(formulario.grupo, formulario.tipoProducto) : ""}
             </DialogDescription>
           </DialogHeader>
           {formulario && (
@@ -400,7 +437,7 @@ export function SeguimientoPresupuesto({
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setFormulario(undefined)}>Cancelar</Button>
-            <Button onClick={guardarFormulario}>{formulario?.id ? "Guardar cambios" : "Agregar tarea"}</Button>
+            <Button onClick={guardarAlta}>Agregar tarea</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

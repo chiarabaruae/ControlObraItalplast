@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Tareas y detalle de proyecto con los mismos campos, filtros y permisos
+
+**Alcance:** unifica la vista de tareas de seguimiento entre la sección Tareas (global) y las pestañas Fábrica/Instalación del detalle de proyecto (D-026).
+
+**Impacto:** el bloque muestra el producto real ("PVC · Fabricación", "Aluminio · Instalación") en vez del genérico "Producto · fabricación", en Tareas, en el detalle de proyecto y en el selector de "Nueva tarea". El detalle de proyecto suma prioridad editable inline y auditoría de creación/modificación para administradores, igual que Tareas. Tareas suma columna "Acciones" con lápiz (editar) y papelera (eliminar), igual que el detalle. Se corrige un permiso: eliminar tarea ahora depende de `permisos.eliminarTarea` (solo administradores) en ambas vistas — antes, en el detalle de proyecto, dependía por error del mismo permiso que completar tareas y quedaba disponible también para supervisores. La edición de una tarea existente usa un diálogo compartido nuevo (`DialogoEditarTarea`) en los dos lugares.
+
+**Archivos clave:** `src/frontend/src/lib/seguimiento-presupuesto.ts` (`etiquetaBloque`, retira `ETIQUETAS_GRUPO`), `src/frontend/src/mocks/data.ts` (`nombreCortoTipoProducto`, `nombreCorto` en el catálogo), `src/frontend/src/components/proyectos/DialogoEditarTarea.tsx` (nuevo), `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`, `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/frontend/src/pages/ProyectoDetalle.tsx`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador como administrador (bloque "PVC · Fabricación" y auditoría visibles en ambas vistas, edición desde Tareas con el mismo diálogo), como supervisor (prioridad editable y lápiz en ambas vistas, sin papelera ni auditoría) y como Usuario (sin columna de acciones).
+
 ## 2026-07-22 — Edición de productos del catálogo y aclaración de excepciones
 
 **Alcance:** los productos personalizados del catálogo suman edición inline; la nota de las brechas explica cómo manejar excepciones.

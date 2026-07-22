@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { ArrowRight, Building2, Layers, Users } from "lucide-react";
 import { toast } from "sonner";
-import { ETIQUETAS_GRUPO, gruposDeProducto } from "@/lib/seguimiento-presupuesto";
+import { etiquetaBloque, gruposDeProducto } from "@/lib/seguimiento-presupuesto";
 import {
   clientes, nombreTipoProducto, PRIORIDADES_TAREA,
   type GrupoTareaPresupuesto, type PrioridadTarea, type Proyecto, type TareaPresupuesto, type TipoProducto
@@ -206,7 +206,9 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
               </SelectTrigger>
               <SelectContent>
                 {bloques.map((b) => (
-                  <SelectItem key={b.grupo} value={b.grupo}>{ETIQUETAS_GRUPO[b.grupo]}</SelectItem>
+                  <SelectItem key={b.grupo} value={b.grupo}>
+                    {productoTipo ? etiquetaBloque(b.grupo, productoTipo) : ""}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
