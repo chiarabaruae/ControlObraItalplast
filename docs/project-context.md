@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-project-context
 context_type: current_project_state
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 branch: feature/frontend-react-migration
 tags:
   - italplast
@@ -130,6 +130,11 @@ El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de pre
 - Al crear el proyecto se genera una tarea por combinación `componente × etapa activa` del producto asignado.
 - Las listas de tareas de Fábrica e Instalación reemplazan completamente la carga manual de porcentaje; los controles `+ / −` fueron retirados del detalle.
 - La sección Tareas del menú lee las mismas `tareasPresupuesto` persistidas por cada proyecto, permite filtrar por proyecto y usa el mismo diálogo de cierre. Un cambio realizado allí se refleja al volver al detalle y viceversa.
+- La tabla "Tareas internas" fue retirada de la sección Tareas: solo existen tareas dependientes de una etapa. El tipo `Tarea` y `tareasIniciales` quedan como legado (Dashboard y pestaña Tareas del detalle), pendientes de retirar o reconvertir.
+- Cada tarea tiene una **prioridad** (baja/media/alta/urgente, por defecto media) que solo administradores y supervisores pueden definir: selector inline en la tabla de Tareas y campos en los formularios de alta/edición. Los demás roles la ven como etiqueta.
+- **Reabrir una tarea completada exige motivo obligatorio para todos los roles.** Se registran fecha, usuario y motivo en `reaperturas`, y el cambio queda en el historial `modificaciones`.
+- Auditoría por tarea: `creadaEn`, `version`, `modificadaEn`, `modificadaPorId`, `modificaciones` y `reaperturas`. En la tabla de Tareas, las columnas **Creación** y **Modificación** son visibles solo para administradores (permiso `verAuditoriaTareas`).
+- Eliminar una tarea es un borrado lógico: pasa a `tareasEliminadas` del proyecto con `eliminadaEn`/`eliminadaPorId`; ninguna interfaz la muestra.
 - La acción primaria para completar siempre se representa con un ícono de check. La evidencia continúa siendo obligatoria dentro del diálogo, pero ya no se representa con una cámara en la lista.
 - Completar una tarea exige una evidencia de imagen; la observación es opcional.
 - La imagen se redimensiona a un máximo de 1280 px y se comprime a JPEG antes de guardarse localmente.
@@ -142,7 +147,7 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 
 ## Alta de tareas en cascada (sección Tareas)
 
-- El botón "Nueva tarea" abre un panel de selección en pasos dependientes: **cliente → proyecto → producto → etapa (bloque) → nombre y fechas**. Cada nivel se habilita solo cuando el anterior está resuelto y ofrece únicamente opciones válidas del nivel superior; solo participan proyectos con seguimiento ya generado.
+- El botón "Nueva tarea" abre un panel de selección en pasos dependientes: **cliente → proyecto → producto → etapa (bloque) → nombre, prioridad y fechas**. Cada nivel se habilita solo cuando el anterior está resuelto y ofrece únicamente opciones válidas del nivel superior; solo participan proyectos con seguimiento ya generado.
 - La tarea nueva se guarda como `TareaPresupuesto` manual en `tareasPresupuesto` del proyecto elegido y aparece de inmediato en el seguimiento; no puede quedar huérfana ni en combinaciones inexistentes.
 - Fuente: `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`, cableada desde `src/frontend/src/pages/Todo.tsx`. Reutiliza `gruposDeProducto` exportado por `src/frontend/src/lib/seguimiento-presupuesto.ts`.
 
@@ -174,7 +179,7 @@ La fuente principal es `src/frontend/src/components/proyectos/TableroProyectos.t
 - Los proyectos mock se guardan bajo la clave `control-obras-proyectos` en `localStorage`.
 - El modelo nuevo usa `productos`, con una configuración de etapas por tipo.
 - `tipoProducto` se conserva temporalmente para migrar proyectos creados con el modelo anterior.
-- `presupuestoEjecutivo` conserva metadata e ítems revisados; `tareasPresupuesto` conserva las tareas (con fechas y manuales) y sus cierres; `pausas`, `cierre`, `cancelacion` e `historialEstados` registran las transiciones de estado.
+- `presupuestoEjecutivo` conserva metadata e ítems revisados; `tareasPresupuesto` conserva las tareas (con fechas, prioridad, auditoría y manuales) y sus cierres; `tareasEliminadas` guarda el borrado lógico; `pausas`, `cierre`, `cancelacion` e `historialEstados` registran las transiciones de estado.
 - Las etapas agregadas al proyecto también se consolidan en las listas superiores de fábrica e instalación para mantener compatibles las tarjetas y métricas existentes.
 
 La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.

@@ -34,6 +34,10 @@ export const permisos = {
   crearTarea: (r: Role) => r === "administrator" || r === "supervisor",
   editarTarea: (r: Role) => r === "administrator" || r === "supervisor",
   eliminarTarea: (r: Role) => r === "administrator",
+  // La prioridad de una tarea solo la determinan administradores y supervisores.
+  definirPrioridadTarea: (r: Role) => r === "administrator" || r === "supervisor",
+  // Columnas de auditoría (creación / modificaciones): solo administradores.
+  verAuditoriaTareas: (r: Role) => r === "administrator",
   completarTarea: (r: Role, esPropia: boolean) =>
     r === "administrator" || r === "supervisor" || esPropia,
 

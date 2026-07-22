@@ -8,7 +8,7 @@ import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
   proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, guardarProyecto, tareasIniciales,
-  nombreTipoProducto, aplicarCambioTarea, type Proyecto, type Tarea, type TareaPresupuesto
+  nombreTipoProducto, aplicarCambioTarea, eliminarTareaConAuditoria, type Proyecto, type Tarea, type TareaPresupuesto
 } from "@/mocks/data";
 import { formatFecha, formatFechaCorta } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
@@ -170,10 +170,8 @@ export default function ProyectoDetalle() {
   };
 
   const eliminarTareaPresupuesto = (tarea: TareaPresupuesto) => {
-    persistir((actual) => ({
-      ...actual,
-      tareasPresupuesto: (actual.tareasPresupuesto ?? []).filter((existente) => existente.id !== tarea.id)
-    }));
+    // Borrado lógico: queda registrada en `tareasEliminadas` (solo datos, sin UI).
+    persistir((actual) => eliminarTareaConAuditoria(actual, tarea, user.id));
   };
 
   const cliente = clientePorId(p.clienteId);

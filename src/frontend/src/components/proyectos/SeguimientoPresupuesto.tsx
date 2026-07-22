@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import { ETIQUETAS_GRUPO, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
 import { formatFechaCorta } from "@/lib/format";
 import {
-  nombreTipoProducto, tituloTarea,
-  type GrupoTareaPresupuesto, type Proyecto, type TareaPresupuesto, type TipoProducto
+  nombreTipoProducto, tituloTarea, registrarModificacionTarea, PRIORIDADES_TAREA,
+  type GrupoTareaPresupuesto, type PrioridadTarea, type Proyecto, type TareaPresupuesto, type TipoProducto
 } from "@/mocks/data";
+import { PrioridadBadge } from "@/components/app/EstadoBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -33,6 +34,7 @@ interface FormularioTarea {
   itemId: string;
   fechaInicio: string;
   fechaFin: string;
+  prioridad: PrioridadTarea;
 }
 
 function FilaTarea({
@@ -81,6 +83,7 @@ function FilaTarea({
             </span>
           )}
           {tarea.manual && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">Agregada</span>}
+          <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
         </div>
       </div>
 
@@ -160,13 +163,14 @@ export function SeguimientoPresupuesto({
     if (formulario.id) {
       const original = tareas.find((tarea) => tarea.id === formulario.id);
       if (!original) return;
-      alActualizar({
+      alActualizar(registrarModificacionTarea({
         ...original,
         titulo,
         itemId: formulario.itemId,
         fechaInicio: formulario.fechaInicio || undefined,
-        fechaFin: formulario.fechaFin || undefined
-      });
+        fechaFin: formulario.fechaFin || undefined,
+        prioridad: formulario.prioridad
+      }, usuarioId, "Editó nombre, fechas o prioridad de la tarea"));
       toast("Tarea actualizada", { description: titulo });
     } else {
       alAgregar({
@@ -179,6 +183,9 @@ export function SeguimientoPresupuesto({
         fechaInicio: formulario.fechaInicio || undefined,
         fechaFin: formulario.fechaFin || undefined,
         manual: true,
+        prioridad: formulario.prioridad,
+        creadaEn: new Date().toISOString(),
+        version: 1,
         completada: false
       });
       toast("Tarea agregada", { description: titulo });
@@ -250,7 +257,8 @@ export function SeguimientoPresupuesto({
                               titulo: "",
                               itemId: "",
                               fechaInicio: "",
-                              fechaFin: ""
+                              fechaFin: "",
+                              prioridad: "media"
                             })}
                           >
                             <Plus className="size-3.5" /> Agregar tarea
@@ -277,7 +285,8 @@ export function SeguimientoPresupuesto({
                             titulo: tituloTarea(actual, proyecto),
                             itemId: actual.itemId,
                             fechaInicio: actual.fechaInicio ?? "",
-                            fechaFin: actual.fechaFin ?? ""
+                            fechaFin: actual.fechaFin ?? "",
+                            prioridad: actual.prioridad ?? "media"
                           })}
                           alEliminar={eliminar}
                         />
@@ -298,8 +307,9 @@ export function SeguimientoPresupuesto({
       <DialogoCompletarTarea
         tarea={seleccionada}
         etiqueta={etiquetaSeleccionada}
+        usuarioId={usuarioId}
         alCerrar={() => setSeleccionada(undefined)}
-        alGuardar={(tarea) => alActualizar({ ...tarea, completadaPorId: tarea.completada ? usuarioId : undefined })}
+        alGuardar={alActualizar}
         puedeReabrir={puedeEditar}
       />
 
@@ -344,6 +354,27 @@ export function SeguimientoPresupuesto({
                       ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Prioridad</Label>
+                <Select
+                  value={formulario.prioridad}
+                  onValueChange={(valor) => setFormulario({ ...formulario, prioridad: valor as PrioridadTarea })}
+                >
+                  <SelectTrigger className="w-full" aria-label="Prioridad de la tarea">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORIDADES_TAREA.map((prioridad) => (
+                      <SelectItem key={prioridad} value={prioridad}>
+                        <span className="capitalize">{prioridad}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Solo administradores y supervisores pueden definirla.
+                </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">

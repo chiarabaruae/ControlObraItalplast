@@ -115,6 +115,24 @@ export interface EvidenciaTarea {
   dataUrl: string;
 }
 
+export type PrioridadTarea = "baja" | "media" | "alta" | "urgente";
+
+export const PRIORIDADES_TAREA: PrioridadTarea[] = ["baja", "media", "alta", "urgente"];
+
+/** Reapertura de una tarea completada: exige motivo sin importar el rol. */
+export interface RegistroReaperturaTarea {
+  fecha: string;
+  usuarioId: string;
+  motivo: string;
+}
+
+/** Auditoría de cambios de una tarea; en la UI la ven solo administradores. */
+export interface RegistroModificacionTarea {
+  fecha: string;
+  usuarioId: string;
+  resumen: string;
+}
+
 export interface TareaPresupuesto {
   id: string;
   /** Vacío en tareas manuales agregadas por el supervisor. */
@@ -128,11 +146,24 @@ export interface TareaPresupuesto {
   fechaFin?: string;
   /** true cuando la agregó una persona (no nació del presupuesto). */
   manual?: boolean;
+  /** Solo administradores y supervisores pueden definirla. Ausente = "media". */
+  prioridad?: PrioridadTarea;
   completada: boolean;
   evidencia?: EvidenciaTarea;
   observaciones?: string;
   completadaEn?: string;
   completadaPorId?: string;
+  // ── Auditoría (columnas visibles solo para administradores) ──
+  creadaEn?: string;
+  /** Arranca en 1; cada modificación la incrementa. */
+  version?: number;
+  modificadaEn?: string;
+  modificadaPorId?: string;
+  modificaciones?: RegistroModificacionTarea[];
+  reaperturas?: RegistroReaperturaTarea[];
+  /** Marcas de borrado lógico; la tarea vive en `tareasEliminadas` del proyecto. */
+  eliminadaEn?: string;
+  eliminadaPorId?: string;
 }
 
 export interface RegistroPausa {
@@ -202,6 +233,8 @@ export interface Proyecto {
   documentos: Documento[];
   presupuestoEjecutivo?: PresupuestoEjecutivo;
   tareasPresupuesto?: TareaPresupuesto[];
+  /** Borrado lógico: las tareas eliminadas se conservan acá, sin UI que las muestre. */
+  tareasEliminadas?: TareaPresupuesto[];
   /** Historial de pausas: cada cambio a "pausada" exige un motivo. */
   pausas?: RegistroPausa[];
   /** Registro del cierre manual desde el tablero (avances al 100%). */
@@ -220,7 +253,7 @@ export interface Tarea {
   responsableId: string;
   fechaFin: string;
   estado: "pendiente" | "en_progreso" | "bloqueada" | "finalizada";
-  prioridad: "baja" | "media" | "alta" | "urgente";
+  prioridad: PrioridadTarea;
 }
 
 // ── Usuarios (subset del seed real) ─────────────────────────────
@@ -490,6 +523,9 @@ function crearSeguimientoDemostrativo(proyecto: Proyecto): Proyecto {
       ...tarea,
       fechaInicio: proyecto.fechaInicio,
       fechaFin,
+      prioridad: "media" as const,
+      creadaEn: `${proyecto.fechaInicio}T12:00:00.000Z`,
+      version: 1,
       completada,
       evidencia: completada ? {
         nombre: "evidencia-demostrativa.svg",
@@ -594,6 +630,38 @@ export function registrarCambioEstado(
         destino,
         motivo: motivo?.trim() || undefined
       }
+    ]
+  };
+}
+
+/** Marca una modificación de tarea: fecha, autor y versión para la auditoría admin. */
+export function registrarModificacionTarea(
+  tarea: TareaPresupuesto,
+  usuarioId: string,
+  resumen: string
+): TareaPresupuesto {
+  const fecha = new Date().toISOString();
+  return {
+    ...tarea,
+    version: (tarea.version ?? 1) + 1,
+    modificadaEn: fecha,
+    modificadaPorId: usuarioId,
+    modificaciones: [...(tarea.modificaciones ?? []), { fecha, usuarioId, resumen }]
+  };
+}
+
+/** Borrado lógico: la tarea sale del seguimiento pero queda auditada en `tareasEliminadas`. */
+export function eliminarTareaConAuditoria(
+  p: Proyecto,
+  tarea: TareaPresupuesto,
+  usuarioId: string
+): Proyecto {
+  return {
+    ...p,
+    tareasPresupuesto: (p.tareasPresupuesto ?? []).filter((existente) => existente.id !== tarea.id),
+    tareasEliminadas: [
+      ...(p.tareasEliminadas ?? []),
+      { ...tarea, eliminadaEn: new Date().toISOString(), eliminadaPorId: usuarioId }
     ]
   };
 }

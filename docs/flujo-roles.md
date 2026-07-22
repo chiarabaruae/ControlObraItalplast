@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-role-flow
 context_type: functional_specification
-last_updated: 2026-07-19
+last_updated: 2026-07-22
 tags:
   - roles
   - permissions
@@ -102,7 +102,15 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Ver tareas | ✅ todas | ✅ todas | ✅ las asignadas a él/ella |
 | Crear / editar tarea | ✅ | ✅ | ❌ |
 | Completar / reabrir | ✅ | ✅ | ✅ **solo las propias** |
-| Eliminar tarea | ✅ | ❌ | ❌ |
+| Reabrir sin motivo | ❌ nadie: el motivo es obligatorio para todos los roles | ❌ | ❌ |
+| Definir prioridad | ✅ | ✅ | ❌ (la ve como etiqueta) |
+| Ver columnas Creación / Modificación (auditoría) | ✅ | ❌ | ❌ |
+| Eliminar tarea (borrado lógico auditado) | ✅ | ❌ | ❌ |
+
+*La sección Tareas ya no muestra "tareas internas": solo tareas de seguimiento
+dependientes de una etapa. Cada reapertura registra fecha, usuario y motivo;
+cada modificación (completar, reabrir, editar, prioridad) suma versión, fecha y
+autor a la auditoría de la tarea.*
 
 *Nota Fase 3: "sus tareas" requiere agregar asignación por usuario
 (`tareas_obra.responsable` hoy es texto libre, no FK a `app_users`). Las tareas

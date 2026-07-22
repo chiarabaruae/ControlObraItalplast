@@ -6,8 +6,8 @@ import { ArrowRight, Building2, Layers, Users } from "lucide-react";
 import { toast } from "sonner";
 import { ETIQUETAS_GRUPO, gruposDeProducto } from "@/lib/seguimiento-presupuesto";
 import {
-  clientes, nombreTipoProducto,
-  type GrupoTareaPresupuesto, type Proyecto, type TareaPresupuesto, type TipoProducto
+  clientes, nombreTipoProducto, PRIORIDADES_TAREA,
+  type GrupoTareaPresupuesto, type PrioridadTarea, type Proyecto, type TareaPresupuesto, type TipoProducto
 } from "@/mocks/data";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +55,7 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
   const [titulo, setTitulo] = useState("");
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
+  const [prioridad, setPrioridad] = useState<PrioridadTarea>("media");
 
   // Solo proyectos con seguimiento ya generado admiten tareas nuevas.
   const proyectosConSeguimiento = useMemo(
@@ -90,7 +91,7 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
 
   const reiniciar = () => {
     setClienteId(""); setProyectoId(""); setProductoTipo(""); setGrupo("");
-    setTitulo(""); setFechaInicio(""); setFechaFin("");
+    setTitulo(""); setFechaInicio(""); setFechaFin(""); setPrioridad("media");
   };
 
   const cerrar = (valor: boolean) => {
@@ -115,6 +116,9 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
       fechaInicio: fechaInicio || undefined,
       fechaFin: fechaFin || undefined,
       manual: true,
+      prioridad,
+      creadaEn: new Date().toISOString(),
+      version: 1,
       completada: false
     });
     toast("Tarea agregada", { description: `${titulo.trim()} · ${proyecto.nombre}` });
@@ -220,6 +224,19 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
                   placeholder="Ej. Verificar plomo de premarcos piso 3"
                   autoFocus
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Prioridad</Label>
+                <Select value={prioridad} onValueChange={(valor) => setPrioridad(valor as PrioridadTarea)}>
+                  <SelectTrigger className="w-full" aria-label="Prioridad de la tarea">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORIDADES_TAREA.map((p) => (
+                      <SelectItem key={p} value={p}><span className="capitalize">{p}</span></SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">

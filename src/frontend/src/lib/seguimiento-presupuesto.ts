@@ -27,6 +27,9 @@ export function generarTareasDesdePresupuesto(
           tipoProducto: producto.tipo,
           grupo,
           etapa: etapa.nombre,
+          prioridad: "media" as const,
+          creadaEn: new Date().toISOString(),
+          version: 1,
           completada: false
         }))
       )

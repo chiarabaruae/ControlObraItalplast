@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-change-log
 context_type: implementation_history
-last_updated: 2026-07-19
+last_updated: 2026-07-22
 tags:
   - changelog
   - commits
@@ -15,6 +15,16 @@ tags:
 # Registro contextual de cambios
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
+
+## 2026-07-22 — Reapertura justificada, auditoría de tareas, prioridad y retiro de tareas internas
+
+**Alcance:** trazabilidad completa de las tareas de seguimiento y simplificación de la sección Tareas.
+
+**Impacto:** reabrir una tarea completada exige un motivo obligatorio para todos los roles; se registran fecha, usuario y motivo (`reaperturas`) y cada cambio queda en `modificaciones` con `version`, `modificadaEn` y `modificadaPorId`. Las tareas guardan `creadaEn`; eliminar pasa a ser borrado lógico hacia `tareasEliminadas` (solo datos, sin UI). La tabla de Tareas suma la columna Prioridad (selector inline para administradores y supervisores; etiqueta de solo lectura para el resto) y las columnas Creación y Modificación visibles únicamente para administradores. La tabla "Tareas internas" se retiró: la sección muestra solo tareas dependientes de etapas. La prioridad también se define en los formularios de alta (cascada y por bloque) y edición.
+
+**Archivos clave:** `src/frontend/src/mocks/data.ts`, `src/frontend/src/lib/roles.ts`, `src/frontend/src/lib/seguimiento-presupuesto.ts`, `src/frontend/src/lib/format.ts`, `src/frontend/src/components/proyectos/DialogoCompletarTarea.tsx`, `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`, `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/frontend/src/pages/ProyectoDetalle.tsx`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador como administrador (reapertura con motivo obligatorio, registro persistido en `localStorage`, columnas de auditoría con versión y autor) y como supervisor (prioridad editable, columnas de auditoría ocultas).
 
 ## 2026-07-21 — Alta de tareas en cascada y avisos de filtro sobre la tabla
 

@@ -200,3 +200,23 @@ tags:
 **Decisión:** el alta desde "Nueva tarea" guía la elección en pasos dependientes: cliente → proyecto → producto → etapa (bloque) → nombre y fechas. Cada nivel ofrece solo las opciones válidas del nivel anterior y se habilita al resolverlo. Solo participan proyectos con seguimiento ya generado desde un presupuesto.
 
 **Consecuencias:** no se pueden crear tareas huérfanas ni en combinaciones inexistentes. El aviso de filtros y el de truncado de filas se ubican sobre la tabla para que el estado del listado sea visible antes de leer los datos.
+
+## D-021 — Reapertura de tareas siempre justificada y auditoría visible solo para administradores
+
+**Estado:** aceptada.
+
+**Contexto:** reabrir una tarea completada borraba el cierre sin dejar rastro de quién lo hizo ni por qué, y no existía registro de creación ni de modificaciones de las tareas de seguimiento.
+
+**Decisión:** reabrir una tarea exige un motivo obligatorio sin importar el rol; se registra fecha, usuario y motivo en `reaperturas`. Cada tarea conserva `creadaEn`, `version`, `modificadaEn`, `modificadaPorId` y el historial `modificaciones` (completar, reabrir, editar, cambiar prioridad). Eliminar una tarea es un borrado lógico: pasa a `tareasEliminadas` del proyecto con `eliminadaEn`/`eliminadaPorId`, sin interfaz que la muestre. En la tabla de Tareas, las columnas Creación y Modificación son visibles únicamente para administradores.
+
+**Consecuencias:** toda alteración del seguimiento queda trazada en datos aunque la interfaz solo exponga el resumen a administradores. El helper `registrarModificacionTarea` centraliza el sellado y `eliminarTareaConAuditoria` el borrado lógico; el diálogo de completar/reabrir sella la auditoría él mismo recibiendo `usuarioId`.
+
+## D-022 — Prioridad por tarea restringida y retiro de las tareas internas
+
+**Estado:** aceptada.
+
+**Contexto:** las tareas de seguimiento no tenían prioridad y la sección Tareas mezclaba una tabla de "tareas internas" sueltas que ya no representa el flujo deseado: por ahora toda tarea debe depender de una etapa.
+
+**Decisión:** `TareaPresupuesto` incorpora `prioridad` (baja/media/alta/urgente, por defecto media). Solo administradores y supervisores pueden definirla (selector inline en la tabla de Tareas y en los formularios de alta/edición); los demás roles la ven como etiqueta de solo lectura. La tabla "Tareas internas" se retira de la sección Tareas; si en el futuro se necesitan tareas genéricas, irán por fuera de las etapas de Fabricación e Instalación pero siempre atadas a un proyecto.
+
+**Consecuencias:** la sección Tareas muestra únicamente seguimiento dependiente de etapas. El tipo `Tarea` y `tareasIniciales` quedan como legado usado por el Dashboard y la pestaña Tareas del detalle de proyecto, pendientes de retirar o reconvertir.

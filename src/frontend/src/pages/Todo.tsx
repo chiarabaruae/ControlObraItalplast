@@ -1,18 +1,22 @@
-// Tareas — vista macro: junta las tareas internas del equipo con TODAS las
-// tareas de seguimiento que nacen del presupuesto de cada proyecto.
-// Completar una tarea de seguimiento acá abre el mismo diálogo de evidencia
-// que en el detalle del proyecto, y actualiza el avance en todos lados.
+// Tareas — vista macro: TODAS las tareas de seguimiento que nacen del
+// presupuesto de cada proyecto, siempre dependientes de una etapa (bloque).
+// La sección de "tareas internas" fue retirada: no hay tareas sueltas.
+// Completar una tarea acá abre el mismo diálogo de evidencia que en el
+// detalle del proyecto, y actualiza el avance en todos lados.
+// Columnas Creación y Modificación: visibles solo para administradores.
 import { useState } from "react";
 import { Link } from "react-router";
-import { Plus, Check, RotateCcw, Trash2, Pencil, ClipboardList } from "lucide-react";
+import { Plus, Check, ClipboardList } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import { ETIQUETAS_GRUPO } from "@/lib/seguimiento-presupuesto";
 import {
-  tareasIniciales, proyectoPorId, usuarioPorId, obtenerProyectos, guardarProyecto,
-  aplicarCambioTarea, tituloTarea, type Proyecto, type Tarea, type TareaPresupuesto
+  usuarioPorId, obtenerProyectos, guardarProyecto, aplicarCambioTarea, tituloTarea,
+  registrarModificacionTarea, PRIORIDADES_TAREA,
+  type PrioridadTarea, type Proyecto, type TareaPresupuesto
 } from "@/mocks/data";
-import { formatFecha } from "@/lib/format";
+import { formatFecha, formatFechaHora } from "@/lib/format";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
@@ -22,7 +26,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
 
 type Filtro = "todas" | "pendientes" | "finalizadas";
 
@@ -33,7 +36,6 @@ interface SeleccionSeguimiento {
 
 export default function Todo() {
   const { user } = useAuth();
-  const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales);
   const [proyectos, setProyectos] = useState<Proyecto[]>(() => obtenerProyectos());
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [proyectoFiltro, setProyectoFiltro] = useState("todos");
@@ -42,14 +44,8 @@ export default function Todo() {
 
   const esViewer = user?.role === "viewer";
   const puedeAvance = user ? permisos.editarAvance(user.role) : false;
-
-  // Tareas internas: el rol Usuario ve solo las suyas.
-  const internas = esViewer ? tareas.filter((t) => t.responsableId === user?.id) : tareas;
-  const internasVisibles = internas.filter((t) => {
-    if (filtro === "pendientes") return t.estado !== "finalizada";
-    if (filtro === "finalizadas") return t.estado === "finalizada";
-    return true;
-  });
+  const puedePrioridad = user ? permisos.definirPrioridadTarea(user.role) : false;
+  const verAuditoria = user ? permisos.verAuditoriaTareas(user.role) : false;
 
   // Tareas de seguimiento de todos los proyectos activos.
   const seguimiento = proyectos.flatMap((proyecto) =>
@@ -72,63 +68,59 @@ export default function Todo() {
       valor: ({ tarea }) => (tarea.fechaFin ? formatFecha(tarea.fechaFin) : "Sin fecha"),
       orden: ({ tarea }) => tarea.fechaFin ?? "9999-12-31",
       tipo: "fecha"
+    },
+    prioridad: ({ tarea }) => tarea.prioridad ?? "media",
+    creacion: {
+      valor: ({ tarea }) => (tarea.creadaEn ? formatFechaHora(tarea.creadaEn) : "Sin registro"),
+      orden: ({ tarea }) => tarea.creadaEn ?? "9999-12-31",
+      tipo: "fecha"
+    },
+    modificacion: {
+      valor: ({ tarea }) => (tarea.modificadaEn ? formatFechaHora(tarea.modificadaEn) : "Sin cambios"),
+      orden: ({ tarea }) => tarea.modificadaEn ?? "9999-12-31",
+      tipo: "fecha"
     }
-  });
-
-  const tablaInternas = useTablaFiltrable(internasVisibles, {
-    tarea: (t) => t.titulo,
-    proyecto: (t) => proyectoPorId(t.proyectoId)?.nombre ?? "Sin proyecto",
-    responsable: (t) => usuarioPorId(t.responsableId)?.displayName ?? "Sin asignar",
-    vence: { valor: (t) => formatFecha(t.fechaFin), orden: (t) => t.fechaFin, tipo: "fecha" },
-    prioridad: (t) => t.prioridad
   });
 
   if (!user) return null;
 
-  const alternarInterna = (t: Tarea) => {
-    const finalizada = t.estado === "finalizada";
-    setTareas((prev) =>
-      prev.map((x) => (x.id === t.id ? { ...x, estado: finalizada ? "pendiente" : "finalizada" } : x))
-    );
-    toast(finalizada ? "Tarea reabierta" : "Tarea completada", { description: t.titulo });
-  };
-
-  const eliminarInterna = (t: Tarea) => {
-    setTareas((prev) => prev.filter((x) => x.id !== t.id));
-    toast("Tarea eliminada", { description: t.titulo });
-  };
-
-  const guardarSeguimiento = (tareaActualizada: TareaPresupuesto) => {
-    if (!seleccion) return;
-    const actualizado = aplicarCambioTarea(seleccion.proyecto, {
-      ...tareaActualizada,
-      completadaPorId: tareaActualizada.completada ? user.id : undefined
-    });
+  const persistir = (actualizado: Proyecto) => {
     try {
       guardarProyecto(actualizado);
     } catch {
       toast("No se pudo guardar el avance", {
         description: "El almacenamiento local está lleno. Probá con una imagen más pequeña."
       });
-      return;
+      return false;
     }
     setProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
+    return true;
+  };
+
+  const guardarSeguimiento = (tareaActualizada: TareaPresupuesto) => {
+    if (!seleccion) return;
+    persistir(aplicarCambioTarea(seleccion.proyecto, tareaActualizada));
+  };
+
+  const cambiarPrioridad = (proyecto: Proyecto, tarea: TareaPresupuesto, prioridad: PrioridadTarea) => {
+    if (prioridad === (tarea.prioridad ?? "media")) return;
+    const actualizada = registrarModificacionTarea(
+      { ...tarea, prioridad },
+      user.id,
+      `Cambió la prioridad a ${prioridad}`
+    );
+    if (persistir(aplicarCambioTarea(proyecto, actualizada))) {
+      toast("Prioridad actualizada", { description: `${tituloTarea(tarea, proyecto)} · ${prioridad}` });
+    }
   };
 
   const agregarTareaSeguimiento = (proyectoId: string, tarea: TareaPresupuesto) => {
     const proyecto = proyectos.find((p) => p.id === proyectoId);
     if (!proyecto) return;
-    const actualizado: Proyecto = {
+    persistir({
       ...proyecto,
       tareasPresupuesto: [...(proyecto.tareasPresupuesto ?? []), tarea]
-    };
-    try {
-      guardarProyecto(actualizado);
-    } catch {
-      toast("No se pudo guardar la tarea", { description: "El almacenamiento local está lleno." });
-      return;
-    }
-    setProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
+    });
   };
 
   return (
@@ -139,8 +131,8 @@ export default function Todo() {
           <h1 className="mt-1 text-2xl font-bold tracking-tight">Tareas</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {esViewer
-              ? "Tus tareas asignadas. Marcá cada una al terminarla."
-              : "Tareas internas del equipo y tareas de seguimiento de todos los proyectos."}
+              ? "Tareas de seguimiento de los proyectos. Consultá el estado de cada etapa."
+              : "Tareas de seguimiento de todos los proyectos, dependientes de cada etapa."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -206,6 +198,13 @@ export default function Todo() {
                   <EncabezadoFiltrable columna="proyecto" control={tablaSeguimiento}>Proyecto</EncabezadoFiltrable>
                   <EncabezadoFiltrable columna="bloque" control={tablaSeguimiento}>Bloque</EncabezadoFiltrable>
                   <EncabezadoFiltrable columna="entrega" control={tablaSeguimiento}>Entrega</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="prioridad" control={tablaSeguimiento}>Prioridad</EncabezadoFiltrable>
+                  {verAuditoria && (
+                    <>
+                      <EncabezadoFiltrable columna="creacion" control={tablaSeguimiento}>Creación</EncabezadoFiltrable>
+                      <EncabezadoFiltrable columna="modificacion" control={tablaSeguimiento}>Modificación</EncabezadoFiltrable>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -233,6 +232,48 @@ export default function Todo() {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{ETIQUETAS_GRUPO[tarea.grupo]}</TableCell>
                     <TableCell className="cifra text-xs">{tarea.fechaFin ? formatFecha(tarea.fechaFin) : "—"}</TableCell>
+                    <TableCell>
+                      {puedePrioridad ? (
+                        <Select
+                          value={tarea.prioridad ?? "media"}
+                          onValueChange={(valor) => cambiarPrioridad(proyecto, tarea, valor as PrioridadTarea)}
+                        >
+                          <SelectTrigger
+                            className="h-7 w-28 text-xs"
+                            aria-label={`Prioridad de ${tituloTarea(tarea, proyecto)}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PRIORIDADES_TAREA.map((p) => (
+                              <SelectItem key={p} value={p}><span className="capitalize">{p}</span></SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
+                      )}
+                    </TableCell>
+                    {verAuditoria && (
+                      <>
+                        <TableCell className="cifra text-xs text-muted-foreground">
+                          {tarea.creadaEn ? formatFechaHora(tarea.creadaEn) : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {tarea.modificadaEn ? (
+                            <span className="inline-flex flex-wrap items-center gap-1.5">
+                              <span className="cifra">{formatFechaHora(tarea.modificadaEn)}</span>
+                              <span>· {usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"}</span>
+                              <span className="rounded bg-muted px-1 py-0.5 text-[10px] font-semibold">
+                                v{tarea.version ?? 1}
+                              </span>
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -244,86 +285,10 @@ export default function Todo() {
         </Card>
       </section>
 
-      {/* Tareas internas */}
-      <section className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Check className="size-4 text-primary" />
-          <h2 className="font-heading text-sm font-semibold">Tareas internas</h2>
-        </div>
-        <Card>
-          <CardContent className="px-0">
-            <AvisoFiltros control={tablaInternas} unidad="tareas" />
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10" />
-                  <EncabezadoFiltrable columna="tarea" control={tablaInternas}>Tarea</EncabezadoFiltrable>
-                  <EncabezadoFiltrable columna="proyecto" control={tablaInternas}>Proyecto</EncabezadoFiltrable>
-                  <EncabezadoFiltrable columna="responsable" control={tablaInternas}>Responsable</EncabezadoFiltrable>
-                  <EncabezadoFiltrable columna="vence" control={tablaInternas}>Vence</EncabezadoFiltrable>
-                  <EncabezadoFiltrable columna="prioridad" control={tablaInternas}>Prioridad</EncabezadoFiltrable>
-                  <TableHead className="w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tablaInternas.filas.map((t) => {
-                  const finalizada = t.estado === "finalizada";
-                  const esPropia = t.responsableId === user.id;
-                  const puedeCompletar = permisos.completarTarea(user.role, esPropia);
-                  return (
-                    <TableRow key={t.id} className={finalizada ? "opacity-55" : ""}>
-                      <TableCell>
-                        {puedeCompletar && (
-                          <Button
-                            variant={finalizada ? "ghost" : "outline"}
-                            size="icon"
-                            className="size-7 rounded-full"
-                            aria-label={finalizada ? "Reabrir tarea" : "Completar tarea"}
-                            onClick={() => alternarInterna(t)}
-                          >
-                            {finalizada ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5" />}
-                          </Button>
-                        )}
-                      </TableCell>
-                      <TableCell className={`font-medium ${finalizada ? "line-through" : ""}`}>{t.titulo}</TableCell>
-                      <TableCell className="text-muted-foreground">{proyectoPorId(t.proyectoId)?.nombre}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {usuarioPorId(t.responsableId)?.displayName}
-                        {esPropia && <span className="ml-1.5 rounded bg-accent px-1 py-0.5 text-[10px] font-semibold text-accent-foreground">vos</span>}
-                      </TableCell>
-                      <TableCell className="cifra text-xs">{formatFecha(t.fechaFin)}</TableCell>
-                      <TableCell><PrioridadBadge prioridad={t.prioridad} /></TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          {permisos.editarTarea(user.role) && (
-                            <Button variant="ghost" size="icon" className="size-7" aria-label="Editar tarea" onClick={() => toast("Editar tarea", { description: "Se conecta a la API en la Fase 4." })}>
-                              <Pencil className="size-3.5" />
-                            </Button>
-                          )}
-                          {permisos.eliminarTarea(user.role) && (
-                            <Button variant="ghost" size="icon" className="size-7 text-destructive" aria-label="Eliminar tarea" onClick={() => eliminarInterna(t)}>
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            {tablaInternas.filas.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                {esViewer ? "No tenés tareas asignadas con este filtro." : "No hay tareas internas con este filtro."}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
       <DialogoCompletarTarea
         tarea={seleccion?.tarea}
         etiqueta={seleccion ? `${tituloTarea(seleccion.tarea, seleccion.proyecto)} · ${seleccion.proyecto.nombre}` : ""}
+        usuarioId={user.id}
         alCerrar={() => setSeleccion(undefined)}
         alGuardar={guardarSeguimiento}
         puedeReabrir={puedeAvance}
