@@ -18,6 +18,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Simplificación de ramas y publicación a main
+
+**Alcance:** se retira `feature/frontend-react-migration` (local y remota) por quedar idéntica a `develop`, y se promueve todo el trabajo acumulado a `main` mediante fast-forward.
+
+**Impacto:** `develop` pasa a ser la única rama de trabajo activo; `main` queda al día con la migración React completa, Reglas y catálogo, planificación backward, asignación/auditoría de tareas y el esqueleto de backend Fase 2. El README principal se actualiza para reflejar el estado vigente (roles, pantallas, esqueleto `/api/v2`).
+
+**Archivos clave:** `README.md`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; fast-forward confirmado sin commits divergentes entre `main` y `develop`.
+
 ## 2026-07-22 — Cambio de prioridad sin confirmación
 
 **Alcance:** se elimina el panel de confirmación al seleccionar una nueva prioridad en Tareas y en el seguimiento del detalle de proyecto.
