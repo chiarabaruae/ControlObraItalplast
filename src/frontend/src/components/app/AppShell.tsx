@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
-  BookOpen, Building2, ChevronDown, CircleHelp, Headphones,
+  BookOpen, Building2, CalendarClock, ChevronDown, CircleHelp, Headphones,
   LayoutGrid, ListTodo, LogOut, Menu, Palette, RefreshCw,
   Settings, UserCog, UserRound, Users
 } from "lucide-react";
@@ -25,13 +25,22 @@ const NAV = [
   { to: "/usuarios", label: "Usuarios", icon: UserCog, visible: (role: Role) => permisos.verUsuarios(role) }
 ];
 
-const SETTINGS_ITEMS = [
+interface UtilityItem {
+  to: string;
+  label: string;
+  description: string;
+  icon: typeof Settings;
+  visible?: (role: Role) => boolean;
+}
+
+const SETTINGS_ITEMS: UtilityItem[] = [
   { to: "/settings/account", label: "Cuenta", description: "Tu perfil y avatar", icon: UserRound },
   { to: "/settings/appearance", label: "Personalizar", description: "Tema y colores", icon: Palette },
+  { to: "/settings/planning", label: "Planificación", description: "Brechas del cálculo de fechas", icon: CalendarClock, visible: (role: Role) => permisos.configurarPlanificacion(role) },
   { to: "/settings/updates", label: "Actualizaciones", description: "Versión del sistema", icon: RefreshCw }
 ];
 
-const SUPPORT_ITEMS = [
+const SUPPORT_ITEMS: UtilityItem[] = [
   { to: "/support/documentation", label: "Documentación", description: "Guías de uso", icon: BookOpen },
   { to: "/support/contact", label: "Contactar soporte", description: "Solicitar ayuda", icon: Headphones }
 ];
@@ -137,6 +146,8 @@ function UtilityGroup({
 
 function SidebarUtilities({ onNavigate }: { onNavigate?: () => void }) {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const settingsItems = SETTINGS_ITEMS.filter((item) => !item.visible || (user && item.visible(user.role)));
   const [settingsOpen, setSettingsOpen] = useState(() => pathname.startsWith("/settings"));
   const [supportOpen, setSupportOpen] = useState(() => pathname.startsWith("/support"));
 
@@ -150,7 +161,7 @@ function SidebarUtilities({ onNavigate }: { onNavigate?: () => void }) {
       <UtilityGroup
         label="Configuración"
         icon={Settings}
-        items={SETTINGS_ITEMS}
+        items={settingsItems}
         open={settingsOpen}
         onToggle={() => { setSettingsOpen((value) => !value); setSupportOpen(false); }}
         onNavigate={onNavigate}

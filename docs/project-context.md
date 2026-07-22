@@ -145,6 +145,14 @@ El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de pre
 
 Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `src/frontend/src/lib/evidencias.ts` y `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`.
 
+## Estimación backward de fechas (cronograma de fábrica)
+
+- Cada producto operativo del alta puede cargar una **planificación opcional**: fecha comprometida de inicio de instalación, días de instalación, días de fábrica y días de fabricación de premarcos.
+- Con esa ancla se calculan hacia atrás (backward) los hitos: fin de producción, inicio de fábrica, firma de ábaco, entrega de premarcos e inicio de fabricación de premarcos, usando tres **brechas configurables** (predeterminadas 3/1/3 días).
+- Las tareas generadas desde el presupuesto nacen con `fechaInicio`/`fechaFin` según el bloque; siguen siendo editables tarea por tarea. Sin planificación cargada, nacen sin fechas como antes.
+- Las brechas se editan solo por administradores en **Configuración → Planificación** (`/settings/planning`, permiso `configurarPlanificacion`) y persisten en `localStorage` (`control-obras-planificacion`). Cambiarlas no recalcula tareas existentes.
+- Fuentes: `src/frontend/src/lib/planificacion.ts` (cálculo y persistencia), `src/frontend/src/pages/Planificacion.tsx` (pantalla), integración en `src/frontend/src/lib/seguimiento-presupuesto.ts` y `src/frontend/src/pages/Proyectos.tsx`.
+
 ## Alta de tareas en cascada (sección Tareas)
 
 - El botón "Nueva tarea" abre un panel de selección en pasos dependientes: **cliente → proyecto → producto → etapa (bloque) → nombre, prioridad y fechas**. Cada nivel se habilita solo cuando el anterior está resuelto y ofrece únicamente opciones válidas del nivel superior; solo participan proyectos con seguimiento ya generado.

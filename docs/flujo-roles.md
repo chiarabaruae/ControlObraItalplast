@@ -54,7 +54,12 @@ tags:
 | Tareas | ✅ | ✅ | ✅ (sus tareas) |
 | Usuarios *(pantalla nueva)* | ✅ | ❌ | ❌ |
 | Configuración / Personalizar | ✅ | ✅ | ✅ |
+| Configuración / Planificación (brechas backward) | ✅ | ❌ oculta | ❌ oculta |
 | Soporte | ✅ | ✅ | ✅ |
+
+*Las brechas del cálculo backward de fechas (fin producción→instalación, firma
+ábaco→fábrica, entrega premarcos→ábaco) son regla de negocio global: solo
+administración puede modificarlas (`permisos.configurarPlanificacion`).*
 
 ## Matriz pantalla × rol
 

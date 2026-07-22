@@ -201,12 +201,21 @@ export interface RegistroCambioEstado {
   motivo?: string;
 }
 
+export interface PlanificacionProducto {
+  /** Ancla del cálculo backward; sin ella no se estiman fechas. */
+  fechaInicioInstalacion?: string;
+  diasFabricacionPremarcos?: number;
+  diasFabrica?: number;
+  diasInstalacion?: number;
+}
+
 export interface ConfiguracionProductoProyecto {
   tipo: TipoProducto;
   etapasFabricacionPremarcos: EtapaSeguimiento[];
   etapasInstalacionPremarcos: EtapaSeguimiento[];
   etapasFabrica: EtapaSeguimiento[];
   etapasObra: EtapaSeguimiento[];
+  planificacion?: PlanificacionProducto;
 }
 
 export interface Proyecto {

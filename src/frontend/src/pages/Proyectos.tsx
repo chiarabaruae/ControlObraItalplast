@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Check, Columns3, Factory, Hammer, HardHat, LayoutGrid, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
+import { CalendarClock, Check, Columns3, Factory, Hammer, HardHat, LayoutGrid, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
@@ -8,9 +8,10 @@ import {
   ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
   ETAPAS_FABRICACION_PREMARCOS, ETAPAS_INSTALACION_PREMARCOS,
   TIPOS_PRODUCTO, nombreTipoProducto, obtenerProyectos, guardarProyectos, guardarProyecto,
-  type ConfiguracionProductoProyecto, type EstadoObra, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
+  type ConfiguracionProductoProyecto, type EstadoObra, type PlanificacionProducto, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
+import { calcularFechasBackward } from "@/lib/planificacion";
 import { formatFecha } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
 import { EstadoBadge } from "@/components/app/EstadoBadge";
@@ -40,6 +41,13 @@ interface EtapaConfigurable {
   seleccionada: boolean;
 }
 
+interface PlanificacionFormulario {
+  fechaInicioInstalacion: string;
+  diasFabricacionPremarcos: string;
+  diasFabrica: string;
+  diasInstalacion: string;
+}
+
 interface ConfiguracionProductoFormulario {
   fabricaraPremarcos: boolean;
   instalaraPremarcos: boolean;
@@ -47,6 +55,7 @@ interface ConfiguracionProductoFormulario {
   etapasInstalacionPremarcos: EtapaConfigurable[];
   etapasFabrica: EtapaConfigurable[];
   etapasObra: EtapaConfigurable[];
+  planificacion: PlanificacionFormulario;
 }
 
 function crearEtapasConfigurables(nombres: string[], seleccionadas: string[] = nombres): EtapaConfigurable[] {
@@ -67,7 +76,28 @@ function crearConfiguracionProducto(): ConfiguracionProductoFormulario {
       [...ETAPAS_FABRICA, ...ETAPAS_FABRICA_OPCIONALES],
       ETAPAS_FABRICA
     ),
-    etapasObra: crearEtapasConfigurables(ETAPAS_OBRA)
+    etapasObra: crearEtapasConfigurables(ETAPAS_OBRA),
+    planificacion: {
+      fechaInicioInstalacion: "",
+      diasFabricacionPremarcos: "",
+      diasFabrica: "",
+      diasInstalacion: ""
+    }
+  };
+}
+
+function numeroDias(valor: string): number | undefined {
+  const numero = Number(valor);
+  return valor.trim() !== "" && Number.isInteger(numero) && numero > 0 ? numero : undefined;
+}
+
+function planificacionDesdeFormulario(formulario: PlanificacionFormulario): PlanificacionProducto | undefined {
+  if (!formulario.fechaInicioInstalacion) return undefined;
+  return {
+    fechaInicioInstalacion: formulario.fechaInicioInstalacion,
+    diasFabricacionPremarcos: numeroDias(formulario.diasFabricacionPremarcos),
+    diasFabrica: numeroDias(formulario.diasFabrica),
+    diasInstalacion: numeroDias(formulario.diasInstalacion)
   };
 }
 
@@ -201,6 +231,121 @@ function EditorEtapas({
         <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
           Este grupo no se agregará al seguimiento de {contexto}.
         </p>
+      )}
+    </section>
+  );
+}
+
+function PlanificacionEditor({
+  tipo,
+  contexto,
+  valor,
+  conPremarcos,
+  alCambiar
+}: {
+  tipo: string;
+  contexto: string;
+  valor: PlanificacionFormulario;
+  conPremarcos: boolean;
+  alCambiar: (cambios: Partial<PlanificacionFormulario>) => void;
+}) {
+  const estimacion = calcularFechasBackward(planificacionDesdeFormulario(valor));
+  return (
+    <section className="rounded-xl border bg-card/60 p-4">
+      <h4 className="flex items-center gap-2 font-heading text-sm font-semibold">
+        <CalendarClock className="size-4 text-primary" strokeWidth={1.75} /> Planificación de fechas
+      </h4>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        Opcional: con la fecha comprometida de inicio de instalación se estiman hacia atrás las fechas de cada bloque,
+        usando las brechas configuradas por administración. Las tareas nacen con esas fechas y siguen siendo editables.
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor={`${tipo}-plan-inicio-instalacion`}>Inicio comprometido de instalación</Label>
+          <Input
+            id={`${tipo}-plan-inicio-instalacion`}
+            type="date"
+            value={valor.fechaInicioInstalacion}
+            onChange={(evento) => alCambiar({ fechaInicioInstalacion: evento.target.value })}
+            aria-label={`Fecha comprometida de inicio de instalación de ${contexto}`}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${tipo}-plan-dias-instalacion`}>Días de instalación</Label>
+          <Input
+            id={`${tipo}-plan-dias-instalacion`}
+            type="number"
+            min={1}
+            step={1}
+            value={valor.diasInstalacion}
+            onChange={(evento) => alCambiar({ diasInstalacion: evento.target.value })}
+            placeholder="Ej.: 15"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${tipo}-plan-dias-fabrica`}>Días de fábrica</Label>
+          <Input
+            id={`${tipo}-plan-dias-fabrica`}
+            type="number"
+            min={1}
+            step={1}
+            value={valor.diasFabrica}
+            onChange={(evento) => alCambiar({ diasFabrica: evento.target.value })}
+            placeholder="Ej.: 10"
+          />
+        </div>
+        {conPremarcos && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`${tipo}-plan-dias-premarcos`}>Días de fabricación de premarcos</Label>
+            <Input
+              id={`${tipo}-plan-dias-premarcos`}
+              type="number"
+              min={1}
+              step={1}
+              value={valor.diasFabricacionPremarcos}
+              onChange={(evento) => alCambiar({ diasFabricacionPremarcos: evento.target.value })}
+              placeholder="Ej.: 5"
+            />
+          </div>
+        )}
+      </div>
+
+      {estimacion && (
+        <dl className="mt-4 grid gap-x-4 gap-y-1.5 rounded-lg bg-muted/60 px-3 py-2.5 text-xs sm:grid-cols-2">
+          {estimacion.inicioFabricacionPremarcos && (
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">Inicio fabricación de premarcos</dt>
+              <dd className="font-medium">{formatFecha(estimacion.inicioFabricacionPremarcos)}</dd>
+            </div>
+          )}
+          {estimacion.entregaPremarcos && (
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">Entrega de premarcos en obra</dt>
+              <dd className="font-medium">{formatFecha(estimacion.entregaPremarcos)}</dd>
+            </div>
+          )}
+          {estimacion.firmaAbaco && (
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">Firma de ábaco</dt>
+              <dd className="font-medium">{formatFecha(estimacion.firmaAbaco)}</dd>
+            </div>
+          )}
+          {estimacion.inicioFabrica && (
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">Inicio de fábrica</dt>
+              <dd className="font-medium">{formatFecha(estimacion.inicioFabrica)}</dd>
+            </div>
+          )}
+          <div className="flex justify-between gap-2">
+            <dt className="text-muted-foreground">Fin de producción</dt>
+            <dd className="font-medium">{formatFecha(estimacion.finProduccion)}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-muted-foreground">Fin de instalación</dt>
+            <dd className="font-medium">{formatFecha(estimacion.finInstalacion)}</dd>
+          </div>
+        </dl>
       )}
     </section>
   );
@@ -369,7 +514,8 @@ export default function Proyectos() {
           []
         ),
         etapasFabrica: etapas(etapasSeleccionadas(configuracion.etapasFabrica), []),
-        etapasObra: etapas(etapasSeleccionadas(configuracion.etapasObra), [])
+        etapasObra: etapas(etapasSeleccionadas(configuracion.etapasObra), []),
+        planificacion: planificacionDesdeFormulario(configuracion.planificacion)
       };
     });
 
@@ -655,6 +801,16 @@ export default function Proyectos() {
                       alCambiar={(valor) => actualizarConfiguracion(tipo, { etapasObra: valor })}
                     />
                   </div>
+
+                  <PlanificacionEditor
+                    tipo={tipo}
+                    contexto={etiquetaProducto}
+                    valor={configuracion.planificacion}
+                    conPremarcos={configuracion.fabricaraPremarcos}
+                    alCambiar={(cambios) =>
+                      actualizarConfiguracion(tipo, { planificacion: { ...configuracion.planificacion, ...cambios } })
+                    }
+                  />
                 </section>
               );
             })}

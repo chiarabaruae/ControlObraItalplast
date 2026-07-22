@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-decisions
 context_type: architecture_decisions
-last_updated: 2026-07-19
+last_updated: 2026-07-22
 tags:
   - decisions
   - product
@@ -220,3 +220,13 @@ tags:
 **Decisión:** `TareaPresupuesto` incorpora `prioridad` (baja/media/alta/urgente, por defecto media). Solo administradores y supervisores pueden definirla (selector inline en la tabla de Tareas y en los formularios de alta/edición); los demás roles la ven como etiqueta de solo lectura. La tabla "Tareas internas" se retira de la sección Tareas; si en el futuro se necesitan tareas genéricas, irán por fuera de las etapas de Fabricación e Instalación pero siempre atadas a un proyecto.
 
 **Consecuencias:** la sección Tareas muestra únicamente seguimiento dependiente de etapas. El tipo `Tarea` y `tareasIniciales` quedan como legado usado por el Dashboard y la pestaña Tareas del detalle de proyecto, pendientes de retirar o reconvertir.
+
+## D-023 — Estimación backward de fechas con brechas configurables por administración
+
+**Estado:** aceptada.
+
+**Contexto:** el cronograma operativo real de Italplast (Excel "Cronograma Fábrica") planifica hacia atrás: desde la fecha comprometida de inicio de instalación se derivan fin de producción, entrada a fábrica, firma de ábaco y premarcos, restando duraciones por bloque y brechas fijas de 3, 1 y 3 días. Esas brechas son regla de negocio y pueden cambiar con el tiempo.
+
+**Decisión:** replicar el cálculo backward en el frontend (`src/frontend/src/lib/planificacion.ts`). En el alta de proyecto, cada producto operativo puede cargar una planificación opcional: fecha comprometida de inicio de instalación más días de instalación, de fábrica y de fabricación de premarcos. Con esa ancla se estiman las fechas de cada bloque (fabricación de premarcos, instalación de premarcos, fábrica, instalación) y las tareas generadas nacen con `fechaInicio`/`fechaFin` sugeridas, siempre editables después. Las tres brechas (fin producción→instalación, firma ábaco→fábrica, entrega premarcos→ábaco) parten de 3/1/3 días y se editan solo por administradores en Configuración → Planificación (permiso `configurarPlanificacion`); persisten en `localStorage` (`control-obras-planificacion`).
+
+**Consecuencias:** las fechas dejan de cargarse siempre a mano: sin planificación cargada el comportamiento anterior se conserva (tareas sin fechas). Cambiar las brechas afecta solo a las estimaciones futuras; no se recalculan tareas existentes. El backend futuro deberá persistir la configuración global y la planificación por producto. La cadena se corta si falta un dato: sin días de fábrica no se estiman ábaco ni premarcos.

@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Estimación backward de fechas con brechas configurables
+
+**Alcance:** se traduce la lógica del Excel "Cronograma Fábrica" al frontend: desde la fecha comprometida de inicio de instalación se estiman hacia atrás las fechas de cada bloque del seguimiento.
+
+**Impacto:** el alta de proyecto permite cargar por producto una planificación opcional (fecha comprometida de instalación, días de instalación, de fábrica y de premarcos) con vista previa de los hitos estimados (entrega de premarcos, firma de ábaco, inicio de fábrica, fin de producción, fin de instalación). Las tareas generadas desde el presupuesto nacen con `fechaInicio`/`fechaFin` por bloque, editables como siempre. Las tres brechas entre hitos (3/1/3 días por defecto) son regla de negocio editable solo por administradores en la nueva pantalla Configuración → Planificación; persisten en `localStorage` bajo `control-obras-planificacion`. Sin planificación cargada, las tareas siguen naciendo sin fechas.
+
+**Archivos clave:** `src/frontend/src/lib/planificacion.ts`, `src/frontend/src/lib/seguimiento-presupuesto.ts`, `src/frontend/src/pages/Planificacion.tsx`, `src/frontend/src/pages/Proyectos.tsx`, `src/frontend/src/mocks/data.ts`, `src/frontend/src/lib/roles.ts`, `src/frontend/src/components/app/AppShell.tsx`, `src/frontend/src/App.tsx`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador como administrador (edición y persistencia de brechas, restauración de predeterminados, vista previa backward correcta: 20 ago −3 → fin producción 17 ago, −10 → inicio fábrica 7 ago, −1 → ábaco 6 ago, −3 → premarcos 3 ago) y como supervisor (ruta /settings/planning redirige a dashboard y la opción no aparece).
+
 ## 2026-07-22 — Reapertura justificada, auditoría de tareas, prioridad y retiro de tareas internas
 
 **Alcance:** trazabilidad completa de las tareas de seguimiento y simplificación de la sección Tareas.

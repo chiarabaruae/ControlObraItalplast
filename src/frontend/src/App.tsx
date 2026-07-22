@@ -13,6 +13,7 @@ import Usuarios from "@/pages/Usuarios";
 import Personalizar from "@/pages/Personalizar";
 import Account from "@/pages/Account";
 import Updates from "@/pages/Updates";
+import Planificacion from "@/pages/Planificacion";
 import Documentation from "@/pages/Documentation";
 import ContactSupport from "@/pages/ContactSupport";
 
@@ -41,9 +42,10 @@ export default function App() {
                 <Route path="/clientes" element={<Clientes />} />
               </Route>
 
-              {/* Usuarios: solo admin */}
+              {/* Usuarios y planificación: solo admin */}
               <Route element={<RequireRole roles={["administrator"]} />}>
                 <Route path="/usuarios" element={<Usuarios />} />
+                <Route path="/settings/planning" element={<Planificacion />} />
               </Route>
             </Route>
           </Route>

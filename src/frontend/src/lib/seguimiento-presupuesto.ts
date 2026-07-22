@@ -4,6 +4,7 @@ import type {
   ItemPresupuesto,
   TareaPresupuesto
 } from "@/mocks/data";
+import { calcularFechasBackward, type BuffersPlanificacion } from "@/lib/planificacion";
 
 export const gruposDeProducto = (producto: ConfiguracionProductoProyecto) => [
   { grupo: "fabricacion_premarcos" as const, etapas: producto.etapasFabricacionPremarcos },
@@ -14,26 +15,31 @@ export const gruposDeProducto = (producto: ConfiguracionProductoProyecto) => [
 
 export function generarTareasDesdePresupuesto(
   productos: ConfiguracionProductoProyecto[],
-  items: ItemPresupuesto[]
+  items: ItemPresupuesto[],
+  buffers?: BuffersPlanificacion
 ): TareaPresupuesto[] {
   return productos.flatMap((producto) => {
     if (producto.tipo === "servicios") return [];
     const itemsProducto = items.filter((item) => item.tipoProducto === producto.tipo);
-    return gruposDeProducto(producto).flatMap(({ grupo, etapas }) =>
-      itemsProducto.flatMap((item) =>
+    const fechasEstimadas = calcularFechasBackward(producto.planificacion, buffers);
+    return gruposDeProducto(producto).flatMap(({ grupo, etapas }) => {
+      const rango = fechasEstimadas?.porGrupo[grupo];
+      return itemsProducto.flatMap((item) =>
         etapas.map((etapa) => ({
           id: `${producto.tipo}-${grupo}-${item.id}-${etapa.nombre}`,
           itemId: item.id,
           tipoProducto: producto.tipo,
           grupo,
           etapa: etapa.nombre,
+          fechaInicio: rango?.inicio,
+          fechaFin: rango?.fin,
           prioridad: "media" as const,
           creadaEn: new Date().toISOString(),
           version: 1,
           completada: false
         }))
-      )
-    );
+      );
+    });
   });
 }
 
