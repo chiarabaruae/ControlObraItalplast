@@ -11,6 +11,8 @@ export interface Usuario {
   positionTitle: string;
   email?: string;
   telefono?: string;
+  /** Avatar guardado por el perfil; si falta, la UI muestra iniciales. */
+  avatar?: string;
   isActive: boolean;
 }
 
@@ -180,6 +182,13 @@ export interface RegistroModificacionTarea {
   resumen: string;
 }
 
+export interface RegistroAsignacionTarea {
+  fecha: string;
+  asignadoPorId: string;
+  responsableId?: string;
+  resumen: string;
+}
+
 export interface TareaPresupuesto {
   id: string;
   /** Vacío en tareas manuales agregadas por el supervisor. */
@@ -200,8 +209,15 @@ export interface TareaPresupuesto {
   observaciones?: string;
   completadaEn?: string;
   completadaPorId?: string;
+  /** Persona responsable de ejecutar la tarea. */
+  responsableId?: string;
+  /** Persona que hizo la última asignación (visible para todos los roles). */
+  asignadaPorId?: string;
+  asignadaEn?: string;
+  asignaciones?: RegistroAsignacionTarea[];
   // ── Auditoría (columnas visibles solo para administradores) ──
   creadaEn?: string;
+  creadaPorId?: string;
   /** Arranca en 1; cada modificación la incrementa. */
   version?: number;
   modificadaEn?: string;
@@ -635,6 +651,12 @@ export function clientePorId(id: string) {
 export function usuarioPorId(id: string) {
   return usuarios.find((u) => u.id === id);
 }
+export function usuarioConAvatarPorId(id: string) {
+  const usuario = usuarioPorId(id);
+  if (!usuario || typeof window === "undefined") return usuario;
+  const avatar = window.localStorage.getItem(`co-avatar-${id}`) ?? undefined;
+  return avatar ? { ...usuario, avatar } : usuario;
+}
 export function proyectoPorId(id: string) {
   return obtenerProyectos().find((p) => p.id === id);
 }
@@ -708,18 +730,53 @@ export function registrarModificacionTarea(
   };
 }
 
+/** Registra una asignación o desasignación sin perder el historial anterior. */
+export function asignarResponsableTarea(
+  tarea: TareaPresupuesto,
+  responsableId: string | undefined,
+  asignadoPorId: string
+): TareaPresupuesto {
+  const fecha = new Date().toISOString();
+  const responsable = responsableId ? usuarioPorId(responsableId)?.displayName : undefined;
+  return registrarModificacionTarea(
+    {
+      ...tarea,
+      responsableId,
+      asignadaPorId: asignadoPorId,
+      asignadaEn: fecha,
+      asignaciones: [
+        ...(tarea.asignaciones ?? []),
+        {
+          fecha,
+          asignadoPorId,
+          responsableId,
+          resumen: responsable ? `Asignó la tarea a ${responsable}` : "Quitó la asignación de la tarea"
+        }
+      ]
+    },
+    asignadoPorId,
+    responsable ? `Asignó la tarea a ${responsable}` : "Quitó la asignación de la tarea"
+  );
+}
+
 /** Borrado lógico: la tarea sale del seguimiento pero queda auditada en `tareasEliminadas`. */
 export function eliminarTareaConAuditoria(
   p: Proyecto,
   tarea: TareaPresupuesto,
   usuarioId: string
 ): Proyecto {
+  const fecha = new Date().toISOString();
+  const auditada = registrarModificacionTarea(
+    { ...tarea, eliminadaEn: fecha, eliminadaPorId: usuarioId },
+    usuarioId,
+    "Archivó la tarea"
+  );
   return {
     ...p,
     tareasPresupuesto: (p.tareasPresupuesto ?? []).filter((existente) => existente.id !== tarea.id),
     tareasEliminadas: [
       ...(p.tareasEliminadas ?? []),
-      { ...tarea, eliminadaEn: new Date().toISOString(), eliminadaPorId: usuarioId }
+      auditada
     ]
   };
 }
@@ -786,7 +843,7 @@ export function obtenerProyectos(): Proyecto[] {
             etapasFabricacionPremarcos,
             etapasInstalacionPremarcos,
             presupuestoEjecutivo: proyecto.presupuestoEjecutivo ?? demostrativo?.presupuestoEjecutivo,
-            tareasPresupuesto: proyecto.tareasPresupuesto?.length
+            tareasPresupuesto: Array.isArray(proyecto.tareasPresupuesto)
               ? proyecto.tareasPresupuesto
               : (demostrativo?.tareasPresupuesto ?? [])
           };

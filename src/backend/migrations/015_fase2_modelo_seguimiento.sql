@@ -165,6 +165,10 @@ create table if not exists tareas_seguimiento (
   completada         boolean not null default false,
   completada_en      timestamptz,
   completada_por_id  uuid references app_users(id),
+  -- Asignación operativa: el responsable ejecuta y el asignador queda visible.
+  responsable_id     uuid references app_users(id),
+  asignada_por_id    uuid references app_users(id),
+  asignada_en        timestamptz,
   observaciones      text,
   evidencia_id       uuid references evidencias(id),
   -- Auditoría (D-021):
@@ -183,6 +187,9 @@ create table if not exists tareas_seguimiento (
 create index if not exists ix_tareas_proyecto on tareas_seguimiento (proyecto_id) where eliminada_en is null;
 create index if not exists ix_tareas_pendientes on tareas_seguimiento (proyecto_id, completada) where eliminada_en is null;
 
+create index if not exists ix_tareas_responsable on tareas_seguimiento (responsable_id)
+  where eliminada_en is null;
+
 create table if not exists tarea_modificaciones (
   id          bigint generated always as identity primary key,
   tarea_id    uuid not null references tareas_seguimiento(id) on delete cascade,
@@ -192,6 +199,17 @@ create table if not exists tarea_modificaciones (
 );
 
 create index if not exists ix_tarea_modificaciones on tarea_modificaciones (tarea_id);
+
+create table if not exists tarea_asignaciones (
+  id             bigint generated always as identity primary key,
+  tarea_id       uuid not null references tareas_seguimiento(id) on delete cascade,
+  fecha          timestamptz not null default now(),
+  asignado_por_id uuid references app_users(id),
+  responsable_id uuid references app_users(id),
+  resumen        varchar(300) not null
+);
+
+create index if not exists ix_tarea_asignaciones on tarea_asignaciones (tarea_id, fecha desc);
 
 create table if not exists tarea_reaperturas (
   id          bigint generated always as identity primary key,

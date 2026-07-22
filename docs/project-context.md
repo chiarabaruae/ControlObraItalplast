@@ -35,7 +35,7 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 - Versión visible: `AppWebb v0.2.0`.
 - La Fase 2 usa datos mock y persistencia temporal en `localStorage`.
 - El backend Express/PostgreSQL permanece en el repositorio, pero el nuevo frontend React todavía no está conectado a todas sus rutas reales.
-- Existe el esqueleto Fase 2 del backend (D-027): migración `src/backend/migrations/015_fase2_modelo_seguimiento.sql` (esquema con terminología vigente: catálogo, reglas backward, proyectos, presupuesto ejecutivo, tareas con auditoría, evidencias, transiciones) y rutas `/api/v2` en `src/backend/src/http/routes/fase2-routes.js` con JWT y la matriz de permisos de `roles.ts`. Falta: subir PDF/evidencias como archivos, transiciones de estado, generación de tareas server-side y conectar el frontend.
+- Existe el esqueleto Fase 2 del backend (D-027): migraciones `015_fase2_modelo_seguimiento.sql` y `016_asignacion_y_archivo_tareas.sql` (catálogo, reglas backward, proyectos, presupuesto ejecutivo, tareas con auditoría, asignación, archivo y evidencias) y rutas `/api/v2` en `src/backend/src/http/routes/fase2-routes.js` con JWT y la matriz de permisos de `roles.ts`. Falta: subir PDF/evidencias como archivos, transiciones de estado, generación de tareas server-side y conectar el frontend.
 - Comandos principales desde `src/frontend`: `npm run dev`, `npm run build` y `npm run lint`.
 - Diagnóstico de lectores PDF: `npm run diagnostico:presupuestos -- <archivo-1.pdf> <archivo-2.pdf>`.
 
@@ -134,11 +134,12 @@ El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de pre
 - La sección Tareas del menú lee las mismas `tareasPresupuesto` persistidas por cada proyecto, permite filtrar por proyecto y usa el mismo diálogo de cierre. Un cambio realizado allí se refleja al volver al detalle y viceversa.
 - La tabla "Tareas internas" fue retirada de la sección Tareas: solo existen tareas dependientes de una etapa. El tipo `Tarea` y `tareasIniciales` quedan como legado (Dashboard y pestaña Tareas del detalle), pendientes de retirar o reconvertir.
 - Cada tarea tiene una **prioridad** (baja/media/alta/urgente, por defecto media) que solo administradores y supervisores pueden definir: selector inline tanto en la tabla de Tareas como en la lista del detalle de proyecto (Fábrica/Instalación), y campos en los formularios de alta/edición. Los demás roles la ven como etiqueta.
+- Cada tarea puede tener un **responsable de ejecución** y conserva quién la asignó, cuándo y el historial de asignaciones. Administración puede asignar a supervisores o usuarios; supervisión solo a usuarios. El selector usa avatar/foto si existe y muestra iniciales como fallback. Los usuarios comunes solo reciben tareas asignadas a su usuario.
 - El **bloque** de una tarea se muestra como `{producto} · {Fabricación/Instalación}` (ej. "PVC · Fabricación", "Aluminio · Instalación"), usando el nombre corto del catálogo — no el genérico "Producto" — para distinguir productos en proyectos multiproducto. Misma etiqueta en Tareas, en el detalle de proyecto y en el selector de "Nueva tarea". Fuente: `etiquetaBloque` en `src/frontend/src/lib/seguimiento-presupuesto.ts`.
 - **Tareas y el detalle de proyecto muestran los mismos campos con las mismas condiciones por rol**: prioridad editable, auditoría (solo admin) y acciones de editar/eliminar. Editar una tarea existente usa el mismo diálogo (`DialogoEditarTarea`) en ambos lugares. Eliminar depende de `permisos.eliminarTarea` (solo administradores) en los dos.
 - **Reabrir una tarea completada exige motivo obligatorio para todos los roles.** Se registran fecha, usuario y motivo en `reaperturas`, y el cambio queda en el historial `modificaciones`.
 - Auditoría por tarea: `creadaEn`, `version`, `modificadaEn`, `modificadaPorId`, `modificaciones` y `reaperturas`. En la tabla de Tareas, las columnas **Creación** y **Modificación** son visibles solo para administradores (permiso `verAuditoriaTareas`).
-- Eliminar una tarea es un borrado lógico: pasa a `tareasEliminadas` del proyecto con `eliminadaEn`/`eliminadaPorId`; ninguna interfaz la muestra.
+- Editar, reasignar o archivar exige confirmación explícita; cambiar la prioridad se aplica directamente y conserva la auditoría. Eliminar una tarea es un borrado lógico: pasa a `tareasEliminadas` del proyecto con `eliminadaEn`/`eliminadaPorId`; la vista de archivadas y el detalle de quién archivó quedan disponibles únicamente para administración.
 - La acción primaria para completar siempre se representa con un ícono de check. La evidencia continúa siendo obligatoria dentro del diálogo, pero ya no se representa con una cámara en la lista.
 - Completar una tarea exige una evidencia de imagen; la observación es opcional.
 - La imagen se redimensiona a un máximo de 1280 px y se comprime a JPEG antes de guardarse localmente.
@@ -228,9 +229,9 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 - La lectura usa heurísticas sobre texto embebido. Los PDFs escaneados sin texto y formatos no reconocidos requieren carga manual; no hay OCR.
 - Las evidencias viven temporalmente como imágenes comprimidas en `localStorage`; el límite de cuota del navegador impide usarlo como repositorio definitivo.
 - Las tareas se generan por componente presupuestado y etapa, no por cada unidad individual cuando `cantidad > 1`.
-- Las tareas generadas todavía no tienen responsable; en Fase 2 las completan administradores o supervisores.
+- Las tareas generadas pueden asignarse desde Tareas o desde el detalle; la persistencia definitiva de la asignación queda preparada en PostgreSQL pero el frontend activo todavía usa `localStorage`.
 - Los componentes, fechas, cierres y evidencias agregados a los cuatro proyectos iniciales son datos ficticios de demostración y no deben interpretarse como registros operativos reales.
-- La vista Tareas muestra el seguimiento global también al rol Usuario, aunque sus controles estén deshabilitados; debe filtrarse por responsabilidad antes de producción.
+- La vista Tareas y las listas por etapa filtran al rol Usuario por `responsableId`; administración y supervisión conservan la vista completa. El archivo de tareas retiradas solo aparece para administración.
 - La reapertura de una Finalizada conserva las tareas completadas al 100%; todavía no existe una operación para revertir masivamente esos cierres, por lo que deben agregarse o reabrirse tareas en forma explícita.
 - No existe administración global de plantillas de productos y etapas.
 - Las futuras plantillas globales solo deben ser modificables por administradores y supervisores autorizados.

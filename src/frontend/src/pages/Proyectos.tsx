@@ -558,7 +558,10 @@ export default function Proyectos() {
       ].map((etapa) => ({ etapa: `${etiquetaProducto} · ${etapa}`, inicio: fechaInicio, fin: fechaInicio }));
     });
     const soloServicios = productos.every((producto) => producto.tipo === "servicios");
-    const tareasPresupuesto = generarTareasDesdePresupuesto(productos, presupuesto.items);
+    const tareasPresupuesto = generarTareasDesdePresupuesto(productos, presupuesto.items).map((tarea) => ({
+      ...tarea,
+      creadaPorId: user.id
+    }));
     const aberturas = presupuesto.items
       .filter((item) => item.tipoProducto === "aberturas_aluminio" || item.tipoProducto === "aberturas_pvc")
       .map((item) => ({

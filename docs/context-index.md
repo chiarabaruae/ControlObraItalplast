@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-context-index
 context_type: retrieval_index
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 tags:
   - agents
   - context
@@ -12,6 +12,8 @@ tags:
   - kanban
   - table-filters
   - task-creation
+  - task-assignment
+  - task-audit
 ---
 
 # Índice de contexto para agentes

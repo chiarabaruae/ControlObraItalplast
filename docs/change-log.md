@@ -10,11 +10,33 @@ tags:
   - executive-budget
   - diagnostics
   - user-management
+  - task-assignment
+  - task-audit
 ---
 
 # Registro contextual de cambios
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
+
+## 2026-07-22 — Cambio de prioridad sin confirmación
+
+**Alcance:** se elimina el panel de confirmación al seleccionar una nueva prioridad en Tareas y en el seguimiento del detalle de proyecto.
+
+**Impacto:** la prioridad se aplica inmediatamente, mantiene el registro de auditoría y conserva las confirmaciones para editar, reasignar y archivar.
+
+**Archivos clave:** `src/frontend/src/pages/Todo.tsx`, `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`, `docs/project-context.md`, `docs/decisions.md`.
+
+**Validaciones:** `npm run build`, `npm run lint` (solo advertencias Fast Refresh preexistentes) y recorrido visual en localhost como supervisor.
+
+## 2026-07-22 — Responsables, confirmaciones y archivo administrativo de tareas
+
+**Alcance:** se implementa asignación de tareas por rol, filtro de tareas propias para Usuario, confirmación de edición/archivado y consulta administrativa de tareas retiradas (D-028).
+
+**Impacto:** administración asigna a supervisores o usuarios; supervisión asigna solo a usuarios. Cada tarea guarda responsable, asignador, fecha e historial. La UI muestra avatar o iniciales y quién asignó. Archivar desde cualquiera de las dos vistas conserva la tarea con autor y momento; solo administración ve el archivo. PostgreSQL queda preparado con la migración 016, `tarea_asignaciones` y rutas `/api/v2` con validación de destino.
+
+**Archivos clave:** `src/frontend/src/lib/roles.ts`, `src/frontend/src/mocks/data.ts`, `src/frontend/src/components/proyectos/SelectorResponsableTarea.tsx`, `src/frontend/src/components/proyectos/DialogoConfirmarCambioTarea.tsx`, `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`, `src/frontend/src/components/proyectos/DialogoEditarTarea.tsx`, `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/backend/migrations/016_asignacion_y_archivo_tareas.sql`, `src/backend/src/http/routes/fase2-routes.js`.
+
+**Validaciones:** `npm run build`, `npm run lint` (solo advertencias Fast Refresh preexistentes), `node --check` de rutas y server. Falta recorrido visual actualizado y ejecución contra PostgreSQL real.
 
 ## 2026-07-22 — Esquema PostgreSQL Fase 2 y rutas /api/v2 (esqueleto backend)
 

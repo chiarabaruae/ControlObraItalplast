@@ -6,7 +6,7 @@ import { ArrowRight, Building2, Layers, Users } from "lucide-react";
 import { toast } from "sonner";
 import { etiquetaBloque, gruposDeProducto } from "@/lib/seguimiento-presupuesto";
 import {
-  clientes, nombreTipoProducto, PRIORIDADES_TAREA,
+  clientes, usuarios, nombreTipoProducto, PRIORIDADES_TAREA,
   type GrupoTareaPresupuesto, type PrioridadTarea, type Proyecto, type TareaPresupuesto, type TipoProducto
 } from "@/mocks/data";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectorResponsableTarea } from "@/components/proyectos/SelectorResponsableTarea";
+import type { Role } from "@/lib/roles";
 
 interface Props {
   abierto: boolean;
   proyectos: Proyecto[];
+  rol: Role;
+  usuarioId: string;
   alCerrar: () => void;
   alAgregar: (proyectoId: string, tarea: TareaPresupuesto) => void;
 }
@@ -47,7 +51,7 @@ function PasoEncabezado({ numero, activo, completado, icono: Icono, titulo }: {
   );
 }
 
-export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: Props) {
+export function DialogoNuevaTarea({ abierto, proyectos, rol, usuarioId, alCerrar, alAgregar }: Props) {
   const [clienteId, setClienteId] = useState("");
   const [proyectoId, setProyectoId] = useState("");
   const [productoTipo, setProductoTipo] = useState<TipoProducto | "">("");
@@ -56,6 +60,7 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [prioridad, setPrioridad] = useState<PrioridadTarea>("media");
+  const [responsableId, setResponsableId] = useState<string>();
 
   // Solo proyectos con seguimiento ya generado admiten tareas nuevas.
   const proyectosConSeguimiento = useMemo(
@@ -92,6 +97,7 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
   const reiniciar = () => {
     setClienteId(""); setProyectoId(""); setProductoTipo(""); setGrupo("");
     setTitulo(""); setFechaInicio(""); setFechaFin(""); setPrioridad("media");
+    setResponsableId(undefined);
   };
 
   const cerrar = (valor: boolean) => {
@@ -106,6 +112,8 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
       toast("Revisá las fechas", { description: "La fecha de entrega no puede ser anterior al inicio." });
       return;
     }
+    const ahora = new Date().toISOString();
+    const responsable = responsableId ? usuarios.find((usuario) => usuario.id === responsableId) : undefined;
     alAgregar(proyecto.id, {
       id: `manual-${Date.now()}`,
       itemId: "",
@@ -117,7 +125,12 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
       fechaFin: fechaFin || undefined,
       manual: true,
       prioridad,
-      creadaEn: new Date().toISOString(),
+      responsableId,
+      asignadaPorId: responsableId ? usuarioId : undefined,
+      asignadaEn: responsableId ? ahora : undefined,
+      asignaciones: responsableId ? [{ fecha: ahora, asignadoPorId: usuarioId, responsableId, resumen: `Asignó la tarea a ${responsable?.displayName ?? "un usuario"}` }] : undefined,
+      creadaPorId: usuarioId,
+      creadaEn: ahora,
       version: 1,
       completada: false
     });
@@ -240,6 +253,7 @@ export function DialogoNuevaTarea({ abierto, proyectos, alCerrar, alAgregar }: P
                   </SelectContent>
                 </Select>
               </div>
+              <SelectorResponsableTarea rol={rol} valor={responsableId} onChange={setResponsableId} />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="nueva-tarea-inicio">Fecha de inicio</Label>

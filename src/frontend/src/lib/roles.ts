@@ -33,7 +33,14 @@ export const permisos = {
   // Tareas
   crearTarea: (r: Role) => r === "administrator" || r === "supervisor",
   editarTarea: (r: Role) => r === "administrator" || r === "supervisor",
-  eliminarTarea: (r: Role) => r === "administrator",
+  // Administración y supervisión pueden retirar una tarea. El retiro es
+  // lógico y queda visible en el archivo de auditoría solo para admin.
+  eliminarTarea: (r: Role) => r === "administrator" || r === "supervisor",
+  asignarTarea: (r: Role) => r === "administrator" || r === "supervisor",
+  puedeAsignarA: (r: Role, destino: Role) =>
+    r === "administrator"
+      ? destino === "supervisor" || destino === "viewer"
+      : r === "supervisor" && destino === "viewer",
   // La prioridad de una tarea solo la determinan administradores y supervisores.
   definirPrioridadTarea: (r: Role) => r === "administrator" || r === "supervisor",
   // Columnas de auditoría (creación / modificaciones): solo administradores.

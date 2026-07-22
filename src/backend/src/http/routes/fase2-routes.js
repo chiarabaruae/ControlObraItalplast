@@ -17,8 +17,10 @@ const puede = {
   editarAvance: (rol) => rol === "administrator" || rol === "supervisor",
   crearTarea: (rol) => rol === "administrator" || rol === "supervisor",
   editarTarea: (rol) => rol === "administrator" || rol === "supervisor",
-  eliminarTarea: (rol) => rol === "administrator",
+  eliminarTarea: (rol) => rol === "administrator" || rol === "supervisor",
+  asignarTarea: (rol) => rol === "administrator" || rol === "supervisor",
   definirPrioridad: (rol) => rol === "administrator" || rol === "supervisor",
+  verAuditoriaTareas: (rol) => rol === "administrator",
   gestionarReglasNegocio: (rol) => rol === "administrator"
 };
 
@@ -30,6 +32,32 @@ function exigir(permiso) {
     }
     next();
   };
+}
+
+function puedeAsignarA(rol, destino) {
+  return rol === "administrator"
+    ? destino === "supervisor" || destino === "viewer"
+    : rol === "supervisor" && destino === "viewer";
+}
+
+async function validarResponsable(pool, request, responsableId) {
+  if (responsableId === undefined || responsableId === null) return null;
+  if (!puede.asignarTarea(request.user?.role)) {
+    const error = new Error("No autorizado para asignar tareas.");
+    error.status = 403;
+    throw error;
+  }
+  const { rows } = await pool.query(
+    `select id, role, is_active from app_users where id = $1`,
+    [responsableId]
+  );
+  const destino = rows[0];
+  if (!destino || !destino.is_active || !puedeAsignarA(request.user.role, destino.role)) {
+    const error = new Error("El responsable elegido no está habilitado para este rol.");
+    error.status = 403;
+    throw error;
+  }
+  return destino;
 }
 
 export function createFase2Routes({ pool, env }) {
@@ -173,8 +201,9 @@ export function createFase2Routes({ pool, env }) {
         pool.query(`select * from proyecto_etapas where proyecto_id = $1 order by grupo, orden`, [request.params.id]),
         pool.query(
           `select * from tareas_seguimiento where proyecto_id = $1 and eliminada_en is null
+            and ($2 in ('administrator','supervisor') or responsable_id = $3)
             order by fecha_fin nulls last`,
-          [request.params.id]
+          [request.params.id, request.user.role, request.user.sub ?? null]
         )
       ]);
       if (proyecto.rows.length === 0) {
@@ -187,6 +216,26 @@ export function createFase2Routes({ pool, env }) {
         etapas: etapas.rows,
         tareas: tareas.rows
       });
+    } catch (error) { next(error); }
+  });
+
+  router.get("/tareas", async (request, response, next) => {
+    try {
+      const filtro = request.user.role === "viewer" ? "and ts.responsable_id = $1" : "";
+      const params = request.user.role === "viewer" ? [request.user.sub] : [];
+      const { rows } = await pool.query(
+        `select ts.*, p.nombre as proyecto_nombre,
+                responsable.display_name as responsable_nombre,
+                asignador.display_name as asignada_por_nombre
+           from tareas_seguimiento ts
+           join proyectos p on p.id = ts.proyecto_id
+           left join app_users responsable on responsable.id = ts.responsable_id
+           left join app_users asignador on asignador.id = ts.asignada_por_id
+          where ts.eliminada_en is null ${filtro}
+          order by ts.fecha_fin nulls last`,
+        params
+      );
+      response.json(rows);
     } catch (error) { next(error); }
   });
 
@@ -244,19 +293,30 @@ export function createFase2Routes({ pool, env }) {
   // ==========================================================================
   router.post("/proyectos/:id/tareas", exigir("crearTarea"), async (request, response, next) => {
     try {
-      const { tipoProducto, grupo, titulo, itemId, fechaInicio, fechaFin, prioridad } = request.body ?? {};
+      const { tipoProducto, grupo, titulo, itemId, fechaInicio, fechaFin, prioridad, responsableId } = request.body ?? {};
       if (!tipoProducto || !grupo || !titulo?.trim()) {
         response.status(400).json({ error: "tipoProducto, grupo y titulo son obligatorios." });
         return;
       }
+      const responsable = await validarResponsable(pool, request, responsableId);
       const id = randomUUID();
       await pool.query(
         `insert into tareas_seguimiento (id, proyecto_id, item_id, tipo_producto, grupo, etapa, titulo,
-                                         fecha_inicio, fecha_fin, manual, prioridad, creada_por_id)
-         values ($1, $2, $3, $4, $5, 'Tarea agregada', $6, $7, $8, true, coalesce($9,'media'), $10)`,
+                                         fecha_inicio, fecha_fin, manual, prioridad, creada_por_id,
+                                         responsable_id, asignada_por_id, asignada_en)
+         values ($1, $2, $3, $4, $5, 'Tarea agregada', $6, $7, $8, true, coalesce($9,'media'), $10,
+                 $11, $12, case when $11 is null then null else now() end)`,
         [id, request.params.id, itemId ?? null, tipoProducto, grupo, titulo.trim(),
-         fechaInicio ?? null, fechaFin ?? null, prioridad, request.user.sub ?? null]
+         fechaInicio ?? null, fechaFin ?? null, prioridad, request.user.sub ?? null,
+         responsable?.id ?? null, request.user.sub ?? null]
       );
+      if (responsable) {
+        await pool.query(
+          `insert into tarea_asignaciones (tarea_id, asignado_por_id, responsable_id, resumen)
+           values ($1, $2, $3, $4)`,
+          [id, request.user.sub ?? null, responsable.id, `Asignó la tarea a ${responsable.display_name}`]
+        );
+      }
       response.status(201).json({ id });
     } catch (error) { next(error); }
   });
@@ -264,7 +324,18 @@ export function createFase2Routes({ pool, env }) {
   // Edición de nombre, componente, fechas y prioridad (sella auditoría, D-021).
   router.patch("/tareas/:id", exigir("editarTarea"), async (request, response, next) => {
     try {
-      const { titulo, itemId, fechaInicio, fechaFin, prioridad, resumen } = request.body ?? {};
+      const { titulo, itemId, fechaInicio, fechaFin, prioridad, responsableId, resumen } = request.body ?? {};
+      const cambiaResponsable = Object.prototype.hasOwnProperty.call(request.body ?? {}, "responsableId");
+      const responsable = cambiaResponsable ? await validarResponsable(pool, request, responsableId) : null;
+      const actual = await pool.query(
+        `select responsable_id from tareas_seguimiento where id = $1 and eliminada_en is null`,
+        [request.params.id]
+      );
+      if (actual.rows.length === 0) {
+        response.status(404).json({ error: "Tarea no encontrada." });
+        return;
+      }
+      const responsableCambio = cambiaResponsable && actual.rows[0].responsable_id !== (responsable?.id ?? null);
       const { rowCount } = await pool.query(
         `update tareas_seguimiento
             set titulo = coalesce($2, titulo),
@@ -272,12 +343,16 @@ export function createFase2Routes({ pool, env }) {
                 fecha_inicio = coalesce($4, fecha_inicio),
                 fecha_fin = coalesce($5, fecha_fin),
                 prioridad = coalesce($6, prioridad),
+                responsable_id = case when $8 then $7 else responsable_id end,
+                asignada_por_id = case when $8 and $7 is not null then $9 else asignada_por_id end,
+                asignada_en = case when $8 then case when $7 is null then null else now() end else asignada_en end,
                 version = version + 1,
                 modificada_en = now(),
-                modificada_por_id = $7
+                modificada_por_id = $9
           where id = $1 and eliminada_en is null`,
         [request.params.id, titulo ?? null, itemId ?? null, fechaInicio ?? null,
-         fechaFin ?? null, prioridad ?? null, request.user.sub ?? null]
+         fechaFin ?? null, prioridad ?? null, responsable?.id ?? null, cambiaResponsable,
+         request.user.sub ?? null]
       );
       if (rowCount === 0) {
         response.status(404).json({ error: "Tarea no encontrada." });
@@ -285,8 +360,16 @@ export function createFase2Routes({ pool, env }) {
       }
       await pool.query(
         `insert into tarea_modificaciones (tarea_id, usuario_id, resumen) values ($1, $2, $3)`,
-        [request.params.id, request.user.sub ?? null, resumen ?? "Editó nombre, fechas o prioridad de la tarea"]
+        [request.params.id, request.user.sub ?? null, resumen ?? (responsableCambio ? "Cambió el responsable de la tarea" : "Editó nombre, fechas o prioridad de la tarea")]
       );
+      if (responsableCambio) {
+        await pool.query(
+          `insert into tarea_asignaciones (tarea_id, asignado_por_id, responsable_id, resumen)
+           values ($1, $2, $3, $4)`,
+          [request.params.id, request.user.sub ?? null, responsable?.id ?? null,
+           responsable ? `Asignó la tarea a ${responsable.display_name}` : "Quitó la asignación de la tarea"]
+        );
+      }
       response.json({ ok: true });
     } catch (error) { next(error); }
   });
@@ -322,6 +405,20 @@ export function createFase2Routes({ pool, env }) {
   // Reabrir: motivo obligatorio para todos los roles (D-021).
   router.post("/tareas/:id/reabrir", async (request, response, next) => {
     try {
+      const tareaActual = await pool.query(
+        `select responsable_id from tareas_seguimiento where id = $1 and eliminada_en is null`,
+        [request.params.id]
+      );
+      if (tareaActual.rows.length === 0) {
+        response.status(404).json({ error: "Tarea no encontrada." });
+        return;
+      }
+      const esAdminOSupervisor = request.user.role === "administrator" || request.user.role === "supervisor";
+      const esResponsable = tareaActual.rows[0].responsable_id && tareaActual.rows[0].responsable_id === request.user.sub;
+      if (!esAdminOSupervisor && !esResponsable) {
+        response.status(403).json({ error: "Solo el responsable o administración puede reabrir esta tarea." });
+        return;
+      }
       const { motivo } = request.body ?? {};
       if (!motivo?.trim()) {
         response.status(400).json({ error: "Reabrir exige un motivo obligatorio." });
@@ -347,6 +444,23 @@ export function createFase2Routes({ pool, env }) {
     } catch (error) { next(error); }
   });
 
+  router.get("/tareas/archivadas", exigir("verAuditoriaTareas"), async (_request, response, next) => {
+    try {
+      const { rows } = await pool.query(
+        `select ts.*, p.nombre as proyecto_nombre,
+                responsable.display_name as responsable_nombre,
+                archivador.display_name as eliminada_por_nombre
+           from tareas_seguimiento ts
+           join proyectos p on p.id = ts.proyecto_id
+           left join app_users responsable on responsable.id = ts.responsable_id
+           left join app_users archivador on archivador.id = ts.eliminada_por_id
+          where ts.eliminada_en is not null
+          order by ts.eliminada_en desc`
+      );
+      response.json(rows);
+    } catch (error) { next(error); }
+  });
+
   // Borrado lógico (D-021): la tarea queda auditada, ninguna vista la muestra.
   router.delete("/tareas/:id", exigir("eliminarTarea"), async (request, response, next) => {
     try {
@@ -360,6 +474,10 @@ export function createFase2Routes({ pool, env }) {
         response.status(404).json({ error: "Tarea no encontrada." });
         return;
       }
+      await pool.query(
+        `insert into tarea_modificaciones (tarea_id, usuario_id, resumen) values ($1, $2, 'Archivó la tarea')`,
+        [request.params.id, request.user.sub ?? null]
+      );
       response.json({ ok: true });
     } catch (error) { next(error); }
   });

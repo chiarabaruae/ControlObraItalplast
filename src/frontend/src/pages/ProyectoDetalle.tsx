@@ -334,6 +334,7 @@ export default function ProyectoDetalle() {
                 puedePrioridad={permisos.definirPrioridadTarea(user.role)}
                 verAuditoria={permisos.verAuditoriaTareas(user.role)}
                 usuarioId={user.id}
+                rol={user.role}
                 alActualizar={actualizarTareaPresupuesto}
                 alAgregar={agregarTareaPresupuesto}
                 alEliminarTarea={eliminarTareaPresupuesto}
@@ -354,6 +355,7 @@ export default function ProyectoDetalle() {
                 puedePrioridad={permisos.definirPrioridadTarea(user.role)}
                 verAuditoria={permisos.verAuditoriaTareas(user.role)}
                 usuarioId={user.id}
+                rol={user.role}
                 alActualizar={actualizarTareaPresupuesto}
                 alAgregar={agregarTareaPresupuesto}
                 alEliminarTarea={eliminarTareaPresupuesto}

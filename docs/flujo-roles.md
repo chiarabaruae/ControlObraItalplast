@@ -12,6 +12,8 @@ tags:
   - task-evidence
   - user-management
   - task-management
+  - task-assignment
+  - task-audit
   - kanban
 ---
 
@@ -100,7 +102,7 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Subir oferta PDF → generar cronograma | ✅ | ❌ (comercial) | ❌ |
 | Reemplazar presupuesto ejecutivo | ✅ | ✅ | ❌ |
 | Generar seguimientos (fábrica/instalación) | ✅ | ✅ | ❌ |
-| Agregar, renombrar, refechar o eliminar tareas de seguimiento | ✅ | ✅ | ❌ |
+| Agregar, renombrar, refechar, reasignar o archivar tareas de seguimiento | ✅ | ✅ | ❌ |
 | **Completar tareas de etapa con evidencia** | ✅ | ✅ *(su función principal)* | ❌ en Fase 2 |
 | Comentarios / hitos | ✅ | ✅ | ❌ |
 
@@ -109,21 +111,19 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 |---|---|---|---|
 | Ver tareas | ✅ todas | ✅ todas | ✅ las asignadas a él/ella |
 | Crear / editar tarea | ✅ | ✅ | ❌ |
+| Asignar responsable | ✅ a supervisores/usuarios | ✅ solo a usuarios | ❌ |
 | Completar / reabrir | ✅ | ✅ | ✅ **solo las propias** |
 | Reabrir sin motivo | ❌ nadie: el motivo es obligatorio para todos los roles | ❌ | ❌ |
 | Definir prioridad | ✅ | ✅ | ❌ (la ve como etiqueta) |
 | Ver columnas Creación / Modificación (auditoría) | ✅ | ❌ | ❌ |
-| Eliminar tarea (borrado lógico auditado) | ✅ | ❌ | ❌ |
+| Archivar tarea (borrado lógico auditado) | ✅ | ✅ | ❌ |
+| Ver tareas archivadas y quién las retiró | ✅ | ❌ | ❌ |
 
 *La sección Tareas ya no muestra "tareas internas": solo tareas de seguimiento
-dependientes de una etapa. Cada reapertura registra fecha, usuario y motivo;
-cada modificación (completar, reabrir, editar, prioridad) suma versión, fecha y
-autor a la auditoría de la tarea.*
-
-*Nota Fase 3: "sus tareas" requiere agregar asignación por usuario
-(`tareas_obra.responsable` hoy es texto libre, no FK a `app_users`). Las tareas
-de seguimiento aún no tienen responsable y la implementación Fase 2 las muestra
-en lectura al rol Usuario; debe filtrarse antes de producción.*
+dependientes de una etapa. Crear, editar, cambiar prioridad, reasignar y archivar
+sellan fecha y autor; el rol Usuario ve solo tareas cuyo `responsableId` coincide
+con su cuenta. El archivo administrativo conserva las tareas retiradas por
+administración o supervisión.*
 
 ### Usuarios (pantalla nueva, admin-only)
 | Acción | administrator |

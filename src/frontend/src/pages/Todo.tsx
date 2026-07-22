@@ -6,7 +6,7 @@
 // Columnas Creación y Modificación: visibles solo para administradores.
 import { useState } from "react";
 import { Link } from "react-router";
-import { Plus, Check, ClipboardList, Pencil, Trash2 } from "lucide-react";
+import { Plus, Check, ClipboardList, Pencil, Trash2, Archive } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
@@ -16,6 +16,7 @@ import {
   registrarModificacionTarea, PRIORIDADES_TAREA,
   type PrioridadTarea, type Proyecto, type TareaPresupuesto
 } from "@/mocks/data";
+import { usuarioConAvatarPorId } from "@/mocks/data";
 import { formatFecha, formatFechaHora } from "@/lib/format";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
@@ -23,6 +24,8 @@ import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFi
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 import { DialogoNuevaTarea } from "@/components/proyectos/DialogoNuevaTarea";
+import { DialogoConfirmarCambioTarea } from "@/components/proyectos/DialogoConfirmarCambioTarea";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,9 +46,10 @@ export default function Todo() {
   const [seleccion, setSeleccion] = useState<SeleccionSeguimiento>();
   const [edicion, setEdicion] = useState<SeleccionSeguimiento>();
   const [nuevaTareaAbierta, setNuevaTareaAbierta] = useState(false);
+  const [tareaParaEliminar, setTareaParaEliminar] = useState<SeleccionSeguimiento>();
+  const [verArchivadas, setVerArchivadas] = useState(false);
 
   const esViewer = user?.role === "viewer";
-  const puedeAvance = user ? permisos.editarAvance(user.role) : false;
   const puedeEditarTarea = user ? permisos.editarTarea(user.role) : false;
   const puedeEliminarTarea = user ? permisos.eliminarTarea(user.role) : false;
   const puedePrioridad = user ? permisos.definirPrioridadTarea(user.role) : false;
@@ -53,7 +57,12 @@ export default function Todo() {
 
   // Tareas de seguimiento de todos los proyectos activos.
   const seguimiento = proyectos.flatMap((proyecto) =>
-    (proyecto.tareasPresupuesto ?? []).map((tarea) => ({ proyecto, tarea }))
+    (proyecto.tareasPresupuesto ?? [])
+      .filter((tarea) => user?.role !== "viewer" || tarea.responsableId === user?.id)
+      .map((tarea) => ({ proyecto, tarea }))
+  );
+  const archivadas = proyectos.flatMap((proyecto) =>
+    (proyecto.tareasEliminadas ?? []).map((tarea) => ({ proyecto, tarea }))
   );
   const seguimientoDelProyecto = seguimiento.filter(({ proyecto }) =>
     proyectoFiltro === "todos" || proyecto.id === proyectoFiltro
@@ -123,7 +132,7 @@ export default function Todo() {
     if (!proyecto) return;
     persistir({
       ...proyecto,
-      tareasPresupuesto: [...(proyecto.tareasPresupuesto ?? []), tarea]
+      tareasPresupuesto: [...(proyecto.tareasPresupuesto ?? []), { ...tarea, creadaPorId: user.id }]
     });
   };
 
@@ -132,9 +141,16 @@ export default function Todo() {
     persistir(aplicarCambioTarea(edicion.proyecto, tareaActualizada));
   };
 
-  const eliminarTarea = (proyecto: Proyecto, tarea: TareaPresupuesto) => {
+  const solicitarEliminarTarea = (proyecto: Proyecto, tarea: TareaPresupuesto) => {
+    setTareaParaEliminar({ proyecto, tarea });
+  };
+
+  const eliminarTarea = () => {
+    if (!tareaParaEliminar) return;
+    const { proyecto, tarea } = tareaParaEliminar;
     persistir(eliminarTareaConAuditoria(proyecto, tarea, user.id));
     toast("Tarea eliminada", { description: tituloTarea(tarea, proyecto) });
+    setTareaParaEliminar(undefined);
   };
 
   return (
@@ -211,6 +227,8 @@ export default function Todo() {
                   <EncabezadoFiltrable columna="tarea" control={tablaSeguimiento}>Tarea</EncabezadoFiltrable>
                   <EncabezadoFiltrable columna="proyecto" control={tablaSeguimiento}>Proyecto</EncabezadoFiltrable>
                   <EncabezadoFiltrable columna="bloque" control={tablaSeguimiento}>Bloque</EncabezadoFiltrable>
+                  <TableHead>Responsable</TableHead>
+                  <TableHead>Asignado por</TableHead>
                   <EncabezadoFiltrable columna="entrega" control={tablaSeguimiento}>Entrega</EncabezadoFiltrable>
                   <EncabezadoFiltrable columna="prioridad" control={tablaSeguimiento}>Prioridad</EncabezadoFiltrable>
                   {verAuditoria && (
@@ -232,7 +250,7 @@ export default function Todo() {
                         className="size-7 rounded-full"
                         aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${tituloTarea(tarea, proyecto)}`}
                         onClick={() => setSeleccion({ proyecto, tarea })}
-                        disabled={!puedeAvance && !tarea.completada}
+                        disabled={!permisos.completarTarea(user.role, tarea.responsableId === user.id) && !tarea.completada}
                       >
                         <Check className="size-3.5" />
                       </Button>
@@ -246,6 +264,28 @@ export default function Todo() {
                       </Link>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{etiquetaBloque(tarea.grupo, tarea.tipoProducto)}</TableCell>
+                    <TableCell>
+                      {tarea.responsableId ? (() => {
+                        const responsable = usuarioConAvatarPorId(tarea.responsableId);
+                        return responsable ? (
+                          <span className="flex items-center gap-2 whitespace-nowrap" title={responsable.displayName}>
+                            <UserAvatar user={responsable} className="size-6" fallbackClassName="text-[9px]" />
+                            <span className="hidden text-xs xl:inline">{responsable.displayName}</span>
+                          </span>
+                        ) : "—";
+                      })() : <span className="text-xs text-muted-foreground">Sin asignar</span>}
+                    </TableCell>
+                    <TableCell>
+                      {tarea.asignadaPorId ? (() => {
+                        const asignador = usuarioConAvatarPorId(tarea.asignadaPorId);
+                        return asignador ? (
+                          <span className="flex items-center gap-2 whitespace-nowrap" title={asignador.displayName}>
+                            <UserAvatar user={asignador} className="size-6" fallbackClassName="text-[9px]" />
+                            <span className="hidden text-xs xl:inline">{asignador.displayName}</span>
+                          </span>
+                        ) : "—";
+                      })() : <span className="text-xs text-muted-foreground">—</span>}
+                    </TableCell>
                     <TableCell className="cifra text-xs">{tarea.fechaFin ? formatFecha(tarea.fechaFin) : "—"}</TableCell>
                     <TableCell>
                       {puedePrioridad ? (
@@ -310,7 +350,7 @@ export default function Todo() {
                               variant="ghost"
                               size="icon"
                               className="size-7 text-muted-foreground hover:text-destructive"
-                              onClick={() => eliminarTarea(proyecto, tarea)}
+                              onClick={() => solicitarEliminarTarea(proyecto, tarea)}
                               aria-label={`Eliminar ${tituloTarea(tarea, proyecto)}`}
                             >
                               <Trash2 className="size-3.5" />
@@ -336,13 +376,14 @@ export default function Todo() {
         usuarioId={user.id}
         alCerrar={() => setSeleccion(undefined)}
         alGuardar={guardarSeguimiento}
-        puedeReabrir={puedeAvance}
+        puedeReabrir={Boolean(seleccion && permisos.completarTarea(user.role, seleccion.tarea.responsableId === user.id))}
       />
 
       <DialogoEditarTarea
         proyecto={edicion?.proyecto}
         tarea={edicion?.tarea}
         usuarioId={user.id}
+        rol={user.role}
         alCerrar={() => setEdicion(undefined)}
         alGuardar={guardarEdicion}
       />
@@ -350,9 +391,56 @@ export default function Todo() {
       <DialogoNuevaTarea
         abierto={nuevaTareaAbierta}
         proyectos={proyectos}
+        rol={user.role}
+        usuarioId={user.id}
         alCerrar={() => setNuevaTareaAbierta(false)}
         alAgregar={agregarTareaSeguimiento}
       />
+
+      <DialogoConfirmarCambioTarea
+        abierto={Boolean(tareaParaEliminar)}
+        titulo="¿Estás seguro de hacer este cambio?"
+        descripcion="La tarea se archivará y quedará registrada con la persona y el momento de la operación. Solo administración podrá verla después."
+        etiquetaConfirmar="Archivar tarea"
+        variante="destructive"
+        alCancelar={() => setTareaParaEliminar(undefined)}
+        alConfirmar={eliminarTarea}
+      />
+      {user.role === "administrator" && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Archive className="size-4 text-primary" />
+              <h2 className="font-heading text-sm font-semibold">Tareas archivadas</h2>
+              <span className="cifra text-xs text-muted-foreground">{archivadas.length}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setVerArchivadas((actual) => !actual)}>
+              {verArchivadas ? "Ocultar archivo" : "Ver archivo"}
+            </Button>
+          </div>
+          {verArchivadas && (
+            <Card>
+              <CardContent className="px-0">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Tarea</TableHead><TableHead>Proyecto</TableHead><TableHead>Responsable</TableHead><TableHead>Archivada por</TableHead><TableHead>Momento</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {archivadas.map(({ proyecto, tarea }) => (
+                      <TableRow key={`${proyecto.id}-${tarea.id}`}>
+                        <TableCell className="font-medium">{tituloTarea(tarea, proyecto)}</TableCell>
+                        <TableCell>{proyecto.nombre}</TableCell>
+                        <TableCell>{usuarioPorId(tarea.responsableId ?? "")?.displayName ?? "Sin asignar"}</TableCell>
+                        <TableCell>{usuarioPorId(tarea.eliminadaPorId ?? "")?.displayName ?? "—"}</TableCell>
+                        <TableCell className="cifra text-xs">{tarea.eliminadaEn ? formatFechaHora(tarea.eliminadaEn) : "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {archivadas.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Todavía no hay tareas archivadas.</p>}
+              </CardContent>
+            </Card>
+          )}
+        </section>
+      )}
     </div>
   );
 }

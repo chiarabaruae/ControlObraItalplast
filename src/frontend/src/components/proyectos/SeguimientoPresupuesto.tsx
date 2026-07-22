@@ -10,9 +10,11 @@ import { toast } from "sonner";
 import { etiquetaBloque, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
 import { formatFechaCorta, formatFechaHora } from "@/lib/format";
 import {
-  nombreTipoProducto, registrarModificacionTarea, tituloTarea, usuarioPorId, PRIORIDADES_TAREA,
+  nombreTipoProducto, registrarModificacionTarea, tituloTarea, usuarioPorId, usuarioConAvatarPorId, PRIORIDADES_TAREA,
   type GrupoTareaPresupuesto, type PrioridadTarea, type Proyecto, type TareaPresupuesto, type TipoProducto
 } from "@/mocks/data";
+import { permisos, type Role } from "@/lib/roles";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +27,8 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
+import { DialogoConfirmarCambioTarea } from "@/components/proyectos/DialogoConfirmarCambioTarea";
+import { SelectorResponsableTarea } from "@/components/proyectos/SelectorResponsableTarea";
 
 const GRUPOS_FABRICA: GrupoTareaPresupuesto[] = ["fabricacion_premarcos", "fabrica"];
 const GRUPOS_INSTALACION: GrupoTareaPresupuesto[] = ["instalacion_premarcos", "instalacion"];
@@ -37,6 +41,7 @@ interface FormularioAlta {
   fechaInicio: string;
   fechaFin: string;
   prioridad: PrioridadTarea;
+  responsableId?: string;
 }
 
 function FilaTarea({
@@ -99,6 +104,23 @@ function FilaTarea({
               {tarea.modificadaEn && (
                 <> · Modificada {formatFechaHora(tarea.modificadaEn)} · {usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"} · v{tarea.version ?? 1}</>
               )}
+            </span>
+          )}
+          {tarea.responsableId && (
+            <span className="flex items-center gap-1.5" title={`Responsable: ${usuarioPorId(tarea.responsableId)?.displayName ?? "—"}`}>
+              {usuarioConAvatarPorId(tarea.responsableId) && (
+                <UserAvatar
+                  user={usuarioConAvatarPorId(tarea.responsableId)!}
+                  className="size-6"
+                  fallbackClassName="text-[9px]"
+                />
+              )}
+              <span className="hidden lg:inline">{usuarioPorId(tarea.responsableId)?.displayName}</span>
+            </span>
+          )}
+          {tarea.asignadaPorId && (
+            <span title={`Asignada por ${usuarioPorId(tarea.asignadaPorId)?.displayName ?? "—"}`}>
+              · por {usuarioPorId(tarea.asignadaPorId)?.displayName ?? "—"}
             </span>
           )}
         </div>
@@ -165,6 +187,7 @@ export function SeguimientoPresupuesto({
   puedePrioridad,
   verAuditoria,
   usuarioId,
+  rol,
   alActualizar,
   alAgregar,
   alEliminarTarea
@@ -176,6 +199,7 @@ export function SeguimientoPresupuesto({
   puedePrioridad: boolean;
   verAuditoria: boolean;
   usuarioId: string;
+  rol: Role;
   alActualizar: (tarea: TareaPresupuesto) => void;
   alAgregar: (tarea: TareaPresupuesto) => void;
   alEliminarTarea: (tarea: TareaPresupuesto) => void;
@@ -185,11 +209,12 @@ export function SeguimientoPresupuesto({
   const [seleccionada, setSeleccionada] = useState<TareaPresupuesto>();
   const [enEdicion, setEnEdicion] = useState<TareaPresupuesto>();
   const [formulario, setFormulario] = useState<FormularioAlta>();
+  const [tareaParaEliminar, setTareaParaEliminar] = useState<TareaPresupuesto>();
   const productos = useMemo(
     () => proyecto.productos?.filter((producto) => producto.tipo !== "servicios") ?? [],
     [proyecto.productos]
   );
-  const tareas = proyecto.tareasPresupuesto ?? [];
+  const tareas = (proyecto.tareasPresupuesto ?? []).filter((tarea) => rol !== "viewer" || tarea.responsableId === usuarioId);
 
   const guardarAlta = () => {
     if (!formulario) return;
@@ -202,6 +227,8 @@ export function SeguimientoPresupuesto({
       toast("Revisá las fechas", { description: "La fecha de entrega no puede ser anterior al inicio." });
       return;
     }
+    const ahora = new Date().toISOString();
+    const responsable = formulario.responsableId ? usuarioPorId(formulario.responsableId) : undefined;
     alAgregar({
       id: `manual-${Date.now()}`,
       itemId: formulario.itemId,
@@ -213,7 +240,12 @@ export function SeguimientoPresupuesto({
       fechaFin: formulario.fechaFin || undefined,
       manual: true,
       prioridad: formulario.prioridad,
-      creadaEn: new Date().toISOString(),
+      responsableId: formulario.responsableId,
+      asignadaPorId: formulario.responsableId ? usuarioId : undefined,
+      asignadaEn: formulario.responsableId ? ahora : undefined,
+      asignaciones: formulario.responsableId ? [{ fecha: ahora, asignadoPorId: usuarioId, responsableId: formulario.responsableId, resumen: `Asignó la tarea a ${responsable?.displayName ?? "un usuario"}` }] : undefined,
+      creadaPorId: usuarioId,
+      creadaEn: ahora,
       version: 1,
       completada: false
     });
@@ -222,8 +254,14 @@ export function SeguimientoPresupuesto({
   };
 
   const eliminar = (tarea: TareaPresupuesto) => {
-    alEliminarTarea(tarea);
-    toast("Tarea eliminada", { description: tituloTarea(tarea, proyecto) });
+    setTareaParaEliminar(tarea);
+  };
+
+  const confirmarEliminar = () => {
+    if (!tareaParaEliminar) return;
+    alEliminarTarea(tareaParaEliminar);
+    toast("Tarea archivada", { description: tituloTarea(tareaParaEliminar, proyecto) });
+    setTareaParaEliminar(undefined);
   };
 
   const cambiarPrioridad = (tarea: TareaPresupuesto, prioridad: PrioridadTarea) => {
@@ -291,7 +329,8 @@ export function SeguimientoPresupuesto({
                               itemId: "",
                               fechaInicio: "",
                               fechaFin: "",
-                              prioridad: "media"
+                              prioridad: "media",
+                              responsableId: undefined
                             })}
                           >
                             <Plus className="size-3.5" /> Agregar tarea
@@ -308,7 +347,7 @@ export function SeguimientoPresupuesto({
                           key={tarea.id}
                           proyecto={proyecto}
                           tarea={tarea}
-                          puedeCompletar={puedeEditar}
+                          puedeCompletar={permisos.completarTarea(rol, tarea.responsableId === usuarioId)}
                           puedeEditar={puedeEditar}
                           puedeEliminar={puedeEliminar}
                           puedePrioridad={puedePrioridad}
@@ -338,7 +377,7 @@ export function SeguimientoPresupuesto({
         usuarioId={usuarioId}
         alCerrar={() => setSeleccionada(undefined)}
         alGuardar={alActualizar}
-        puedeReabrir={puedeEditar}
+        puedeReabrir={Boolean(seleccionada && permisos.completarTarea(rol, seleccionada.responsableId === usuarioId))}
       />
 
       {/* Edición de una tarea existente: mismo diálogo que la sección Tareas */}
@@ -346,6 +385,7 @@ export function SeguimientoPresupuesto({
         proyecto={proyecto}
         tarea={enEdicion}
         usuarioId={usuarioId}
+        rol={rol}
         alCerrar={() => setEnEdicion(undefined)}
         alGuardar={alActualizar}
       />
@@ -413,6 +453,11 @@ export function SeguimientoPresupuesto({
                   Solo administradores y supervisores pueden definirla.
                 </p>
               </div>
+              <SelectorResponsableTarea
+                rol={rol}
+                valor={formulario.responsableId}
+                onChange={(responsableId) => setFormulario({ ...formulario, responsableId })}
+              />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="fecha-inicio-tarea">Fecha de inicio</Label>
@@ -441,6 +486,15 @@ export function SeguimientoPresupuesto({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DialogoConfirmarCambioTarea
+        abierto={Boolean(tareaParaEliminar)}
+        titulo="¿Estás seguro de hacer este cambio?"
+        descripcion="La tarea se archivará y la operación quedará registrada para administración."
+        etiquetaConfirmar="Archivar tarea"
+        variante="destructive"
+        alCancelar={() => setTareaParaEliminar(undefined)}
+        alConfirmar={confirmarEliminar}
+      />
     </div>
   );
 }
