@@ -1,8 +1,8 @@
 ---
 context_id: controlobra-project-context
 context_type: current_project_state
-last_updated: 2026-07-19
-branch: main
+last_updated: 2026-07-21
+branch: feature/frontend-react-migration
 tags:
   - italplast
   - react
@@ -16,6 +16,8 @@ tags:
   - user-management
   - task-management
   - kanban
+  - table-filters
+  - task-creation
 ---
 
 # Contexto vigente del proyecto
@@ -28,7 +30,7 @@ La interfaz se presenta como **Gestión de proyectos** porque debe cubrir abertu
 
 ## Estado actual
 
-- Rama estable publicada: `main`, actualizada desde `feature/frontend-react-migration` el 2026-07-19.
+- Rama activa de trabajo: `feature/frontend-react-migration` (adelantada respecto de `main`, que quedó publicada el 2026-07-19). Los cambios de UI del 2026-07-21 viven en esta rama vía PR #4.
 - Frontend activo: React, TypeScript, Vite, Tailwind CSS y componentes shadcn/Radix.
 - Versión visible: `AppWebb v0.2.0`.
 - La Fase 2 usa datos mock y persistencia temporal en `localStorage`.
@@ -138,6 +140,20 @@ El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de pre
 
 Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `src/frontend/src/lib/evidencias.ts` y `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`.
 
+## Alta de tareas en cascada (sección Tareas)
+
+- El botón "Nueva tarea" abre un panel de selección en pasos dependientes: **cliente → proyecto → producto → etapa (bloque) → nombre y fechas**. Cada nivel se habilita solo cuando el anterior está resuelto y ofrece únicamente opciones válidas del nivel superior; solo participan proyectos con seguimiento ya generado.
+- La tarea nueva se guarda como `TareaPresupuesto` manual en `tareasPresupuesto` del proyecto elegido y aparece de inmediato en el seguimiento; no puede quedar huérfana ni en combinaciones inexistentes.
+- Fuente: `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`, cableada desde `src/frontend/src/pages/Todo.tsx`. Reutiliza `gruposDeProducto` exportado por `src/frontend/src/lib/seguimiento-presupuesto.ts`.
+
+## Filtro y orden por columna en tablas de gestión
+
+- Las tablas de Clientes, Usuarios y Tareas (seguimiento e internas) tienen un ícono de filtro por columna, al estilo de una planilla: **ordenar** y **filtrar por valores** de esa columna, sin otras funciones.
+- Las etiquetas de orden se adaptan al tipo de dato: texto `A → Z / Z → A`, números `De menor a mayor / De mayor a menor`, fechas `Más recientes primero / Más antiguas primero`. La lista de valores del filtro respeta ese orden (fechas cronológicas, números por magnitud).
+- El aviso "Mostrando X de Y · Quitar filtros" y el de truncado de filas se ubican **sobre** la tabla, con borde inferior.
+- El selector de vista de Proyectos (Tarjetas/Tablero) quedó solo con íconos, con tooltip y texto accesible.
+- Fuentes: hook `src/frontend/src/lib/tabla-filtros.ts` (`useTablaFiltrable`, con tipos de columna) y `src/frontend/src/components/app/EncabezadoFiltrable.tsx` (`EncabezadoFiltrable`, `AvisoFiltros`). El estado de orden/filtro no se persiste entre sesiones.
+
 ## Tablero de proyectos y cambios de estado
 
 - Proyectos permite alternar entre Tarjetas y Tablero.
@@ -170,6 +186,8 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 - `src/frontend/src/components/proyectos/PresupuestoUploader.tsx`: carga y revisión del PDF.
 - `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`: lista de tareas y cierre con evidencia.
 - `src/frontend/src/components/proyectos/TableroProyectos.tsx`: tablero horizontal arrastrable y transiciones condicionadas.
+- `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`: alta de tareas en cascada (cliente→proyecto→producto→etapa).
+- `src/frontend/src/lib/tabla-filtros.ts` y `src/frontend/src/components/app/EncabezadoFiltrable.tsx`: filtro y orden por columna reutilizables.
 - `src/frontend/src/lib/presupuesto-parser.ts`: detección y parsing de los tres formatos.
 - `src/frontend/scripts/diagnostico-presupuestos.ts`: prueba repetible con PDFs reales provistos externamente.
 - `src/frontend/src/mocks/data.ts`: tipos, defaults, mocks, migración local y persistencia.

@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-context-index
 context_type: retrieval_index
-last_updated: 2026-07-19
+last_updated: 2026-07-21
 tags:
   - agents
   - context
@@ -10,6 +10,8 @@ tags:
   - user-management
   - task-management
   - kanban
+  - table-filters
+  - task-creation
 ---
 
 # Índice de contexto para agentes
@@ -29,8 +31,10 @@ Este archivo es el punto de entrada para recuperar contexto sin revisar todo el 
 |---|---|
 | Entender qué aplicación está activa hoy | `docs/project-context.md` |
 | Crear o modificar proyectos y etapas | `docs/project-context.md` + `docs/flujo-roles.md` |
-| Entender presupuestos PDF, tareas y evidencia | `docs/project-context.md` + decisiones D-009 a D-014 |
-| Revisar tablero y cambios de estado | `docs/project-context.md` + decisión D-015 + `docs/flujo-roles.md` |
+| Entender presupuestos PDF, tareas y evidencia | `docs/project-context.md` + decisiones D-009 a D-014, D-018 |
+| Revisar tablero y cambios de estado | `docs/project-context.md` + decisiones D-015, D-017 + `docs/flujo-roles.md` |
+| Crear tareas nuevas (cascada cliente→proyecto→producto→etapa) | `docs/project-context.md` + decisión D-020 + `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx` |
+| Filtrar y ordenar tablas de gestión | `docs/project-context.md` + decisión D-019 + `src/frontend/src/lib/tabla-filtros.ts` |
 | Revisar permisos por rol | `docs/flujo-roles.md` + `src/frontend/src/lib/roles.ts` |
 | Crear o editar usuarios | `docs/project-context.md` + `docs/flujo-roles.md` + `src/frontend/src/pages/Usuarios.tsx` |
 | Comprender por qué se eligió una solución | `docs/decisions.md` |
