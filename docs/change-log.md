@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Plazo de instalación de premarcos en la planificación backward
+
+**Alcance:** la planificación por producto suma "Días de instalación de premarcos" (faltaba también en el Excel de referencia).
+
+**Impacto:** el campo aparece solo cuando el producto tiene instalación de premarcos activa. Si se carga, esa ventana reemplaza a la brecha global entrega→ábaco para ubicar la entrega de premarcos hacia atrás desde la firma del ábaco; vacío, sigue rigiendo la brecha configurada por administración.
+
+**Archivos clave:** `src/frontend/src/lib/planificacion.ts`, `src/frontend/src/mocks/data.ts`, `src/frontend/src/pages/Proyectos.tsx`, `docs/decisions.md` (D-023 ampliada).
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador (con 6 días cargados la entrega de premarcos pasa del 3 ago a 31 jul para ábaco del 6 ago).
+
 ## 2026-07-22 — Supervisores pueden crear proyectos
 
 **Alcance:** el permiso `crearProyecto` se extiende al rol `supervisor` (D-024).

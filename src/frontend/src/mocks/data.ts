@@ -205,6 +205,8 @@ export interface PlanificacionProducto {
   /** Ancla del cálculo backward; sin ella no se estiman fechas. */
   fechaInicioInstalacion?: string;
   diasFabricacionPremarcos?: number;
+  /** Si falta, la ventana de instalación de premarcos usa la brecha global entrega→ábaco. */
+  diasInstalacionPremarcos?: number;
   diasFabrica?: number;
   diasInstalacion?: number;
 }

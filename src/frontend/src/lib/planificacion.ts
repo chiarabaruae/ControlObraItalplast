@@ -82,7 +82,12 @@ export function calcularFechasBackward(
 
   const inicioFabrica = sumarDias(finProduccion, -plan.diasFabrica);
   const firmaAbaco = sumarDias(inicioFabrica, -buffers.diasAbacoAFabrica);
-  const entregaPremarcos = sumarDias(firmaAbaco, -buffers.diasPremarcosAAbaco);
+  // El plazo de instalación de premarcos del producto reemplaza a la brecha global
+  // entrega→ábaco cuando fue cargado: los premarcos se entregan al iniciar su instalación.
+  const ventanaPremarcos = plan.diasInstalacionPremarcos && plan.diasInstalacionPremarcos > 0
+    ? plan.diasInstalacionPremarcos
+    : buffers.diasPremarcosAAbaco;
+  const entregaPremarcos = sumarDias(firmaAbaco, -ventanaPremarcos);
   porGrupo.fabrica = { inicio: inicioFabrica, fin: finProduccion };
   porGrupo.instalacion_premarcos = { inicio: entregaPremarcos, fin: firmaAbaco };
   resultado.inicioFabrica = inicioFabrica;

@@ -147,7 +147,7 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 
 ## Estimación backward de fechas (cronograma de fábrica)
 
-- Cada producto operativo del alta puede cargar una **planificación opcional**: fecha comprometida de inicio de instalación, días de instalación, días de fábrica y días de fabricación de premarcos.
+- Cada producto operativo del alta puede cargar una **planificación opcional**: fecha comprometida de inicio de instalación, días de instalación, días de fábrica, días de fabricación de premarcos y días de instalación de premarcos (visible con ese grupo activo; si se carga, reemplaza a la brecha global entrega→ábaco).
 - Con esa ancla se calculan hacia atrás (backward) los hitos: fin de producción, inicio de fábrica, firma de ábaco, entrega de premarcos e inicio de fabricación de premarcos, usando tres **brechas configurables** (predeterminadas 3/1/3 días).
 - Las tareas generadas desde el presupuesto nacen con `fechaInicio`/`fechaFin` según el bloque; siguen siendo editables tarea por tarea. Sin planificación cargada, nacen sin fechas como antes.
 - Las brechas se editan solo por administradores en **Configuración → Planificación** (`/settings/planning`, permiso `configurarPlanificacion`) y persisten en `localStorage` (`control-obras-planificacion`). Cambiarlas no recalcula tareas existentes.

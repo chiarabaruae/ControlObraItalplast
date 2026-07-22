@@ -11,7 +11,7 @@ import {
   type ConfiguracionProductoProyecto, type EstadoObra, type PlanificacionProducto, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
-import { calcularFechasBackward } from "@/lib/planificacion";
+import { calcularFechasBackward, obtenerBuffersPlanificacion } from "@/lib/planificacion";
 import { formatFecha } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
 import { EstadoBadge } from "@/components/app/EstadoBadge";
@@ -44,6 +44,7 @@ interface EtapaConfigurable {
 interface PlanificacionFormulario {
   fechaInicioInstalacion: string;
   diasFabricacionPremarcos: string;
+  diasInstalacionPremarcos: string;
   diasFabrica: string;
   diasInstalacion: string;
 }
@@ -80,6 +81,7 @@ function crearConfiguracionProducto(): ConfiguracionProductoFormulario {
     planificacion: {
       fechaInicioInstalacion: "",
       diasFabricacionPremarcos: "",
+      diasInstalacionPremarcos: "",
       diasFabrica: "",
       diasInstalacion: ""
     }
@@ -96,6 +98,7 @@ function planificacionDesdeFormulario(formulario: PlanificacionFormulario): Plan
   return {
     fechaInicioInstalacion: formulario.fechaInicioInstalacion,
     diasFabricacionPremarcos: numeroDias(formulario.diasFabricacionPremarcos),
+    diasInstalacionPremarcos: numeroDias(formulario.diasInstalacionPremarcos),
     diasFabrica: numeroDias(formulario.diasFabrica),
     diasInstalacion: numeroDias(formulario.diasInstalacion)
   };
@@ -241,12 +244,14 @@ function PlanificacionEditor({
   contexto,
   valor,
   conPremarcos,
+  conInstalacionPremarcos,
   alCambiar
 }: {
   tipo: string;
   contexto: string;
   valor: PlanificacionFormulario;
   conPremarcos: boolean;
+  conInstalacionPremarcos: boolean;
   alCambiar: (cambios: Partial<PlanificacionFormulario>) => void;
 }) {
   const estimacion = calcularFechasBackward(planificacionDesdeFormulario(valor));
@@ -306,6 +311,20 @@ function PlanificacionEditor({
               value={valor.diasFabricacionPremarcos}
               onChange={(evento) => alCambiar({ diasFabricacionPremarcos: evento.target.value })}
               placeholder="Ej.: 5"
+            />
+          </div>
+        )}
+        {conInstalacionPremarcos && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`${tipo}-plan-dias-instalacion-premarcos`}>Días de instalación de premarcos</Label>
+            <Input
+              id={`${tipo}-plan-dias-instalacion-premarcos`}
+              type="number"
+              min={1}
+              step={1}
+              value={valor.diasInstalacionPremarcos}
+              onChange={(evento) => alCambiar({ diasInstalacionPremarcos: evento.target.value })}
+              placeholder={`Vacío: brecha global (${obtenerBuffersPlanificacion().diasPremarcosAAbaco} días)`}
             />
           </div>
         )}
@@ -807,6 +826,7 @@ export default function Proyectos() {
                     contexto={etiquetaProducto}
                     valor={configuracion.planificacion}
                     conPremarcos={configuracion.fabricaraPremarcos}
+                    conInstalacionPremarcos={configuracion.instalaraPremarcos}
                     alCambiar={(cambios) =>
                       actualizarConfiguracion(tipo, { planificacion: { ...configuracion.planificacion, ...cambios } })
                     }
