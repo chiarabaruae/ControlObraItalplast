@@ -41,7 +41,7 @@ tags:
 | Rol | Quiénes (según seed real) | Idea central |
 |---|---|---|
 | `administrator` | Gerencia, Jefe de Proyectos | Control total + gestión de usuarios |
-| `supervisor` *(nuevo)* | Jefa de Obras, Encargados de Cuadrillas, Encargados de Producción PVC/ALU | Carga avances y gestiona tareas; no crea/borra proyectos ni toca datos comerciales |
+| `supervisor` *(nuevo)* | Jefa de Obras, Encargados de Cuadrillas, Encargados de Producción PVC/ALU | Carga avances, gestiona tareas y crea proyectos; no edita/borra proyectos ni toca datos comerciales |
 | `viewer` *(se muestra como "Usuario")* | Auxiliares de obra, operarios de producción, administración, comercial | Consulta estado y avances; solo puede completar sus propias tareas |
 
 ## Navegación (sidebar) por rol
@@ -86,7 +86,7 @@ para coordinar en obra; un operario no necesita la cartera de clientes.*
 | Arrastrar o solicitar cambio ordinario de estado | ✅ | ✅ | ❌ |
 | Cancelar o reactivar proyecto con motivo | ✅ | ❌ | ❌ |
 | Reabrir proyecto finalizado con motivo | ✅ | ❌ | ❌ |
-| Crear proyecto | ✅ | ❌ | ❌ |
+| Crear proyecto | ✅ | ✅ | ❌ |
 | Editar datos del proyecto | ✅ | ❌ | ❌ |
 | Eliminar proyecto | ✅ | ❌ | ❌ |
 

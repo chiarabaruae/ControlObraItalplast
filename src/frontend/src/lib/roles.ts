@@ -18,7 +18,7 @@ export const permisos = {
   gestionarClientes: (r: Role) => r === "administrator",
 
   // Proyectos
-  crearProyecto: (r: Role) => r === "administrator",
+  crearProyecto: (r: Role) => r === "administrator" || r === "supervisor",
   editarProyecto: (r: Role) => r === "administrator",
   eliminarProyecto: (r: Role) => r === "administrator",
   subirOferta: (r: Role) => r === "administrator",

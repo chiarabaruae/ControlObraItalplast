@@ -230,3 +230,13 @@ tags:
 **Decisión:** replicar el cálculo backward en el frontend (`src/frontend/src/lib/planificacion.ts`). En el alta de proyecto, cada producto operativo puede cargar una planificación opcional: fecha comprometida de inicio de instalación más días de instalación, de fábrica y de fabricación de premarcos. Con esa ancla se estiman las fechas de cada bloque (fabricación de premarcos, instalación de premarcos, fábrica, instalación) y las tareas generadas nacen con `fechaInicio`/`fechaFin` sugeridas, siempre editables después. Las tres brechas (fin producción→instalación, firma ábaco→fábrica, entrega premarcos→ábaco) parten de 3/1/3 días y se editan solo por administradores en Configuración → Planificación (permiso `configurarPlanificacion`); persisten en `localStorage` (`control-obras-planificacion`).
 
 **Consecuencias:** las fechas dejan de cargarse siempre a mano: sin planificación cargada el comportamiento anterior se conserva (tareas sin fechas). Cambiar las brechas afecta solo a las estimaciones futuras; no se recalculan tareas existentes. El backend futuro deberá persistir la configuración global y la planificación por producto. La cadena se corta si falta un dato: sin días de fábrica no se estiman ábaco ni premarcos.
+
+## D-024 — Supervisores pueden crear proyectos
+
+**Estado:** aceptada (modifica la matriz congelada en Fase 1).
+
+**Contexto:** la definición original reservaba la creación de proyectos a administración, pero la operación real necesita que los supervisores también den de alta proyectos.
+
+**Decisión:** `crearProyecto` pasa a incluir al rol `supervisor`. Editar, eliminar, cancelar, reactivar y reabrir proyectos siguen siendo exclusivos de administración.
+
+**Consecuencias:** el botón "Nuevo proyecto" y el alta completa (presupuesto ejecutivo incluido) quedan disponibles para supervisores. La matriz de `docs/flujo-roles.md` queda actualizada; el backend real deberá reflejar este permiso en sus rutas de escritura.

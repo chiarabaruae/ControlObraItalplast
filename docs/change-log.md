@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-22 — Supervisores pueden crear proyectos
+
+**Alcance:** el permiso `crearProyecto` se extiende al rol `supervisor` (D-024).
+
+**Impacto:** el botón "Nuevo proyecto" y el alta completa quedan disponibles para supervisores. Editar, eliminar, cancelar, reactivar y reabrir proyectos siguen siendo exclusivos de administración.
+
+**Archivos clave:** `src/frontend/src/lib/roles.ts`, `docs/flujo-roles.md`, `docs/decisions.md`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador como supervisor (botón visible y diálogo de alta operativo) y como Usuario (botón oculto).
+
 ## 2026-07-22 — Estimación backward de fechas con brechas configurables
 
 **Alcance:** se traduce la lógica del Excel "Cronograma Fábrica" al frontend: desde la fecha comprometida de inicio de instalación se estiman hacia atrás las fechas de cada bloque del seguimiento.

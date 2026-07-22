@@ -67,7 +67,7 @@ La fuente de rutas es `src/frontend/src/App.tsx`.
 ## Roles
 
 - `administrator`: control total, creación de proyectos y gestión de usuarios.
-- `supervisor`: lectura operativa, edición de avances y tareas según permisos.
+- `supervisor`: lectura operativa, creación de proyectos, edición de avances y tareas según permisos.
 - `viewer`, mostrado como **Usuario**: consulta y tareas propias.
 
 La matriz funcional completa está en `docs/flujo-roles.md`. La implementación frontend está centralizada en `src/frontend/src/lib/roles.ts`.
