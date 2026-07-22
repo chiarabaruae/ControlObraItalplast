@@ -453,21 +453,25 @@ export default function Proyectos() {
               type="button"
               onClick={() => cambiarVista("tarjetas")}
               aria-pressed={vista === "tarjetas"}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              title="Vista de tarjetas"
+              className={`grid size-8 place-items-center rounded-md transition-colors ${
                 vista === "tarjetas" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <LayoutGrid className="size-3.5" /> Tarjetas
+              <LayoutGrid className="size-4" strokeWidth={1.75} />
+              <span className="sr-only">Vista de tarjetas</span>
             </button>
             <button
               type="button"
               onClick={() => cambiarVista("tablero")}
               aria-pressed={vista === "tablero"}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              title="Vista de tablero"
+              className={`grid size-8 place-items-center rounded-md transition-colors ${
                 vista === "tablero" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Columns3 className="size-3.5" /> Tablero
+              <Columns3 className="size-4" strokeWidth={1.75} />
+              <span className="sr-only">Vista de tablero</span>
             </button>
           </div>
           {vista === "tarjetas" && (

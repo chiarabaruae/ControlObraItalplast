@@ -16,6 +16,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-21 — Filtro y orden por columna en las tablas, con etiquetas por tipo de dato
+
+**Alcance:** las tablas de Clientes, Usuarios y Tareas (seguimiento e internas) suman un ícono de filtro por columna, al estilo de una planilla.
+
+**Impacto:** cada columna permite ordenar y filtrar por sus valores. Las etiquetas de orden se adaptan al dato: texto usa "A → Z / Z → A", los números "De menor a mayor / De mayor a menor" y las fechas "Más recientes primero / Más antiguas primero". La lista de valores del filtro también respeta ese orden (fechas cronológicas, números por magnitud). El selector de vista de Proyectos pasó a mostrar solo íconos (con tooltip y texto accesible). El estado de orden y filtro vive en el hook `useTablaFiltrable` y no se persiste.
+
+**Archivos clave:** `src/frontend/src/lib/tabla-filtros.ts`, `src/frontend/src/components/app/EncabezadoFiltrable.tsx`, `src/frontend/src/pages/Clientes.tsx`, `src/frontend/src/pages/Usuarios.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/frontend/src/pages/Proyectos.tsx`.
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador de las tres tablas (orden de números y fechas, filtro por valor y aviso de filtros activos).
+
 ## 2026-07-19 — Promoción de la migración React a main y README vigente
 
 **Alcance:** se actualizan el README principal y la guía del frontend antes de integrar `feature/frontend-react-migration` en `main` mediante fast-forward.

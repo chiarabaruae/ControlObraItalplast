@@ -2,7 +2,9 @@ import { useState, type FormEvent } from "react";
 import { Plus, Pencil, KeyRound, Archive, ArchiveRestore } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
+import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { usuarios as usuariosMock, type Usuario } from "@/mocks/data";
+import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,6 +42,11 @@ export default function Usuarios() {
   const [usuarioEnEdicion, setUsuarioEnEdicion] = useState<Usuario | null>(null);
   const [formulario, setFormulario] = useState<FormularioUsuario>(FORMULARIO_VACIO);
   const [errorFormulario, setErrorFormulario] = useState("");
+  const tabla = useTablaFiltrable(lista, {
+    usuario: (u) => u.displayName,
+    area: (u) => u.department,
+    rol: (u) => ROLE_LABELS[u.role]
+  });
   if (!user) return null;
 
   const activos = lista.filter((u) => u.isActive).length;
@@ -145,14 +152,14 @@ export default function Usuarios() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Área</TableHead>
-                <TableHead>Rol</TableHead>
+                <EncabezadoFiltrable columna="usuario" control={tabla}>Usuario</EncabezadoFiltrable>
+                <EncabezadoFiltrable columna="area" control={tabla}>Área</EncabezadoFiltrable>
+                <EncabezadoFiltrable columna="rol" control={tabla}>Rol</EncabezadoFiltrable>
                 <TableHead className="w-36 text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {lista.map((u) => (
+              {tabla.filas.map((u) => (
                 <TableRow key={u.id} className={!u.isActive ? "opacity-55" : ""}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -190,6 +197,12 @@ export default function Usuarios() {
               ))}
             </TableBody>
           </Table>
+          {tabla.filas.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Ninguna persona coincide con el filtro aplicado.
+            </p>
+          )}
+          <AvisoFiltros control={tabla} unidad="personas" />
         </CardContent>
       </Card>
 

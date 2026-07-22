@@ -180,3 +180,13 @@ tags:
 **Decisión:** derivar componentes y tareas ficticias desde las aberturas de los cuatro proyectos iniciales. El seguimiento activo usa exclusivamente `tareasPresupuesto`, tanto en el detalle como en Tareas. La acción se muestra con check y solicita evidencia dentro del diálogo. Los proyectos desconocidos que aún no tengan seguimiento muestran un estado pendiente de generación, sin controles porcentuales.
 
 **Consecuencias:** el porcentaje queda siempre derivado de checks en la interfaz activa y ambas vistas comparten la persistencia de proyecto. Los presupuestos, fechas y evidencias sembrados quedan identificados como demostrativos; sirven para pruebas visuales, no como información operativa ni como migración definitiva del backend.
+
+## D-019 — Filtro y orden por columna al estilo de planilla
+
+**Estado:** aceptada.
+
+**Contexto:** las tablas de gestión (Clientes, Usuarios, Tareas) crecen y el equipo necesita ubicar registros con la misma lógica que ya usan en Excel, sin sumar controles complejos.
+
+**Decisión:** cada columna expone un menú con dos acciones: ordenar y filtrar por valores. El ordenamiento y la lista de valores respetan el tipo de dato (texto alfabético, números por magnitud, fechas cronológicas de más reciente a más antigua). La lógica vive en el hook reutilizable `useTablaFiltrable` y el encabezado `EncabezadoFiltrable`. El estado no se persiste entre sesiones.
+
+**Consecuencias:** cualquier tabla nueva puede sumar filtro y orden declarando sus columnas y el tipo de cada una. El selector de vista de Proyectos queda solo con íconos, apoyado en tooltip y texto accesible.

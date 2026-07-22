@@ -13,7 +13,9 @@ import {
   aplicarCambioTarea, tituloTarea, type Proyecto, type Tarea, type TareaPresupuesto
 } from "@/mocks/data";
 import { formatFecha } from "@/lib/format";
+import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
+import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,13 +37,12 @@ export default function Todo() {
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [proyectoFiltro, setProyectoFiltro] = useState("todos");
   const [seleccion, setSeleccion] = useState<SeleccionSeguimiento>();
-  if (!user) return null;
 
-  const esViewer = user.role === "viewer";
-  const puedeAvance = permisos.editarAvance(user.role);
+  const esViewer = user?.role === "viewer";
+  const puedeAvance = user ? permisos.editarAvance(user.role) : false;
 
   // Tareas internas: el rol Usuario ve solo las suyas.
-  const internas = esViewer ? tareas.filter((t) => t.responsableId === user.id) : tareas;
+  const internas = esViewer ? tareas.filter((t) => t.responsableId === user?.id) : tareas;
   const internasVisibles = internas.filter((t) => {
     if (filtro === "pendientes") return t.estado !== "finalizada";
     if (filtro === "finalizadas") return t.estado === "finalizada";
@@ -60,6 +61,27 @@ export default function Todo() {
     if (filtro === "finalizadas") return tarea.completada;
     return true;
   });
+
+  const tablaSeguimiento = useTablaFiltrable(seguimientoVisibles, {
+    tarea: ({ proyecto, tarea }) => tituloTarea(tarea, proyecto),
+    proyecto: ({ proyecto }) => proyecto.nombre,
+    bloque: ({ tarea }) => ETIQUETAS_GRUPO[tarea.grupo],
+    entrega: {
+      valor: ({ tarea }) => (tarea.fechaFin ? formatFecha(tarea.fechaFin) : "Sin fecha"),
+      orden: ({ tarea }) => tarea.fechaFin ?? "9999-12-31",
+      tipo: "fecha"
+    }
+  });
+
+  const tablaInternas = useTablaFiltrable(internasVisibles, {
+    tarea: (t) => t.titulo,
+    proyecto: (t) => proyectoPorId(t.proyectoId)?.nombre ?? "Sin proyecto",
+    responsable: (t) => usuarioPorId(t.responsableId)?.displayName ?? "Sin asignar",
+    vence: { valor: (t) => formatFecha(t.fechaFin), orden: (t) => t.fechaFin, tipo: "fecha" },
+    prioridad: (t) => t.prioridad
+  });
+
+  if (!user) return null;
 
   const alternarInterna = (t: Tarea) => {
     const finalizada = t.estado === "finalizada";
@@ -156,14 +178,14 @@ export default function Todo() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10" />
-                  <TableHead>Tarea</TableHead>
-                  <TableHead>Proyecto</TableHead>
-                  <TableHead>Bloque</TableHead>
-                  <TableHead>Entrega</TableHead>
+                  <EncabezadoFiltrable columna="tarea" control={tablaSeguimiento}>Tarea</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="proyecto" control={tablaSeguimiento}>Proyecto</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="bloque" control={tablaSeguimiento}>Bloque</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="entrega" control={tablaSeguimiento}>Entrega</EncabezadoFiltrable>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {seguimientoVisibles.slice(0, 30).map(({ proyecto, tarea }) => (
+                {tablaSeguimiento.filas.slice(0, 30).map(({ proyecto, tarea }) => (
                   <TableRow key={tarea.id} className={tarea.completada ? "opacity-55" : ""}>
                     <TableCell>
                       <Button
@@ -191,14 +213,15 @@ export default function Todo() {
                 ))}
               </TableBody>
             </Table>
-            {seguimientoVisibles.length === 0 && (
+            {tablaSeguimiento.filas.length === 0 && (
               <p className="py-8 text-center text-sm text-muted-foreground">No hay tareas de seguimiento con este filtro.</p>
             )}
-            {seguimientoVisibles.length > 30 && (
+            {tablaSeguimiento.filas.length > 30 && (
               <p className="border-t px-4 py-2.5 text-xs text-muted-foreground">
-                Mostrando 30 de {seguimientoVisibles.length}. Entrá a cada proyecto para ver su lista completa.
+                Mostrando 30 de {tablaSeguimiento.filas.length}. Entrá a cada proyecto para ver su lista completa.
               </p>
             )}
+            <AvisoFiltros control={tablaSeguimiento} unidad="tareas" />
           </CardContent>
         </Card>
       </section>
@@ -215,16 +238,16 @@ export default function Todo() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10" />
-                  <TableHead>Tarea</TableHead>
-                  <TableHead>Proyecto</TableHead>
-                  <TableHead>Responsable</TableHead>
-                  <TableHead>Vence</TableHead>
-                  <TableHead>Prioridad</TableHead>
+                  <EncabezadoFiltrable columna="tarea" control={tablaInternas}>Tarea</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="proyecto" control={tablaInternas}>Proyecto</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="responsable" control={tablaInternas}>Responsable</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="vence" control={tablaInternas}>Vence</EncabezadoFiltrable>
+                  <EncabezadoFiltrable columna="prioridad" control={tablaInternas}>Prioridad</EncabezadoFiltrable>
                   <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {internasVisibles.map((t) => {
+                {tablaInternas.filas.map((t) => {
                   const finalizada = t.estado === "finalizada";
                   const esPropia = t.responsableId === user.id;
                   const puedeCompletar = permisos.completarTarea(user.role, esPropia);
@@ -270,11 +293,12 @@ export default function Todo() {
                 })}
               </TableBody>
             </Table>
-            {internasVisibles.length === 0 && (
+            {tablaInternas.filas.length === 0 && (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {esViewer ? "No tenés tareas asignadas con este filtro." : "No hay tareas internas con este filtro."}
               </p>
             )}
+            <AvisoFiltros control={tablaInternas} unidad="tareas" />
           </CardContent>
         </Card>
       </section>

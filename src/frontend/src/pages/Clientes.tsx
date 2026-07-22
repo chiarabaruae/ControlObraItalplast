@@ -1,7 +1,9 @@
 import { Plus, Pencil, Trash2, Phone, Mail } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
+import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { clientes } from "@/mocks/data";
+import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,6 +11,13 @@ import { toast } from "sonner";
 
 export default function Clientes() {
   const { user } = useAuth();
+  const tabla = useTablaFiltrable(clientes, {
+    cliente: (c) => c.nombre,
+    ruc: (c) => c.ruc,
+    contacto: (c) => c.contacto,
+    proyectos: { valor: (c) => String(c.proyectos), orden: (c) => c.proyectos, tipo: "numero" },
+    estado: (c) => (c.estado === "activo" ? "Activo" : "Inactivo")
+  });
   if (!user) return null;
 
   const gestiona = permisos.gestionarClientes(user.role);
@@ -37,16 +46,16 @@ export default function Clientes() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>RUC</TableHead>
-                <TableHead>Contacto</TableHead>
-                <TableHead className="text-right">Proyectos</TableHead>
-                <TableHead>Estado</TableHead>
+                <EncabezadoFiltrable columna="cliente" control={tabla}>Cliente</EncabezadoFiltrable>
+                <EncabezadoFiltrable columna="ruc" control={tabla}>RUC</EncabezadoFiltrable>
+                <EncabezadoFiltrable columna="contacto" control={tabla}>Contacto</EncabezadoFiltrable>
+                <EncabezadoFiltrable columna="proyectos" control={tabla} alinear="derecha">Proyectos</EncabezadoFiltrable>
+                <EncabezadoFiltrable columna="estado" control={tabla}>Estado</EncabezadoFiltrable>
                 {gestiona && <TableHead className="w-20" />}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clientes.map((c) => (
+              {tabla.filas.map((c) => (
                 <TableRow key={c.id} className={c.estado === "inactivo" ? "opacity-55" : ""}>
                   <TableCell>
                     <div className="font-medium">{c.nombre}</div>
@@ -81,6 +90,12 @@ export default function Clientes() {
               ))}
             </TableBody>
           </Table>
+          {tabla.filas.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Ningún cliente coincide con el filtro aplicado.
+            </p>
+          )}
+          <AvisoFiltros control={tabla} unidad="clientes" />
         </CardContent>
       </Card>
     </div>
