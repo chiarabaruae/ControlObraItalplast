@@ -7,13 +7,14 @@ import {
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
-  proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, guardarProyecto, tareasIniciales,
-  nombreTipoProducto, aplicarCambioTarea, eliminarTareaConAuditoria, type Proyecto, type Tarea, type TareaPresupuesto
+  proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, guardarProyecto,
+  nombreTipoProducto, aplicarCambioTarea, eliminarTareaConAuditoria, type Proyecto, type TareaPresupuesto
 } from "@/mocks/data";
 import { formatFecha, formatFechaCorta } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
-import { EstadoBadge, PrioridadBadge } from "@/components/app/EstadoBadge";
+import { EstadoBadge } from "@/components/app/EstadoBadge";
 import { SeguimientoPresupuesto } from "@/components/proyectos/SeguimientoPresupuesto";
+import { TareasGenerales } from "@/components/proyectos/TareasGenerales";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -68,54 +69,8 @@ function Cronograma({ p }: { p: Proyecto }) {
   );
 }
 
-function TareasProyecto({ tareas }: { tareas: Tarea[] }) {
-  const porHacer = tareas.filter((t) => t.estado !== "finalizada");
-  const hechas = tareas.filter((t) => t.estado === "finalizada");
-
-  const TablaTareas = ({ titulo, items }: { titulo: string; items: Tarea[] }) => (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 font-heading text-base">
-          <ListTodo className="size-4.5 text-primary" strokeWidth={1.75} /> {titulo}
-        </CardTitle>
-        <span className="cifra text-xs text-muted-foreground">{items.length}</span>
-      </CardHeader>
-      <CardContent className="px-0">
-        {items.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tarea</TableHead>
-                <TableHead>Responsable</TableHead>
-                <TableHead>Vence</TableHead>
-                <TableHead>Prioridad</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((t) => (
-                <TableRow key={t.id} className={t.estado === "finalizada" ? "opacity-60" : ""}>
-                  <TableCell className={`font-medium ${t.estado === "finalizada" ? "line-through" : ""}`}>{t.titulo}</TableCell>
-                  <TableCell className="text-muted-foreground">{usuarioPorId(t.responsableId)?.displayName ?? "Sin asignar"}</TableCell>
-                  <TableCell className="cifra text-xs">{formatFecha(t.fechaFin)}</TableCell>
-                  <TableCell><PrioridadBadge prioridad={t.prioridad} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <p className="px-6 py-8 text-sm text-muted-foreground">No hay tareas en este estado.</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <TablaTareas titulo="Por hacer" items={porHacer} />
-      <TablaTareas titulo="Hechas" items={hechas} />
-    </div>
-  );
-}
+// La tabla legada "Por hacer / Hechas" (tareasIniciales) fue reemplazada por
+// las tareas genéricas del proyecto (D-030) en TareasGenerales.tsx.
 
 function SeguimientoPendiente() {
   return (
@@ -180,7 +135,6 @@ export default function ProyectoDetalle() {
   const totalComponentes = itemsPresupuesto.length > 0
     ? itemsPresupuesto.reduce((total, item) => total + item.cantidad, 0)
     : p.aberturas.reduce((total, abertura) => total + abertura.cantidad, 0);
-  const tareasDelProyecto = tareasIniciales.filter((t) => t.proyectoId === p.id);
   const productos = p.productos?.length
     ? p.productos
     : p.tipoProducto
@@ -243,7 +197,7 @@ export default function ProyectoDetalle() {
       <Tabs defaultValue="resumen">
         <TabsList className="flex-wrap">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
-          <TabsTrigger value="tareas">Tareas</TabsTrigger>
+          {permisos.verTareasGeneralesProyecto(user.role) && <TabsTrigger value="tareas">Tareas</TabsTrigger>}
           <TabsTrigger value="cronograma">Cronograma</TabsTrigger>
           {!soloServicios && (
             <>
@@ -312,10 +266,23 @@ export default function ProyectoDetalle() {
           </Card>}
         </TabsContent>
 
-        {/* Tareas */}
-        <TabsContent value="tareas" className="mt-4">
-          <TareasProyecto tareas={tareasDelProyecto} />
-        </TabsContent>
+        {/* Tareas genéricas del proyecto (D-030): solo administración y supervisión */}
+        {permisos.verTareasGeneralesProyecto(user.role) && (
+          <TabsContent value="tareas" className="mt-4">
+            <TareasGenerales
+              proyecto={p}
+              puedeEditar={permisos.editarTarea(user.role)}
+              puedeEliminar={permisos.eliminarTarea(user.role)}
+              puedePrioridad={permisos.definirPrioridadTarea(user.role)}
+              verAuditoria={permisos.verAuditoriaTareas(user.role)}
+              usuarioId={user.id}
+              rol={user.role}
+              alActualizar={actualizarTareaPresupuesto}
+              alAgregar={agregarTareaPresupuesto}
+              alEliminarTarea={eliminarTareaPresupuesto}
+            />
+          </TabsContent>
+        )}
 
         {/* Cronograma */}
         <TabsContent value="cronograma" className="mt-4">

@@ -18,6 +18,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-23 — Tareas genéricas del proyecto, solo administración y supervisión
+
+**Alcance:** la pestaña Tareas del detalle de proyecto pasa a gestionar tareas genéricas atadas directamente al proyecto, sin producto ni etapa de fábrica/instalación (D-030).
+
+**Impacto:** nuevo grupo `generales` en `TareaPresupuesto` (pseudo-tipo "general"; `null` en PostgreSQL). La pestaña usa la misma tabla estructurada, la misma `FilaTarea` compartida y los mismos diálogos (completar con evidencia, editar con confirmación, archivar auditado, prioridad inline) que Fábrica/Instalación, con bloque "Proyecto · General". Alta con nombre, prioridad, responsable y fechas. Vista y edición exclusivas de administración y supervisión: el rol Usuario no ve la pestaña y las tareas generales quedan fuera de su lista global aunque estén asignadas a él (filtros en frontend y en `/api/v2`). Se retira la tabla legada "Por hacer / Hechas" del detalle; `tareasIniciales` queda solo en el Dashboard.
+
+**Archivos clave:** `src/frontend/src/components/proyectos/TareasGenerales.tsx` (nuevo), `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx` (exporta `FilaTarea`), `src/frontend/src/mocks/data.ts`, `src/frontend/src/lib/seguimiento-presupuesto.ts` (`etiquetaBloque` para generales), `src/frontend/src/lib/roles.ts` (`verTareasGeneralesProyecto`), `src/frontend/src/pages/ProyectoDetalle.tsx`, `src/frontend/src/pages/Todo.tsx`, `src/backend/migrations/018_tareas_generales_proyecto.sql`, `src/backend/src/http/routes/fase2-routes.js`.
+
+**Validaciones:** `tsc -b`, `npm run lint` y `node --check` sin errores nuevos; recorrida en navegador como administrador (alta de tarea genérica visible en la tabla con bloque "Proyecto · General" y en el conteo de la sección global) y como Usuario con la tarea asignada a él (pestaña Tareas ausente y tarea excluida de su lista).
+
 ## 2026-07-23 — Catálogo editable para todos los productos con auditoría silenciosa
 
 **Alcance:** los productos estándar del catálogo también pueden editarse y retirarse; las etapas opcionales se configuran por grupo; todo cambio queda auditado en datos (D-029).

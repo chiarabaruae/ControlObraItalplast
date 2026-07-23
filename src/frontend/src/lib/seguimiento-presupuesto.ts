@@ -55,15 +55,18 @@ const SUFIJOS_BLOQUE: Record<GrupoTareaPresupuesto, string> = {
   fabricacion_premarcos: "Premarcos · fabricación",
   instalacion_premarcos: "Premarcos · instalación",
   fabrica: "Fabricación",
-  instalacion: "Instalación"
+  instalacion: "Instalación",
+  generales: "General"
 };
 
 /**
  * Etiqueta de bloque con el producto real (ej. "PVC · Fabricación") en vez del
  * genérico "Producto · fabricación", para distinguir tareas de distintos
- * productos dentro del mismo proyecto multiproducto.
+ * productos dentro del mismo proyecto multiproducto. Las tareas genéricas del
+ * proyecto (grupo "generales") no tienen producto: "Proyecto · General".
  */
 export function etiquetaBloque(grupo: GrupoTareaPresupuesto, tipoProducto: TipoProducto) {
+  if (grupo === "generales") return "Proyecto · General";
   return `${nombreCortoTipoProducto(tipoProducto)} · ${SUFIJOS_BLOQUE[grupo]}`;
 }
 

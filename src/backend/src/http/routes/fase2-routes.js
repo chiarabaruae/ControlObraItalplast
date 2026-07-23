@@ -235,7 +235,7 @@ export function createFase2Routes({ pool, env }) {
         pool.query(`select * from proyecto_etapas where proyecto_id = $1 order by grupo, orden`, [request.params.id]),
         pool.query(
           `select * from tareas_seguimiento where proyecto_id = $1 and eliminada_en is null
-            and ($2 in ('administrator','supervisor') or responsable_id = $3)
+            and ($2 in ('administrator','supervisor') or (responsable_id = $3 and grupo <> 'generales'))
             order by fecha_fin nulls last`,
           [request.params.id, request.user.role, request.user.sub ?? null]
         )
@@ -255,7 +255,8 @@ export function createFase2Routes({ pool, env }) {
 
   router.get("/tareas", async (request, response, next) => {
     try {
-      const filtro = request.user.role === "viewer" ? "and ts.responsable_id = $1" : "";
+      // El rol viewer solo ve sus tareas asignadas; las generales (D-030) nunca.
+      const filtro = request.user.role === "viewer" ? "and ts.responsable_id = $1 and ts.grupo <> 'generales'" : "";
       const params = request.user.role === "viewer" ? [request.user.sub] : [];
       const { rows } = await pool.query(
         `select ts.*, p.nombre as proyecto_nombre,
@@ -328,8 +329,9 @@ export function createFase2Routes({ pool, env }) {
   router.post("/proyectos/:id/tareas", exigir("crearTarea"), async (request, response, next) => {
     try {
       const { tipoProducto, grupo, titulo, itemId, fechaInicio, fechaFin, prioridad, responsableId } = request.body ?? {};
-      if (!tipoProducto || !grupo || !titulo?.trim()) {
-        response.status(400).json({ error: "tipoProducto, grupo y titulo son obligatorios." });
+      // Las tareas del grupo "generales" (D-030) no llevan producto; el resto sí.
+      if (!grupo || !titulo?.trim() || (grupo !== "generales" && !tipoProducto)) {
+        response.status(400).json({ error: "grupo y titulo son obligatorios (tipoProducto salvo en generales)." });
         return;
       }
       const responsable = await validarResponsable(pool, request, responsableId);
@@ -338,9 +340,11 @@ export function createFase2Routes({ pool, env }) {
         `insert into tareas_seguimiento (id, proyecto_id, item_id, tipo_producto, grupo, etapa, titulo,
                                          fecha_inicio, fecha_fin, manual, prioridad, creada_por_id,
                                          responsable_id, asignada_por_id, asignada_en)
-         values ($1, $2, $3, $4, $5, 'Tarea agregada', $6, $7, $8, true, coalesce($9,'media'), $10,
-                 $11, $12, case when $11 is null then null else now() end)`,
-        [id, request.params.id, itemId ?? null, tipoProducto, grupo, titulo.trim(),
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, coalesce($10,'media'), $11,
+                 $12, $13, case when $12 is null then null else now() end)`,
+        [id, request.params.id, itemId ?? null,
+         grupo === "generales" ? null : tipoProducto, grupo,
+         grupo === "generales" ? "Tarea del proyecto" : "Tarea agregada", titulo.trim(),
          fechaInicio ?? null, fechaFin ?? null, prioridad, request.user.sub ?? null,
          responsable?.id ?? null, request.user.sub ?? null]
       );

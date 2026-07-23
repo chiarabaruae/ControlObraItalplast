@@ -223,7 +223,12 @@ export type GrupoTareaPresupuesto =
   | "fabricacion_premarcos"
   | "instalacion_premarcos"
   | "fabrica"
-  | "instalacion";
+  | "instalacion"
+  /** Tareas genéricas del proyecto (D-030): sin producto ni etapa de fábrica/instalación. */
+  | "generales";
+
+/** Pseudo-tipo de producto para tareas genéricas; no pertenece al catálogo. */
+export const TIPO_TAREA_GENERAL: TipoProducto = "general";
 
 export interface EvidenciaTarea {
   nombre: string;

@@ -45,7 +45,8 @@ interface FormularioAlta {
   responsableId?: string;
 }
 
-function FilaTarea({
+/** Fila de la tabla de tareas. Compartida con las tareas genéricas del proyecto (D-030). */
+export function FilaTarea({
   proyecto,
   tarea,
   puedeCompletar,

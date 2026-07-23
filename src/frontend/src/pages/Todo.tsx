@@ -58,7 +58,9 @@ export default function Todo() {
   // Tareas de seguimiento de todos los proyectos activos.
   const seguimiento = proyectos.flatMap((proyecto) =>
     (proyecto.tareasPresupuesto ?? [])
-      .filter((tarea) => user?.role !== "viewer" || tarea.responsableId === user?.id)
+      // Las tareas genéricas del proyecto (D-030) son exclusivas de
+      // administración y supervisión: el rol Usuario no las ve ni asignadas.
+      .filter((tarea) => user?.role !== "viewer" || (tarea.responsableId === user?.id && tarea.grupo !== "generales"))
       .map((tarea) => ({ proyecto, tarea }))
   );
   const archivadas = proyectos.flatMap((proyecto) =>

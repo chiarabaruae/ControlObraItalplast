@@ -51,6 +51,10 @@ export const permisos = {
   // Usuarios
   gestionarUsuarios: (r: Role) => r === "administrator",
 
+  // Tareas genéricas del proyecto (D-030): vista y edición solo para
+  // administración y supervisión; el rol Usuario no accede ni a la lectura.
+  verTareasGeneralesProyecto: (r: Role) => r === "administrator" || r === "supervisor",
+
   // Reglas y catálogo: brechas backward y catálogo de productos, solo administradores.
   configurarPlanificacion: (r: Role) => r === "administrator",
   gestionarReglasNegocio: (r: Role) => r === "administrator"
