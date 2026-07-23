@@ -161,10 +161,11 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 ## Reglas y catálogo (sección admin)
 
 - Nueva entrada del menú principal debajo de Usuarios, visible solo para administradores (permiso `gestionarReglasNegocio`).
-- Reúne las **brechas de planificación backward** y el **catálogo de productos**: los seis tipos estándar más los personalizados que agregue administración, cada uno con nombre y si **lleva premarcos**.
-- Los tipos personalizados persisten en `localStorage` (`control-obras-catalogo-productos`), aparecen de inmediato en el alta de proyectos (admin y supervisor) y pueden retirarse sin afectar proyectos existentes; los estándar no se eliminan.
-- Un producto sin premarcos no ofrece los grupos de fabricación/instalación de premarcos ni sus plazos de planificación. Servicios mantiene su regla especial.
-- Fuentes: `src/frontend/src/pages/Reglas.tsx` y el catálogo en `src/frontend/src/mocks/data.ts` (`obtenerCatalogoProductos`, `ProductoCatalogo`).
+- Reúne las **brechas de planificación backward** y el **catálogo de productos**: los seis tipos estándar más los personalizados que agregue administración.
+- **Todos los productos —estándar incluidos— pueden editarse y retirarse** (D-029). Editar permite cambiar el nombre y configurar por separado si el producto ofrece **fabricación de premarcos** e **instalación de premarcos** (Servicios no muestra estos switches). Retirar es baja lógica: la fila queda "Retirado" con botón de restaurar y los proyectos existentes conservan la referencia.
+- Los cambios sobre estándar persisten como overrides (`control-obras-catalogo-overrides`); los personalizados en `control-obras-catalogo-productos`. Cada alta/edición/baja/reactivación sella auditoría (fecha, usuario, acción, detalle) en `control-obras-catalogo-auditoria` — solo datos, sin interfaz; PostgreSQL la persiste en `catalogo_auditoria` (migración 017).
+- El alta de proyectos ofrece solo productos activos (`obtenerCatalogoActivo`) y muestra cada editor de premarcos según el flag de su grupo.
+- Fuentes: `src/frontend/src/pages/Reglas.tsx` y el catálogo en `src/frontend/src/mocks/data.ts` (`obtenerCatalogoProductos`, `obtenerCatalogoActivo`, `ProductoCatalogo`).
 
 ## Alta de tareas en cascada (sección Tareas)
 

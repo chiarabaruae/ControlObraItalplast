@@ -7,7 +7,7 @@ import {
   clientes, usuarios, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, etapas,
   ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
   ETAPAS_FABRICACION_PREMARCOS, ETAPAS_INSTALACION_PREMARCOS,
-  obtenerCatalogoProductos, productoCatalogo, nombreTipoProducto, obtenerProyectos, guardarProyectos, guardarProyecto,
+  obtenerCatalogoActivo, productoCatalogo, nombreTipoProducto, obtenerProyectos, guardarProyectos, guardarProyecto,
   type ConfiguracionProductoProyecto, type EstadoObra, type PlanificacionProducto, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
@@ -106,7 +106,7 @@ function planificacionDesdeFormulario(formulario: PlanificacionFormulario): Plan
 
 function crearMapaConfiguraciones() {
   return Object.fromEntries(
-    obtenerCatalogoProductos().map((producto) => [producto.valor, crearConfiguracionProducto()])
+    obtenerCatalogoActivo().map((producto) => [producto.valor, crearConfiguracionProducto()])
   ) as Record<TipoProducto, ConfiguracionProductoFormulario>;
 }
 
@@ -406,7 +406,7 @@ export default function Proyectos() {
     setListaProyectos((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
   };
 
-  const catalogoProductos = obtenerCatalogoProductos();
+  const catalogoProductos = obtenerCatalogoActivo();
   const visibles = listaProyectos.filter((proyecto) => filtro === "todas" || proyecto.estado === filtro);
   const responsables = usuarios.filter((usuario) => usuario.isActive && (usuario.role === "administrator" || usuario.role === "supervisor"));
   const productosConfigurables = tiposSeleccionados.filter((tipo) => tipo !== "servicios");
@@ -775,7 +775,9 @@ export default function Proyectos() {
             {productosConfigurables.map((tipo) => {
               const configuracion = configuraciones[tipo];
               const etiquetaProducto = nombreTipoProducto(tipo);
-              const permitePremarcos = productoCatalogo(tipo)?.llevaPremarcos ?? true;
+              const definicionCatalogo = productoCatalogo(tipo);
+              const permiteFabricacionPremarcos = definicionCatalogo?.llevaFabricacionPremarcos ?? definicionCatalogo?.llevaPremarcos ?? true;
+              const permiteInstalacionPremarcos = definicionCatalogo?.llevaInstalacionPremarcos ?? definicionCatalogo?.llevaPremarcos ?? true;
               return (
                 <section key={tipo} className="grid gap-4 rounded-2xl border border-primary/20 bg-primary/[0.025] p-4">
                   <div>
@@ -787,7 +789,7 @@ export default function Proyectos() {
                   </div>
 
                   <div className="grid gap-4 lg:grid-cols-2">
-                    {permitePremarcos && <EditorEtapas
+                    {permiteFabricacionPremarcos && <EditorEtapas
                       idBase={`${tipo}-fabricacion-premarcos`}
                       contexto={etiquetaProducto}
                       titulo="Fabricación de premarcos"
@@ -799,7 +801,7 @@ export default function Proyectos() {
                       habilitado={configuracion.fabricaraPremarcos}
                       alCambiarHabilitado={(valor) => actualizarConfiguracion(tipo, { fabricaraPremarcos: valor })}
                     />}
-                    {permitePremarcos && <EditorEtapas
+                    {permiteInstalacionPremarcos && <EditorEtapas
                       idBase={`${tipo}-instalacion-premarcos`}
                       contexto={etiquetaProducto}
                       titulo="Instalación de premarcos"

@@ -18,6 +18,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-23 — Catálogo editable para todos los productos con auditoría silenciosa
+
+**Alcance:** los productos estándar del catálogo también pueden editarse y retirarse; las etapas opcionales se configuran por grupo; todo cambio queda auditado en datos (D-029).
+
+**Impacto:** en Reglas y catálogo, cada producto (estándar o personalizado) muestra lápiz y papelera. Editar permite cambiar el nombre y definir si el producto ofrece **fabricación de premarcos** y/o **instalación de premarcos** (dos switches; Servicios no los muestra). Retirar es baja lógica: la fila queda atenuada como "Retirado" con botón de restaurar, y los proyectos existentes conservan la referencia. Los cambios sobre estándar se guardan como overrides sin tocar la definición base. Cada operación (crear/editar/desactivar/reactivar) sella fecha, usuario, acción y detalle en `control-obras-catalogo-auditoria` — sin interfaz que la muestre; en PostgreSQL persiste en `catalogo_auditoria`. El alta de proyectos ofrece solo productos activos y muestra los editores de premarcos según el flag de cada grupo.
+
+**Archivos clave:** `src/frontend/src/mocks/data.ts` (overrides, `obtenerCatalogoActivo`, `registrarAuditoriaCatalogo`, flags por grupo), `src/frontend/src/pages/Reglas.tsx`, `src/frontend/src/pages/Proyectos.tsx`, `src/backend/migrations/017_catalogo_editable_y_auditoria.sql`, `src/backend/src/http/routes/fase2-routes.js` (PATCH/DELETE para estándar + `POST /:valor/reactivar` + auditoría).
+
+**Validaciones:** `tsc -b`, `npm run lint` y `node --check` sin errores nuevos; recorrida en navegador como administrador: edición de Persianas (instalación de premarcos apagada → el alta deja de ofrecer ese grupo), retiro de Mosquiteras (desaparece del alta, queda "Retirado" con restaurar) y auditoría verificada en `localStorage` con usuario, acción, detalle y fecha.
+
 ## 2026-07-22 — Rediseño visual de la fila de tarea en Fábrica/Instalación
 
 **Alcance:** la fila de tarea del detalle de proyecto (`SeguimientoPresupuesto.tsx`) mezclaba título, info del ítem, auditoría completa, responsable, fechas, prioridad y acciones en un único contenedor `flex-wrap`, que se acomodaba de forma impredecible y se veía encimado con datos densos (varias asignaciones/ediciones).

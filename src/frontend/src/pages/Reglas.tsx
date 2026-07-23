@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarClock, Check, Package, Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { ArchiveRestore, CalendarClock, Check, Package, Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
 import {
   BUFFERS_PREDETERMINADOS,
   guardarBuffersPlanificacion,
@@ -7,11 +7,15 @@ import {
   type BuffersPlanificacion
 } from "@/lib/planificacion";
 import {
+  guardarOverridesCatalogo,
   guardarProductosPersonalizados,
   obtenerCatalogoProductos,
+  obtenerOverridesCatalogo,
   obtenerProductosPersonalizados,
+  registrarAuditoriaCatalogo,
   type ProductoCatalogo
 } from "@/mocks/data";
+import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -136,21 +140,51 @@ function SeccionBrechas() {
 }
 
 function SeccionCatalogo() {
-  const [personalizados, setPersonalizados] = useState<ProductoCatalogo[]>(() => obtenerProductosPersonalizados());
+  const { user } = useAuth();
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [llevaPremarcos, setLlevaPremarcos] = useState(true);
   const [editando, setEditando] = useState<string | null>(null);
   const [nombreEdicion, setNombreEdicion] = useState("");
-  const [premarcosEdicion, setPremarcosEdicion] = useState(true);
+  const [fabricacionEdicion, setFabricacionEdicion] = useState(true);
+  const [instalacionEdicion, setInstalacionEdicion] = useState(true);
+  // Contador para releer el catálogo tras cada cambio persistido.
+  const [refresco, setRefresco] = useState(0);
   const catalogo = obtenerCatalogoProductos();
+  void refresco;
+
+  const usuarioId = user?.id ?? "";
 
   const comenzarEdicion = (producto: ProductoCatalogo) => {
     setEditando(String(producto.valor));
     setNombreEdicion(producto.label);
-    setPremarcosEdicion(producto.llevaPremarcos);
+    setFabricacionEdicion(producto.llevaFabricacionPremarcos ?? producto.llevaPremarcos);
+    setInstalacionEdicion(producto.llevaInstalacionPremarcos ?? producto.llevaPremarcos);
+  };
+
+  /** Persiste cambios de un producto: overrides para estándar, lista para personalizados. */
+  const aplicarCambio = (
+    producto: ProductoCatalogo,
+    cambios: { label?: string; llevaFabricacionPremarcos?: boolean; llevaInstalacionPremarcos?: boolean; activo?: boolean }
+  ) => {
+    if (producto.base) {
+      const overrides = obtenerOverridesCatalogo();
+      overrides[String(producto.valor)] = { ...overrides[String(producto.valor)], ...cambios };
+      guardarOverridesCatalogo(overrides);
+    } else {
+      guardarProductosPersonalizados(
+        obtenerProductosPersonalizados().map((item) =>
+          item.valor === producto.valor
+            ? { ...item, ...cambios, llevaPremarcos: (cambios.llevaFabricacionPremarcos ?? item.llevaFabricacionPremarcos ?? item.llevaPremarcos) || (cambios.llevaInstalacionPremarcos ?? item.llevaInstalacionPremarcos ?? item.llevaPremarcos) }
+            : item
+        )
+      );
+    }
+    setRefresco((n) => n + 1);
   };
 
   const guardarEdicion = () => {
+    const objetivo = catalogo.find((producto) => producto.valor === editando);
+    if (!objetivo) return;
     const label = nombreEdicion.trim();
     if (!label) {
       toast("Falta el nombre", { description: "El producto necesita un nombre." });
@@ -163,11 +197,17 @@ function SeccionCatalogo() {
       toast("Nombre duplicado", { description: `Ya existe "${duplicado.label}" en el catálogo.` });
       return;
     }
-    const nuevos = personalizados.map((producto) =>
-      producto.valor === editando ? { ...producto, label, llevaPremarcos: premarcosEdicion } : producto
-    );
-    guardarProductosPersonalizados(nuevos);
-    setPersonalizados(nuevos);
+    aplicarCambio(objetivo, {
+      label,
+      llevaFabricacionPremarcos: fabricacionEdicion,
+      llevaInstalacionPremarcos: instalacionEdicion
+    });
+    registrarAuditoriaCatalogo({
+      usuarioId,
+      accion: "editar",
+      valor: String(objetivo.valor),
+      detalle: `Nombre: ${label} · Fabricación de premarcos: ${fabricacionEdicion ? "sí" : "no"} · Instalación de premarcos: ${instalacionEdicion ? "sí" : "no"}`
+    });
     setEditando(null);
     toast("Producto actualizado", { description: `"${label}" se aplicará así en los próximos proyectos.` });
   };
@@ -190,22 +230,29 @@ function SeccionCatalogo() {
       toast("Producto duplicado", { description: `Ya existe "${existente.label}" en el catálogo.` });
       return;
     }
-    const nuevos = [...personalizados, { valor, label, llevaPremarcos }];
-    guardarProductosPersonalizados(nuevos);
-    setPersonalizados(nuevos);
+    guardarProductosPersonalizados([
+      ...obtenerProductosPersonalizados(),
+      { valor, label, llevaPremarcos, llevaFabricacionPremarcos: llevaPremarcos, llevaInstalacionPremarcos: llevaPremarcos }
+    ]);
+    registrarAuditoriaCatalogo({ usuarioId, accion: "crear", valor, detalle: `Nombre: ${label}` });
+    setRefresco((n) => n + 1);
     setNombreNuevo("");
     setLlevaPremarcos(true);
     toast("Producto agregado", { description: `"${label}" ya está disponible al crear proyectos.` });
   };
 
-  const eliminar = (valor: string) => {
-    const producto = personalizados.find((item) => item.valor === valor);
-    const nuevos = personalizados.filter((item) => item.valor !== valor);
-    guardarProductosPersonalizados(nuevos);
-    setPersonalizados(nuevos);
+  const desactivar = (producto: ProductoCatalogo) => {
+    aplicarCambio(producto, { activo: false });
+    registrarAuditoriaCatalogo({ usuarioId, accion: "desactivar", valor: String(producto.valor) });
     toast("Producto retirado", {
-      description: `"${producto?.label}" ya no se ofrece en proyectos nuevos. Los proyectos existentes no cambian.`
+      description: `"${producto.label}" ya no se ofrece en proyectos nuevos. Los proyectos existentes no cambian.`
     });
+  };
+
+  const reactivar = (producto: ProductoCatalogo) => {
+    aplicarCambio(producto, { activo: true });
+    registrarAuditoriaCatalogo({ usuarioId, accion: "reactivar", valor: String(producto.valor) });
+    toast("Producto restaurado", { description: `"${producto.label}" vuelve a ofrecerse al crear proyectos.` });
   };
 
   return (
@@ -225,92 +272,126 @@ function SeccionCatalogo() {
       </CardHeader>
       <CardContent className="space-y-4 pt-1">
         <ul className="divide-y rounded-xl border">
-          {catalogo.map((producto) => (
-            <li key={producto.valor} className="flex items-center gap-3 px-4 py-2.5">
-              {editando === producto.valor ? (
-                <>
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <Input
-                      value={nombreEdicion}
-                      onChange={(evento) => setNombreEdicion(evento.target.value)}
-                      onKeyDown={(evento) => {
-                        if (evento.key === "Enter") {
-                          evento.preventDefault();
-                          guardarEdicion();
-                        }
-                        if (evento.key === "Escape") setEditando(null);
-                      }}
-                      aria-label={`Nuevo nombre de ${producto.label}`}
-                      autoFocus
-                    />
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id={`editar-premarcos-${producto.valor}`}
-                        checked={premarcosEdicion}
-                        onCheckedChange={setPremarcosEdicion}
+          {catalogo.map((producto) => {
+            const esServicios = producto.valor === "servicios";
+            const inactivo = producto.activo === false;
+            const etiquetaEtapas = esServicios
+              ? "Sin etapas de seguimiento"
+              : [
+                  producto.llevaFabricacionPremarcos ? "Fabricación de premarcos" : null,
+                  producto.llevaInstalacionPremarcos ? "Instalación de premarcos" : null
+                ].filter(Boolean).join(" + ") || "Sin premarcos";
+
+            return (
+              <li key={producto.valor} className={`flex items-center gap-3 px-4 py-2.5 ${inactivo ? "opacity-55" : ""}`}>
+                {editando === producto.valor ? (
+                  <>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Input
+                        value={nombreEdicion}
+                        onChange={(evento) => setNombreEdicion(evento.target.value)}
+                        onKeyDown={(evento) => {
+                          if (evento.key === "Enter") {
+                            evento.preventDefault();
+                            guardarEdicion();
+                          }
+                          if (evento.key === "Escape") setEditando(null);
+                        }}
+                        aria-label={`Nuevo nombre de ${producto.label}`}
+                        autoFocus
                       />
-                      <Label htmlFor={`editar-premarcos-${producto.valor}`} className="text-xs">Lleva premarcos</Label>
+                      {!esServicios && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              id={`editar-fab-premarcos-${producto.valor}`}
+                              checked={fabricacionEdicion}
+                              onCheckedChange={setFabricacionEdicion}
+                            />
+                            <Label htmlFor={`editar-fab-premarcos-${producto.valor}`} className="text-xs">
+                              Ofrece fabricación de premarcos
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              id={`editar-inst-premarcos-${producto.valor}`}
+                              checked={instalacionEdicion}
+                              onCheckedChange={setInstalacionEdicion}
+                            />
+                            <Label htmlFor={`editar-inst-premarcos-${producto.valor}`} className="text-xs">
+                              Ofrece instalación de premarcos
+                            </Label>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-primary"
-                    onClick={guardarEdicion}
-                    aria-label={`Guardar cambios de ${producto.label}`}
-                  >
-                    <Check className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-muted-foreground"
-                    onClick={() => setEditando(null)}
-                    aria-label={`Cancelar edición de ${producto.label}`}
-                  >
-                    <X className="size-4" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{producto.label}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {producto.base ? "Estándar" : "Personalizado"}
-                      {" · "}
-                      {producto.valor === "servicios"
-                        ? "Sin etapas de seguimiento"
-                        : producto.llevaPremarcos
-                          ? "Con premarcos opcionales"
-                          : "Sin premarcos"}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-primary"
+                      onClick={guardarEdicion}
+                      aria-label={`Guardar cambios de ${producto.label}`}
+                    >
+                      <Check className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground"
+                      onClick={() => setEditando(null)}
+                      aria-label={`Cancelar edición de ${producto.label}`}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{producto.label}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {producto.base ? "Estándar" : "Personalizado"}
+                        {" · "}
+                        {etiquetaEtapas}
+                        {inactivo && " · Retirado"}
+                      </div>
                     </div>
-                  </div>
-                  {!producto.base && (
-                    <>
+                    {inactivo ? (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="shrink-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => comenzarEdicion(producto)}
-                        aria-label={`Editar ${producto.label}`}
+                        onClick={() => reactivar(producto)}
+                        aria-label={`Restaurar ${producto.label} al catálogo`}
                       >
-                        <Pencil className="size-4" />
+                        <ArchiveRestore className="size-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => eliminar(String(producto.valor))}
-                        aria-label={`Retirar ${producto.label} del catálogo`}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </>
-                  )}
-                </>
-              )}
-            </li>
-          ))}
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => comenzarEdicion(producto)}
+                          aria-label={`Editar ${producto.label}`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => desactivar(producto)}
+                          aria-label={`Retirar ${producto.label} del catálogo`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
 
         <div className="rounded-xl border p-4">

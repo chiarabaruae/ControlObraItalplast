@@ -65,13 +65,23 @@ export function createFase2Routes({ pool, env }) {
   router.use(requireAuth(env));
 
   // ==========================================================================
-  // Catálogo de productos (D-025)
+  // Catálogo de productos (D-025, editable para todos según D-029)
   // ==========================================================================
-  router.get("/catalogo/productos", async (_request, response, next) => {
+  const auditarCatalogo = (accion, valor, usuarioId, detalle) =>
+    pool.query(
+      `insert into catalogo_auditoria (accion, valor, usuario_id, detalle) values ($1, $2, $3, $4)`,
+      [accion, valor, usuarioId ?? null, detalle ? JSON.stringify(detalle) : null]
+    );
+
+  router.get("/catalogo/productos", async (request, response, next) => {
     try {
+      // ?todos=1 incluye los retirados (para administrar y resolver etiquetas históricas).
+      const incluirInactivos = request.query.todos === "1";
       const { rows } = await pool.query(
-        `select valor, label, nombre_corto, lleva_premarcos, es_base
-           from catalogo_productos where activo order by es_base desc, label`
+        `select valor, label, nombre_corto, lleva_premarcos,
+                lleva_fabricacion_premarcos, lleva_instalacion_premarcos, es_base, activo
+           from catalogo_productos ${incluirInactivos ? "" : "where activo"}
+          order by es_base desc, label`
       );
       response.json(rows);
     } catch (error) { next(error); }
@@ -85,8 +95,9 @@ export function createFase2Routes({ pool, env }) {
         return;
       }
       const { rows } = await pool.query(
-        `insert into catalogo_productos (valor, label, nombre_corto, lleva_premarcos)
-         values ($1, $2, $3, coalesce($4, true))
+        `insert into catalogo_productos (valor, label, nombre_corto, lleva_premarcos,
+                                         lleva_fabricacion_premarcos, lleva_instalacion_premarcos)
+         values ($1, $2, $3, coalesce($4, true), coalesce($4, true), coalesce($4, true))
          on conflict (valor) do nothing
          returning valor`,
         [valor, label, nombreCorto ?? null, llevaPremarcos]
@@ -95,42 +106,65 @@ export function createFase2Routes({ pool, env }) {
         response.status(409).json({ error: "Ya existe un producto con ese slug." });
         return;
       }
+      await auditarCatalogo("crear", valor, request.user.sub, { label });
       response.status(201).json({ valor });
     } catch (error) { next(error); }
   });
 
+  // Edición para todos los productos, estándar incluidos (D-028): nombre y
+  // disponibilidad de las etapas opcionales por grupo.
   router.patch("/catalogo/productos/:valor", exigir("gestionarReglasNegocio"), async (request, response, next) => {
     try {
-      const { label, nombreCorto, llevaPremarcos } = request.body ?? {};
+      const { label, nombreCorto, llevaFabricacionPremarcos, llevaInstalacionPremarcos } = request.body ?? {};
       const { rowCount } = await pool.query(
         `update catalogo_productos
             set label = coalesce($2, label),
                 nombre_corto = coalesce($3, nombre_corto),
-                lleva_premarcos = coalesce($4, lleva_premarcos),
+                lleva_fabricacion_premarcos = coalesce($4, lleva_fabricacion_premarcos),
+                lleva_instalacion_premarcos = coalesce($5, lleva_instalacion_premarcos),
+                lleva_premarcos = coalesce($4, lleva_fabricacion_premarcos) or coalesce($5, lleva_instalacion_premarcos),
                 actualizado_en = now()
-          where valor = $1 and not es_base`,
-        [request.params.valor, label ?? null, nombreCorto ?? null, llevaPremarcos ?? null]
+          where valor = $1`,
+        [request.params.valor, label ?? null, nombreCorto ?? null,
+         llevaFabricacionPremarcos ?? null, llevaInstalacionPremarcos ?? null]
       );
       if (rowCount === 0) {
-        response.status(404).json({ error: "Producto personalizado no encontrado (los estándar no se editan)." });
+        response.status(404).json({ error: "Producto no encontrado." });
         return;
       }
+      await auditarCatalogo("editar", request.params.valor, request.user.sub,
+        { label, llevaFabricacionPremarcos, llevaInstalacionPremarcos });
       response.json({ ok: true });
     } catch (error) { next(error); }
   });
 
+  // Baja lógica para todos: los proyectos existentes conservan la referencia.
   router.delete("/catalogo/productos/:valor", exigir("gestionarReglasNegocio"), async (request, response, next) => {
     try {
-      // Baja lógica: los proyectos existentes conservan la referencia.
       const { rowCount } = await pool.query(
-        `update catalogo_productos set activo = false, actualizado_en = now()
-          where valor = $1 and not es_base`,
+        `update catalogo_productos set activo = false, actualizado_en = now() where valor = $1`,
         [request.params.valor]
       );
       if (rowCount === 0) {
-        response.status(404).json({ error: "Producto personalizado no encontrado (los estándar no se eliminan)." });
+        response.status(404).json({ error: "Producto no encontrado." });
         return;
       }
+      await auditarCatalogo("desactivar", request.params.valor, request.user.sub);
+      response.json({ ok: true });
+    } catch (error) { next(error); }
+  });
+
+  router.post("/catalogo/productos/:valor/reactivar", exigir("gestionarReglasNegocio"), async (request, response, next) => {
+    try {
+      const { rowCount } = await pool.query(
+        `update catalogo_productos set activo = true, actualizado_en = now() where valor = $1`,
+        [request.params.valor]
+      );
+      if (rowCount === 0) {
+        response.status(404).json({ error: "Producto no encontrado." });
+        return;
+      }
+      await auditarCatalogo("reactivar", request.params.valor, request.user.sub);
       response.json({ ok: true });
     } catch (error) { next(error); }
   });

@@ -45,10 +45,15 @@ export interface ProductoCatalogo {
   label: string;
   /** Nombre breve para columnas y etiquetas de bloque (ej. "PVC", "Aluminio"). Si falta, se usa `label`. */
   nombreCorto?: string;
-  /** Habilita los grupos opcionales de fabricación/instalación de premarcos. */
+  /** Compatibilidad: true si alguno de los grupos de premarcos está disponible. */
   llevaPremarcos: boolean;
-  /** true en los productos estándar, que no pueden eliminarse del catálogo. */
+  /** Etapas opcionales configurables por producto (D-029). Ausente = hereda `llevaPremarcos`. */
+  llevaFabricacionPremarcos?: boolean;
+  llevaInstalacionPremarcos?: boolean;
+  /** true en los productos estándar (no se borran físicamente; su baja es lógica). */
   base?: boolean;
+  /** false = retirado del catálogo (baja lógica); los proyectos existentes lo conservan. */
+  activo?: boolean;
 }
 
 export const TIPOS_PRODUCTO: ProductoCatalogo[] = [
@@ -61,26 +66,89 @@ export const TIPOS_PRODUCTO: ProductoCatalogo[] = [
 ];
 
 const CATALOGO_STORAGE_KEY = "control-obras-catalogo-productos";
+const CATALOGO_OVERRIDES_KEY = "control-obras-catalogo-overrides";
+const CATALOGO_AUDITORIA_KEY = "control-obras-catalogo-auditoria";
+
+/** Cambios que administración aplica sobre un producto estándar (editar o desactivar). */
+export interface OverrideProductoCatalogo {
+  label?: string;
+  llevaFabricacionPremarcos?: boolean;
+  llevaInstalacionPremarcos?: boolean;
+  activo?: boolean;
+}
+
+function leerJson<T>(clave: string, respaldo: T): T {
+  if (typeof window === "undefined") return respaldo;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(clave) ?? "null");
+    return (parsed ?? respaldo) as T;
+  } catch {
+    return respaldo;
+  }
+}
+
+export function obtenerOverridesCatalogo(): Record<string, OverrideProductoCatalogo> {
+  return leerJson(CATALOGO_OVERRIDES_KEY, {});
+}
+
+export function guardarOverridesCatalogo(overrides: Record<string, OverrideProductoCatalogo>) {
+  window.localStorage.setItem(CATALOGO_OVERRIDES_KEY, JSON.stringify(overrides));
+}
+
+/**
+ * Auditoría del catálogo (D-029): cada alta, edición o baja queda sellada con
+ * fecha, usuario y detalle. Solo datos — ninguna pantalla la muestra; el
+ * backend la persistirá en `catalogo_auditoria`.
+ */
+export interface RegistroAuditoriaCatalogo {
+  fecha: string;
+  usuarioId: string;
+  accion: "crear" | "editar" | "desactivar" | "reactivar";
+  valor: string;
+  detalle?: string;
+}
+
+export function registrarAuditoriaCatalogo(registro: Omit<RegistroAuditoriaCatalogo, "fecha">) {
+  const historial = leerJson<RegistroAuditoriaCatalogo[]>(CATALOGO_AUDITORIA_KEY, []);
+  historial.push({ ...registro, fecha: new Date().toISOString() });
+  window.localStorage.setItem(CATALOGO_AUDITORIA_KEY, JSON.stringify(historial));
+}
 
 export function obtenerProductosPersonalizados(): ProductoCatalogo[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(CATALOGO_STORAGE_KEY) ?? "[]") as ProductoCatalogo[];
-    return Array.isArray(parsed)
-      ? parsed.filter((producto) => producto.valor && producto.label).map((producto) => ({ ...producto, base: false }))
-      : [];
-  } catch {
-    return [];
-  }
+  const parsed = leerJson<ProductoCatalogo[]>(CATALOGO_STORAGE_KEY, []);
+  return Array.isArray(parsed)
+    ? parsed.filter((producto) => producto.valor && producto.label).map((producto) => ({ ...producto, base: false }))
+    : [];
 }
 
 export function guardarProductosPersonalizados(productos: ProductoCatalogo[]) {
   window.localStorage.setItem(CATALOGO_STORAGE_KEY, JSON.stringify(productos));
 }
 
-/** Catálogo completo: productos estándar más los personalizados por administración. */
+function normalizarProducto(producto: ProductoCatalogo): ProductoCatalogo {
+  return {
+    ...producto,
+    activo: producto.activo !== false,
+    llevaFabricacionPremarcos: producto.llevaFabricacionPremarcos ?? producto.llevaPremarcos,
+    llevaInstalacionPremarcos: producto.llevaInstalacionPremarcos ?? producto.llevaPremarcos
+  };
+}
+
+/**
+ * Catálogo completo (incluye desactivados, para resolver etiquetas de proyectos
+ * existentes): estándar con sus overrides aplicados más los personalizados.
+ */
 export function obtenerCatalogoProductos(): ProductoCatalogo[] {
-  return [...TIPOS_PRODUCTO, ...obtenerProductosPersonalizados()];
+  const overrides = obtenerOverridesCatalogo();
+  const estandar = TIPOS_PRODUCTO.map((producto) =>
+    normalizarProducto({ ...producto, ...overrides[String(producto.valor)] })
+  );
+  return [...estandar, ...obtenerProductosPersonalizados().map(normalizarProducto)];
+}
+
+/** Solo los productos ofrecidos al crear proyectos nuevos. */
+export function obtenerCatalogoActivo(): ProductoCatalogo[] {
+  return obtenerCatalogoProductos().filter((producto) => producto.activo !== false);
 }
 
 export function productoCatalogo(tipo?: TipoProducto): ProductoCatalogo | undefined {
