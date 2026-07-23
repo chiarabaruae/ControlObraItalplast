@@ -4,8 +4,8 @@
 // cambiar fechas o eliminar. Completar exige evidencia fotográfica.
 // Mismos campos y condiciones por rol que la sección Tareas: prioridad
 // editable, auditoría solo para administradores, y el mismo diálogo de edición.
-import { useMemo, useState, type ReactNode } from "react";
-import { CalendarDays, Check, Factory, HardHat, History, Pencil, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, Factory, HardHat, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { etiquetaBloque, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
 import { formatFechaCorta, formatFechaHora } from "@/lib/format";
@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 import { DialogoConfirmarCambioTarea } from "@/components/proyectos/DialogoConfirmarCambioTarea";
@@ -42,27 +43,6 @@ interface FormularioAlta {
   fechaFin: string;
   prioridad: PrioridadTarea;
   responsableId?: string;
-}
-
-/** Etiqueta compacta para metadatos secundarios (ítem, responsable, auditoría). */
-function MetaChip({
-  icono: Icono,
-  children,
-  title
-}: {
-  icono?: typeof CalendarDays;
-  children: ReactNode;
-  title?: string;
-}) {
-  return (
-    <span
-      className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-normal text-muted-foreground"
-      title={title}
-    >
-      {Icono && <Icono className="size-3 shrink-0" />}
-      <span className="truncate">{children}</span>
-    </span>
-  );
 }
 
 function FilaTarea({
@@ -102,113 +82,118 @@ function FilaTarea({
     ? `Responsable: ${responsable.displayName}${asignadaPor ? ` · Asignada por ${asignadaPor}` : ""}`
     : undefined;
 
-  const tituloAuditoria = verAuditoria
+  const tituloAuditoria = verAuditoria && tarea.modificadaEn
     ? [
         tarea.creadaEn ? `Creada ${formatFechaHora(tarea.creadaEn)}` : null,
-        tarea.modificadaEn
-          ? `Modificada ${formatFechaHora(tarea.modificadaEn)} por ${usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"}`
-          : null
+        `Modificada ${formatFechaHora(tarea.modificadaEn)} por ${usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"} · v${tarea.version ?? 1}`
       ].filter(Boolean).join(" · ")
     : undefined;
 
   return (
-    <li className={`grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5 px-4 py-3 ${tarea.completada ? "opacity-60" : ""}`}>
-      <Button
-        type="button"
-        variant={tarea.completada ? "default" : "outline"}
-        size="icon"
-        className="row-span-2 size-8 shrink-0 self-start rounded-full"
-        onClick={() => alSeleccionar(tarea)}
-        disabled={!puedeCompletar && !tarea.completada}
-        aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${titulo}`}
-      >
-        <Check className="size-4" />
-      </Button>
+    <TableRow className={tarea.completada ? "opacity-60" : ""}>
+      <TableCell>
+        <Button
+          type="button"
+          variant={tarea.completada ? "default" : "outline"}
+          size="icon"
+          className="size-8 shrink-0 rounded-full"
+          onClick={() => alSeleccionar(tarea)}
+          disabled={!puedeCompletar && !tarea.completada}
+          aria-label={`${tarea.completada ? "Ver evidencia de" : "Completar"} ${titulo}`}
+        >
+          <Check className="size-4" />
+        </Button>
+      </TableCell>
 
-      {/* Fila 1: identidad de la tarea + controles primarios (prioridad, editar, eliminar). */}
-      <div className="flex min-w-0 items-center gap-2">
-        <span className={`min-w-0 truncate text-sm font-medium ${tarea.completada ? "line-through" : ""}`}>
-          {titulo}
-        </span>
-        {tarea.manual && (
-          <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">
-            Agregada
-          </span>
-        )}
-
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          {puedePrioridad ? (
-            <Select value={tarea.prioridad ?? "media"} onValueChange={(valor) => alCambiarPrioridad(tarea, valor as PrioridadTarea)}>
-              <SelectTrigger className="h-7 w-28 shrink-0 text-xs" aria-label={`Prioridad de ${titulo}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORIDADES_TAREA.map((p) => (
-                  <SelectItem key={p} value={p}><span className="capitalize">{p}</span></SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
-          )}
-
-          {puedeEditar && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              onClick={() => alEditar(tarea)}
-              aria-label={`Editar ${titulo}`}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
-          )}
-          {puedeEliminar && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground hover:text-destructive"
-              onClick={() => alEliminar(tarea)}
-              aria-label={`Eliminar ${titulo}`}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-          )}
-        </span>
-      </div>
-
-      {/* Fila 2: metadatos secundarios como chips + fechas, separados de los controles. */}
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        {item && <MetaChip>{item.ambiente || item.descripcion} · {item.cantidad} un.</MetaChip>}
-        {responsable && (
-          <MetaChip title={tituloResponsable}>
-            <span className="inline-flex items-center gap-1">
-              {usuarioConAvatarPorId(tarea.responsableId!) && (
-                <UserAvatar
-                  user={usuarioConAvatarPorId(tarea.responsableId!)!}
-                  className="size-4"
-                  fallbackClassName="text-[8px]"
-                />
-              )}
-              {responsable.displayName}
+      <TableCell>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={`truncate text-sm font-medium ${tarea.completada ? "line-through" : ""}`}>{titulo}</span>
+          {tarea.manual && (
+            <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">
+              Agregada
             </span>
-          </MetaChip>
-        )}
-        {verAuditoria && tarea.modificadaEn && (
-          <MetaChip icono={History} title={tituloAuditoria}>
-            v{tarea.version ?? 1} · {usuarioPorId(tarea.modificadaPorId ?? "")?.displayName ?? "—"}
-          </MetaChip>
-        )}
+          )}
+          {tituloAuditoria && (
+            <span title={tituloAuditoria} className="shrink-0 text-muted-foreground">
+              <History className="size-3.5" />
+            </span>
+          )}
+        </div>
+      </TableCell>
 
-        {rangoFechas && (
-          <span className="cifra ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <CalendarDays className="size-3.5" /> {rangoFechas}
+      <TableCell className="truncate text-xs text-muted-foreground">
+        {item ? <>{item.ambiente || item.descripcion} · {item.cantidad} un.</> : "—"}
+      </TableCell>
+
+      <TableCell>
+        {responsable ? (
+          <span className="flex min-w-0 items-center gap-1.5 text-xs" title={tituloResponsable}>
+            {usuarioConAvatarPorId(tarea.responsableId!) && (
+              <UserAvatar
+                user={usuarioConAvatarPorId(tarea.responsableId!)!}
+                className="size-5 shrink-0"
+                fallbackClassName="text-[9px]"
+              />
+            )}
+            <span className="truncate">{responsable.displayName}</span>
           </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Sin asignar</span>
         )}
-      </div>
-    </li>
+      </TableCell>
+
+      <TableCell className="cifra whitespace-nowrap text-xs text-muted-foreground">
+        {rangoFechas ?? "—"}
+      </TableCell>
+
+      <TableCell>
+        {puedePrioridad ? (
+          <Select value={tarea.prioridad ?? "media"} onValueChange={(valor) => alCambiarPrioridad(tarea, valor as PrioridadTarea)}>
+            <SelectTrigger className="h-7 w-28 shrink-0 text-xs" aria-label={`Prioridad de ${titulo}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRIORIDADES_TAREA.map((p) => (
+                <SelectItem key={p} value={p}><span className="capitalize">{p}</span></SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <PrioridadBadge prioridad={tarea.prioridad ?? "media"} />
+        )}
+      </TableCell>
+
+      {(puedeEditar || puedeEliminar) && (
+        <TableCell>
+          <span className="flex shrink-0 justify-end gap-0.5">
+            {puedeEditar && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => alEditar(tarea)}
+                aria-label={`Editar ${titulo}`}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            )}
+            {puedeEliminar && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground hover:text-destructive"
+                onClick={() => alEliminar(tarea)}
+                aria-label={`Eliminar ${titulo}`}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            )}
+          </span>
+        </TableCell>
+      )}
+    </TableRow>
   );
 }
 
@@ -374,25 +359,39 @@ export function SeguimientoPresupuesto({
                     <Progress value={porcentajeTareas(tareasGrupo)} />
                   </CardHeader>
                   <CardContent className="px-0">
-                    <ul className="divide-y">
-                      {[...pendientes, ...hechas].map((tarea) => (
-                        <FilaTarea
-                          key={tarea.id}
-                          proyecto={proyecto}
-                          tarea={tarea}
-                          puedeCompletar={permisos.completarTarea(rol, tarea.responsableId === usuarioId)}
-                          puedeEditar={puedeEditar}
-                          puedeEliminar={puedeEliminar}
-                          puedePrioridad={puedePrioridad}
-                          verAuditoria={verAuditoria}
-                          alSeleccionar={setSeleccionada}
-                          alEditar={setEnEdicion}
-                          alEliminar={eliminar}
-                          alCambiarPrioridad={cambiarPrioridad}
-                        />
-                      ))}
-                    </ul>
-                    {tareasGrupo.length === 0 && (
+                    {tareasGrupo.length > 0 ? (
+                      <Table className="table-fixed">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10" />
+                            <TableHead className="w-[26%]">Tarea</TableHead>
+                            <TableHead className="w-[20%]">Detalle</TableHead>
+                            <TableHead className="w-[16%]">Responsable</TableHead>
+                            <TableHead className="w-28">Fechas</TableHead>
+                            <TableHead className="w-32">Prioridad</TableHead>
+                            {(puedeEditar || puedeEliminar) && <TableHead className="w-20 text-right">Acciones</TableHead>}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {[...pendientes, ...hechas].map((tarea) => (
+                            <FilaTarea
+                              key={tarea.id}
+                              proyecto={proyecto}
+                              tarea={tarea}
+                              puedeCompletar={permisos.completarTarea(rol, tarea.responsableId === usuarioId)}
+                              puedeEditar={puedeEditar}
+                              puedeEliminar={puedeEliminar}
+                              puedePrioridad={puedePrioridad}
+                              verAuditoria={verAuditoria}
+                              alSeleccionar={setSeleccionada}
+                              alEditar={setEnEdicion}
+                              alEliminar={eliminar}
+                              alCambiarPrioridad={cambiarPrioridad}
+                            />
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
                       <p className="px-4 py-6 text-sm text-muted-foreground">Sin tareas en este bloque.</p>
                     )}
                   </CardContent>

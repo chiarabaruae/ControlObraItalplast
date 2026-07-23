@@ -22,11 +22,11 @@ Este registro resume cambios materiales. Git continúa siendo la fuente exacta d
 
 **Alcance:** la fila de tarea del detalle de proyecto (`SeguimientoPresupuesto.tsx`) mezclaba título, info del ítem, auditoría completa, responsable, fechas, prioridad y acciones en un único contenedor `flex-wrap`, que se acomodaba de forma impredecible y se veía encimado con datos densos (varias asignaciones/ediciones).
 
-**Impacto:** la fila pasa a una grilla de 2 filas fijas: (1) identidad de la tarea + prioridad + editar/eliminar, siempre alineados a la derecha; (2) metadatos secundarios como chips consistentes (ítem, responsable con avatar, auditoría) + fechas alineadas a la derecha. El rastro de auditoría, antes un texto largo ("Creada... · Modificada... · Autor · vN"), se condensa en un chip compacto ("vN · Autor") con el detalle completo en tooltip nativo al pasar el mouse. Se verificó responsive hasta 420px: los chips hacen wrap a su propia línea sin romper el layout.
+**Impacto:** se presentaron 4 alternativas visuales como mockups (tabla estructurada, tarjeta por tarea, fila compacta expandible, chips con acento de prioridad); se eligió la **tabla estructurada** y se reemplazó la lista `<ul>` por columnas fijas y alineadas (`Table` de shadcn, `table-fixed` con anchos explícitos): Tarea, Detalle, Responsable, Fechas, Prioridad y Acciones (editar/eliminar, condicional por permiso). El rastro de auditoría, antes un texto largo ("Creada... · Modificada... · Autor · vN"), se condensa en un ícono de historial junto al título con el detalle completo en tooltip nativo. La tabla se recorrió como administrador, supervisor y usuario (viewer) para confirmar que las columnas de auditoría, prioridad editable y acciones respetan los mismos permisos que la sección Tareas (D-026).
 
-**Archivos clave:** `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx` (`MetaChip`, `FilaTarea`).
+**Archivos clave:** `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx` (`FilaTarea`, integración de `Table`/`TableHeader`/`TableBody`).
 
-**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador en 1280px y 420px con una tarea con auditoría (v2), responsable asignado y fechas.
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador con los tres roles, verificando columnas, tooltip de auditoría y ausencia de truncado en títulos largos.
 
 ## 2026-07-22 — Simplificación de ramas y publicación a main
 
