@@ -9,6 +9,8 @@ import { Check, Factory, HardHat, History, Pencil, Plus, Trash2 } from "lucide-r
 import { toast } from "sonner";
 import { etiquetaBloque, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
 import { formatFechaCorta, formatFechaHora } from "@/lib/format";
+import { useTablaFiltrable } from "@/lib/tabla-filtros";
+import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import {
   nombreTipoProducto, registrarModificacionTarea, tituloTarea, usuarioPorId, usuarioConAvatarPorId, PRIORIDADES_TAREA,
   type GrupoTareaPresupuesto, type PrioridadTarea, type Proyecto, type TareaPresupuesto, type TipoProducto
@@ -43,6 +45,94 @@ interface FormularioAlta {
   fechaFin: string;
   prioridad: PrioridadTarea;
   responsableId?: string;
+}
+
+/**
+ * Tabla de tareas con filtros por columna (D-031), compartida por los bloques
+ * de Fábrica/Instalación y por las tareas genéricas del proyecto (D-030).
+ * El orden de `tareas` (pendientes primero) se conserva salvo orden explícito.
+ */
+export function TablaTareasSeguimiento({
+  proyecto,
+  tareas,
+  rol,
+  usuarioId,
+  puedeEditar,
+  puedeEliminar,
+  puedePrioridad,
+  verAuditoria,
+  alSeleccionar,
+  alEditar,
+  alEliminar,
+  alCambiarPrioridad
+}: {
+  proyecto: Proyecto;
+  tareas: TareaPresupuesto[];
+  rol: Role;
+  usuarioId: string;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+  puedePrioridad: boolean;
+  verAuditoria: boolean;
+  alSeleccionar: (tarea: TareaPresupuesto) => void;
+  alEditar: (tarea: TareaPresupuesto) => void;
+  alEliminar: (tarea: TareaPresupuesto) => void;
+  alCambiarPrioridad: (tarea: TareaPresupuesto, prioridad: PrioridadTarea) => void;
+}) {
+  const tabla = useTablaFiltrable(tareas, {
+    tarea: (tarea) => tituloTarea(tarea, proyecto),
+    detalle: (tarea) => {
+      const item = proyecto.presupuestoEjecutivo?.items.find((actual) => actual.id === tarea.itemId);
+      return item ? `${item.ambiente || item.descripcion} · ${item.cantidad} un.` : "—";
+    },
+    responsable: (tarea) => (tarea.responsableId ? usuarioPorId(tarea.responsableId)?.displayName ?? "—" : "Sin asignar"),
+    fechas: {
+      valor: (tarea) => (tarea.fechaFin ? formatFechaCorta(tarea.fechaFin) : "Sin fecha"),
+      orden: (tarea) => tarea.fechaFin ?? "9999-12-31",
+      tipo: "fecha"
+    },
+    prioridad: (tarea) => tarea.prioridad ?? "media"
+  });
+
+  return (
+    <>
+      <AvisoFiltros control={tabla} unidad="tareas" />
+      <Table className="table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10" />
+            <EncabezadoFiltrable columna="tarea" control={tabla} className="w-[26%]">Tarea</EncabezadoFiltrable>
+            <EncabezadoFiltrable columna="detalle" control={tabla} className="w-[20%]">Detalle</EncabezadoFiltrable>
+            <EncabezadoFiltrable columna="responsable" control={tabla} className="w-[16%]">Responsable</EncabezadoFiltrable>
+            <EncabezadoFiltrable columna="fechas" control={tabla} className="w-28">Fechas</EncabezadoFiltrable>
+            <EncabezadoFiltrable columna="prioridad" control={tabla} className="w-32">Prioridad</EncabezadoFiltrable>
+            {(puedeEditar || puedeEliminar) && <TableHead className="w-20 text-right">Acciones</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tabla.filas.map((tarea) => (
+            <FilaTarea
+              key={tarea.id}
+              proyecto={proyecto}
+              tarea={tarea}
+              puedeCompletar={permisos.completarTarea(rol, tarea.responsableId === usuarioId)}
+              puedeEditar={puedeEditar}
+              puedeEliminar={puedeEliminar}
+              puedePrioridad={puedePrioridad}
+              verAuditoria={verAuditoria}
+              alSeleccionar={alSeleccionar}
+              alEditar={alEditar}
+              alEliminar={alEliminar}
+              alCambiarPrioridad={alCambiarPrioridad}
+            />
+          ))}
+        </TableBody>
+      </Table>
+      {tabla.filas.length === 0 && (
+        <p className="px-4 py-6 text-sm text-muted-foreground">No hay tareas con este filtro.</p>
+      )}
+    </>
+  );
 }
 
 /** Fila de la tabla de tareas. Compartida con las tareas genéricas del proyecto (D-030). */
@@ -361,37 +451,20 @@ export function SeguimientoPresupuesto({
                   </CardHeader>
                   <CardContent className="px-0">
                     {tareasGrupo.length > 0 ? (
-                      <Table className="table-fixed">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-10" />
-                            <TableHead className="w-[26%]">Tarea</TableHead>
-                            <TableHead className="w-[20%]">Detalle</TableHead>
-                            <TableHead className="w-[16%]">Responsable</TableHead>
-                            <TableHead className="w-28">Fechas</TableHead>
-                            <TableHead className="w-32">Prioridad</TableHead>
-                            {(puedeEditar || puedeEliminar) && <TableHead className="w-20 text-right">Acciones</TableHead>}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {[...pendientes, ...hechas].map((tarea) => (
-                            <FilaTarea
-                              key={tarea.id}
-                              proyecto={proyecto}
-                              tarea={tarea}
-                              puedeCompletar={permisos.completarTarea(rol, tarea.responsableId === usuarioId)}
-                              puedeEditar={puedeEditar}
-                              puedeEliminar={puedeEliminar}
-                              puedePrioridad={puedePrioridad}
-                              verAuditoria={verAuditoria}
-                              alSeleccionar={setSeleccionada}
-                              alEditar={setEnEdicion}
-                              alEliminar={eliminar}
-                              alCambiarPrioridad={cambiarPrioridad}
-                            />
-                          ))}
-                        </TableBody>
-                      </Table>
+                      <TablaTareasSeguimiento
+                        proyecto={proyecto}
+                        tareas={[...pendientes, ...hechas]}
+                        rol={rol}
+                        usuarioId={usuarioId}
+                        puedeEditar={puedeEditar}
+                        puedeEliminar={puedeEliminar}
+                        puedePrioridad={puedePrioridad}
+                        verAuditoria={verAuditoria}
+                        alSeleccionar={setSeleccionada}
+                        alEditar={setEnEdicion}
+                        alEliminar={eliminar}
+                        alCambiarPrioridad={cambiarPrioridad}
+                      />
                     ) : (
                       <p className="px-4 py-6 text-sm text-muted-foreground">Sin tareas en este bloque.</p>
                     )}

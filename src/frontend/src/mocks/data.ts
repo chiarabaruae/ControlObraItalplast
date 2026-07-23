@@ -234,7 +234,10 @@ export interface EvidenciaTarea {
   nombre: string;
   tipo: string;
   tamano: number;
+  /** Contenido en base64; para enlaces (`esEnlace`) guarda la URL misma. */
   dataUrl: string;
+  /** true cuando la evidencia es un enlace externo (D-031), no un archivo. */
+  esEnlace?: boolean;
 }
 
 export type PrioridadTarea = "baja" | "media" | "alta" | "urgente";

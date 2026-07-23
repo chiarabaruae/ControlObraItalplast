@@ -416,6 +416,11 @@ export function createFase2Routes({ pool, env }) {
   router.post("/tareas/:id/completar", exigir("editarAvance"), async (request, response, next) => {
     try {
       const { evidenciaId, observaciones } = request.body ?? {};
+      // D-031: observaciones opcionales, pero si llegan deben justificar (≥50).
+      if (observaciones?.trim() && observaciones.trim().length < 50) {
+        response.status(400).json({ error: "La observación debe tener al menos 50 caracteres." });
+        return;
+      }
       if (!evidenciaId) {
         response.status(400).json({ error: "Completar exige una evidencia (evidenciaId)." });
         return;
@@ -458,8 +463,9 @@ export function createFase2Routes({ pool, env }) {
         return;
       }
       const { motivo } = request.body ?? {};
-      if (!motivo?.trim()) {
-        response.status(400).json({ error: "Reabrir exige un motivo obligatorio." });
+      // D-031: toda justificación exige un mínimo de 50 caracteres.
+      if ((motivo?.trim().length ?? 0) < 50) {
+        response.status(400).json({ error: "Reabrir exige un motivo de al menos 50 caracteres." });
         return;
       }
       const { rowCount } = await pool.query(

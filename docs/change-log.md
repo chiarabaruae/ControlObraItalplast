@@ -18,6 +18,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-23 — Evidencia multi-formato, justificaciones mínimas y filtros en las matrices por proyecto
+
+**Alcance:** tres reglas transversales del seguimiento (D-031): la evidencia admite documentos y enlaces, toda justificación exige 50 caracteres y las matrices de tareas del proyecto ganan filtros por columna.
+
+**Impacto:** el diálogo de completar acepta imagen (comprimida, máx. 12 MB), PDF/Word/Excel/CSV/texto (máx. 4 MB en Fase 2) o un enlace externo; la vista de evidencia muestra imagen, ancla o descarga según el tipo. `lib/justificaciones.ts` centraliza el mínimo de 50 caracteres y lo aplican el motivo de reapertura de tareas, los cinco motivos del tablero de proyectos y las observaciones de cierre cuando se escriben (cada campo indica cuántos caracteres faltan); `/api/v2` replica la validación. La nueva `TablaTareasSeguimiento` (compartida por los bloques de Fábrica/Instalación y las tareas genéricas) suma ordenar y filtrar por Tarea, Detalle, Responsable, Fechas y Prioridad, igual que la sección Tareas. Se verificó además que las tareas genéricas aparecen en el listado global con bloque "Proyecto · General".
+
+**Archivos clave:** `src/frontend/src/lib/justificaciones.ts` (nuevo), `src/frontend/src/lib/evidencias.ts`, `src/frontend/src/mocks/data.ts` (`esEnlace`), `src/frontend/src/components/proyectos/DialogoCompletarTarea.tsx`, `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx` (`TablaTareasSeguimiento`), `src/frontend/src/components/proyectos/TareasGenerales.tsx`, `src/frontend/src/components/proyectos/TableroProyectos.tsx`, `src/backend/src/http/routes/fase2-routes.js`.
+
+**Validaciones:** `tsc -b`, `npm run lint` y `node --check` sin errores nuevos; recorrida en navegador como administrador: cierre con enlace persistido (`esEnlace`), observación de 3 caracteres rechazada con aviso de faltantes, reapertura bloqueada hasta los 50 caracteres, filtros visibles en las matrices de Fábrica y de tareas genéricas, y "Proyecto · General" listado como valor del filtro Bloque en la sección Tareas.
+
 ## 2026-07-23 — Tareas genéricas del proyecto, solo administración y supervisión
 
 **Alcance:** la pestaña Tareas del detalle de proyecto pasa a gestionar tareas genéricas atadas directamente al proyecto, sin producto ni etapa de fábrica/instalación (D-030).

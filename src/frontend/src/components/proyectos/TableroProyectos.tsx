@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { prepararEvidencia } from "@/lib/evidencias";
+import { descripcionJustificacion, justificacionValida } from "@/lib/justificaciones";
 import { formatFecha } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -328,8 +329,8 @@ export function TableroProyectos({
   const confirmarPausa = () => {
     if (movimiento?.tipo !== "pausa") return;
     const motivoLimpio = motivo.trim();
-    if (!motivoLimpio) {
-      toast("Falta el motivo", { description: "Registrá por qué se pausa el proyecto." });
+    if (!justificacionValida(motivoLimpio)) {
+      toast("Justificación insuficiente", { description: `Registrá por qué se pausa el proyecto. ${descripcionJustificacion(motivoLimpio)}` });
       return;
     }
     const proyectoPausado = registrarCambioEstado(movimiento.proyecto, "pausada", usuarioId, motivoLimpio);
@@ -344,8 +345,8 @@ export function TableroProyectos({
   const confirmarReanudacion = () => {
     if (movimiento?.tipo !== "reanudacion") return;
     const motivoLimpio = motivo.trim();
-    if (!motivoLimpio) {
-      toast("Falta la observación", { description: "Registrá por qué se reanuda el proyecto." });
+    if (!justificacionValida(motivoLimpio)) {
+      toast("Justificación insuficiente", { description: `Registrá por qué se reanuda el proyecto. ${descripcionJustificacion(motivoLimpio)}` });
       return;
     }
     const ahora = new Date().toISOString();
@@ -399,8 +400,8 @@ export function TableroProyectos({
   const confirmarCancelacion = () => {
     if (movimiento?.tipo !== "cancelacion") return;
     const motivoLimpio = motivo.trim();
-    if (!motivoLimpio) {
-      toast("Falta el motivo", { description: "Registrá por qué se cancela el proyecto." });
+    if (!justificacionValida(motivoLimpio)) {
+      toast("Justificación insuficiente", { description: `Registrá por qué se cancela el proyecto. ${descripcionJustificacion(motivoLimpio)}` });
       return;
     }
     const cancelado = registrarCambioEstado(movimiento.proyecto, "cancelada", usuarioId, motivoLimpio);
@@ -415,8 +416,8 @@ export function TableroProyectos({
   const confirmarReactivacion = () => {
     if (movimiento?.tipo !== "reactivacion") return;
     const motivoLimpio = motivo.trim();
-    if (!motivoLimpio) {
-      toast("Falta el motivo", { description: "Registrá por qué se reactiva el proyecto." });
+    if (!justificacionValida(motivoLimpio)) {
+      toast("Justificación insuficiente", { description: `Registrá por qué se reactiva el proyecto. ${descripcionJustificacion(motivoLimpio)}` });
       return;
     }
     const proyecto = movimiento.proyecto;
@@ -440,8 +441,8 @@ export function TableroProyectos({
   const confirmarReapertura = () => {
     if (movimiento?.tipo !== "reapertura") return;
     const motivoLimpio = motivo.trim();
-    if (!motivoLimpio) {
-      toast("Falta el motivo", { description: "Registrá por qué se reabre el proyecto." });
+    if (!justificacionValida(motivoLimpio)) {
+      toast("Justificación insuficiente", { description: `Registrá por qué se reabre el proyecto. ${descripcionJustificacion(motivoLimpio)}` });
       return;
     }
     const proyecto = movimiento.proyecto;
@@ -714,6 +715,7 @@ function CampoMotivo({
     <div className="space-y-1.5">
       <Label htmlFor={id}>{etiqueta}</Label>
       <Textarea id={id} value={valor} onChange={(evento) => alCambiar(evento.target.value)} placeholder={placeholder} autoFocus />
+      <p className="text-xs text-muted-foreground">{descripcionJustificacion(valor)}</p>
     </div>
   );
 }

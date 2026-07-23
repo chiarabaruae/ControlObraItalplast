@@ -20,8 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FilaTarea } from "@/components/proyectos/SeguimientoPresupuesto";
+import { TablaTareasSeguimiento } from "@/components/proyectos/SeguimientoPresupuesto";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 import { DialogoConfirmarCambioTarea } from "@/components/proyectos/DialogoConfirmarCambioTarea";
@@ -58,7 +57,6 @@ export function TareasGenerales({
   alAgregar: (tarea: TareaPresupuesto) => void;
   alEliminarTarea: (tarea: TareaPresupuesto) => void;
 }) {
-  void rol;
   const [seleccionada, setSeleccionada] = useState<TareaPresupuesto>();
   const [enEdicion, setEnEdicion] = useState<TareaPresupuesto>();
   const [formulario, setFormulario] = useState<FormularioAltaGeneral>();
@@ -166,37 +164,20 @@ export function TareasGenerales({
         </CardHeader>
         <CardContent className="px-0">
           {tareas.length > 0 ? (
-            <Table className="table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10" />
-                  <TableHead className="w-[26%]">Tarea</TableHead>
-                  <TableHead className="w-[20%]">Detalle</TableHead>
-                  <TableHead className="w-[16%]">Responsable</TableHead>
-                  <TableHead className="w-28">Fechas</TableHead>
-                  <TableHead className="w-32">Prioridad</TableHead>
-                  {(puedeEditar || puedeEliminar) && <TableHead className="w-20 text-right">Acciones</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...pendientes, ...hechas].map((tarea) => (
-                  <FilaTarea
-                    key={tarea.id}
-                    proyecto={proyecto}
-                    tarea={tarea}
-                    puedeCompletar={puedeEditar}
-                    puedeEditar={puedeEditar}
-                    puedeEliminar={puedeEliminar}
-                    puedePrioridad={puedePrioridad}
-                    verAuditoria={verAuditoria}
-                    alSeleccionar={setSeleccionada}
-                    alEditar={setEnEdicion}
-                    alEliminar={setTareaParaEliminar}
-                    alCambiarPrioridad={cambiarPrioridad}
-                  />
-                ))}
-              </TableBody>
-            </Table>
+            <TablaTareasSeguimiento
+              proyecto={proyecto}
+              tareas={[...pendientes, ...hechas]}
+              rol={rol}
+              usuarioId={usuarioId}
+              puedeEditar={puedeEditar}
+              puedeEliminar={puedeEliminar}
+              puedePrioridad={puedePrioridad}
+              verAuditoria={verAuditoria}
+              alSeleccionar={setSeleccionada}
+              alEditar={setEnEdicion}
+              alEliminar={setTareaParaEliminar}
+              alCambiarPrioridad={cambiarPrioridad}
+            />
           ) : (
             <p className="px-4 py-6 text-sm text-muted-foreground">
               Sin tareas genéricas. Agregá la primera con "Agregar tarea".
