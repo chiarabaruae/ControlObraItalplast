@@ -1,9 +1,11 @@
-// Diálogo compartido para completar una tarea de seguimiento:
-// evidencia obligatoria (imagen, PDF, Word, Excel, CSV, texto o enlace)
-// + observaciones opcionales (si se escriben, mínimo 50 caracteres, D-031).
-// Reabrir exige SIEMPRE un motivo de al menos 50 caracteres (sin importar el
-// rol) y registra quién reabre y cuándo. Lo usan el detalle del proyecto y la
-// sección Tareas.
+// Diálogo compartido para completar una tarea de seguimiento.
+// Evidencia obligatoria: las tareas de etapas de fabricación/instalación
+// exigen fotografía; solo las tareas generales del proyecto (grupo
+// "generales") admiten además documentos (PDF, Word, Excel, CSV, texto) o un
+// enlace externo (D-031). Observaciones opcionales (si se escriben, mínimo 50
+// caracteres). Reabrir exige SIEMPRE un motivo de al menos 50 caracteres (sin
+// importar el rol) y registra quién reabre y cuándo. Lo usan el detalle del
+// proyecto y la sección Tareas.
 import { useEffect, useState } from "react";
 import { Check, FileText, ImageIcon, Link2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -82,7 +84,10 @@ export function DialogoCompletarTarea({
     setMotivoReapertura("");
   }, [tarea?.id, tarea?.observaciones]);
 
-  const hayEvidencia = Boolean(archivo || enlace.trim() || tarea?.evidencia);
+  // Solo las tareas generales del proyecto admiten documentos y enlaces (D-031);
+  // las tareas de etapas de fabricación/instalación exigen fotografía.
+  const admiteMultiformato = tarea?.grupo === "generales";
+  const hayEvidencia = Boolean(archivo || (admiteMultiformato && enlace.trim()) || tarea?.evidencia);
 
   const completar = async () => {
     if (!tarea || !hayEvidencia) return;
@@ -94,8 +99,8 @@ export function DialogoCompletarTarea({
     setGuardando(true);
     try {
       const evidencia = archivo
-        ? await prepararEvidencia(archivo)
-        : enlace.trim()
+        ? await prepararEvidencia(archivo, { soloImagen: !admiteMultiformato })
+        : admiteMultiformato && enlace.trim()
           ? crearEvidenciaEnlace(enlace)
           : tarea.evidencia;
       if (!evidencia) return;
@@ -175,31 +180,35 @@ export function DialogoCompletarTarea({
         ) : (
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="evidencia-tarea">Evidencia *</Label>
+              <Label htmlFor="evidencia-tarea">{admiteMultiformato ? "Evidencia *" : "Evidencia fotográfica *"}</Label>
               <Input
                 id="evidencia-tarea"
                 type="file"
-                accept={ACCEPT_EVIDENCIA}
+                accept={admiteMultiformato ? ACCEPT_EVIDENCIA : "image/*"}
                 onChange={(evento) => setArchivo(evento.target.files?.[0])}
               />
               <p className="text-xs text-muted-foreground">
-                Imagen, PDF, Word, Excel, CSV o texto. Las imágenes se comprimen (máx. 12 MB); los documentos hasta 4 MB.
+                {admiteMultiformato
+                  ? "Imagen, PDF, Word, Excel, CSV o texto. Las imágenes se comprimen (máx. 12 MB); los documentos hasta 4 MB."
+                  : "Se comprime localmente antes de guardarse. Máximo 12 MB."}
               </p>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="enlace-evidencia">…o pegá un enlace</Label>
-              <Input
-                id="enlace-evidencia"
-                type="url"
-                value={enlace}
-                onChange={(evento) => setEnlace(evento.target.value)}
-                placeholder="https://drive.google.com/…"
-                disabled={Boolean(archivo)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Si adjuntás un archivo, el enlace se ignora.
-              </p>
-            </div>
+            {admiteMultiformato && (
+              <div className="space-y-1.5">
+                <Label htmlFor="enlace-evidencia">…o pegá un enlace</Label>
+                <Input
+                  id="enlace-evidencia"
+                  type="url"
+                  value={enlace}
+                  onChange={(evento) => setEnlace(evento.target.value)}
+                  placeholder="https://drive.google.com/…"
+                  disabled={Boolean(archivo)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Si adjuntás un archivo, el enlace se ignora.
+                </p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="observaciones-tarea">Observaciones (opcional)</Label>
               <Textarea

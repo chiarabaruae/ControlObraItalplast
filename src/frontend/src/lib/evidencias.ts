@@ -62,10 +62,18 @@ async function prepararImagen(archivo: File): Promise<EvidenciaTarea> {
 /**
  * Prepara un archivo como evidencia (D-031): las imágenes se comprimen; los
  * documentos (PDF, Word, Excel, CSV, texto) se guardan tal cual con un límite
- * menor. Cualquier otro tipo se rechaza.
+ * menor. Cualquier otro tipo se rechaza. Los documentos solo están permitidos
+ * en las tareas generales del proyecto: con `soloImagen` (tareas de etapas de
+ * fabricación/instalación y cierre de proyecto) todo lo que no sea imagen falla.
  */
-export async function prepararEvidencia(archivo: File): Promise<EvidenciaTarea> {
+export async function prepararEvidencia(
+  archivo: File,
+  opciones?: { soloImagen?: boolean }
+): Promise<EvidenciaTarea> {
   if (archivo.type.startsWith("image/")) return prepararImagen(archivo);
+  if (opciones?.soloImagen) {
+    throw new Error("La evidencia de esta tarea debe ser una fotografía.");
+  }
 
   const esDocumento = TIPOS_DOCUMENTO.includes(archivo.type) ||
     /\.(pdf|docx?|xlsx?|csv|txt)$/i.test(archivo.name);

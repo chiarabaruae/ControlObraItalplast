@@ -375,7 +375,7 @@ export function TableroProyectos({
     }
     setGuardando(true);
     try {
-      const evidenciaGeneral = archivoCierre ? await prepararEvidencia(archivoCierre) : undefined;
+      const evidenciaGeneral = archivoCierre ? await prepararEvidencia(archivoCierre, { soloImagen: true }) : undefined;
       const finalizado = registrarCambioEstado(proyecto, "finalizada", usuarioId, "Cierre manual confirmado");
       alGuardar({
         ...finalizado,

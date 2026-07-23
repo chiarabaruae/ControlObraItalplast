@@ -18,6 +18,16 @@ tags:
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
 
+## 2026-07-23 — Evidencia multi-formato acotada a las tareas generales del proyecto
+
+**Alcance:** delimita D-031: los documentos y enlaces como evidencia aplican solo al grupo `generales`; las tareas de etapas vuelven a exigir fotografía.
+
+**Impacto:** el diálogo de completar condiciona por grupo: en tareas de fabricación/instalación muestra "Evidencia fotográfica *" con `accept="image/*"` y sin campo de enlace; en tareas generales mantiene "Evidencia *" multi-formato con enlace. `prepararEvidencia` acepta `{ soloImagen }` y rechaza documentos fuera de las generales; el cierre de proyecto en el tablero también fija `soloImagen`.
+
+**Archivos clave:** `src/frontend/src/components/proyectos/DialogoCompletarTarea.tsx`, `src/frontend/src/lib/evidencias.ts`, `src/frontend/src/components/proyectos/TableroProyectos.tsx`, `docs/decisions.md` (D-031 ampliada).
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos; recorrida en navegador: tarea de etapa (Herrajes — V-02) muestra solo evidencia fotográfica sin enlace, y una tarea general muestra el multi-formato completo.
+
 ## 2026-07-23 — Evidencia multi-formato, justificaciones mínimas y filtros en las matrices por proyecto
 
 **Alcance:** tres reglas transversales del seguimiento (D-031): la evidencia admite documentos y enlaces, toda justificación exige 50 caracteres y las matrices de tareas del proyecto ganan filtros por columna.
