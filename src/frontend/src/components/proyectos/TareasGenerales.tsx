@@ -167,6 +167,7 @@ export function TareasGenerales({
             <TablaTareasSeguimiento
               proyecto={proyecto}
               tareas={[...pendientes, ...hechas]}
+              contexto="Tareas generales"
               rol={rol}
               usuarioId={usuarioId}
               puedeEditar={puedeEditar}

@@ -33,6 +33,8 @@ import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTa
 import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 import { DialogoConfirmarCambioTarea } from "@/components/proyectos/DialogoConfirmarCambioTarea";
 import { SelectorResponsableTarea } from "@/components/proyectos/SelectorResponsableTarea";
+import { BotonExportar } from "@/components/app/BotonExportar";
+import { exportarExcel, registrarDescarga, type ColumnaExport } from "@/lib/exportar-excel";
 
 const GRUPOS_FABRICA: GrupoTareaPresupuesto[] = ["fabricacion_premarcos", "fabrica"];
 const GRUPOS_INSTALACION: GrupoTareaPresupuesto[] = ["instalacion_premarcos", "instalacion"];
@@ -62,6 +64,7 @@ export function TablaTareasSeguimiento({
   puedeEliminar,
   puedePrioridad,
   verAuditoria,
+  contexto,
   alSeleccionar,
   alEditar,
   alEliminar,
@@ -75,6 +78,7 @@ export function TablaTareasSeguimiento({
   puedeEliminar: boolean;
   puedePrioridad: boolean;
   verAuditoria: boolean;
+  contexto?: string;
   alSeleccionar: (tarea: TareaPresupuesto) => void;
   alEditar: (tarea: TareaPresupuesto) => void;
   alEliminar: (tarea: TareaPresupuesto) => void;
@@ -95,8 +99,40 @@ export function TablaTareasSeguimiento({
     prioridad: (tarea) => tarea.prioridad ?? "media"
   });
 
+  const descargar = () => {
+    const columnas: ColumnaExport<TareaPresupuesto>[] = [
+      { header: "Tarea", valor: (t) => tituloTarea(t, proyecto) },
+      {
+        header: "Detalle",
+        valor: (t) => {
+          const item = proyecto.presupuestoEjecutivo?.items.find((actual) => actual.id === t.itemId);
+          return item ? `${item.ambiente || item.descripcion} · ${item.cantidad} un.` : "";
+        }
+      },
+      { header: "Responsable", valor: (t) => (t.responsableId ? usuarioPorId(t.responsableId)?.displayName ?? "" : "Sin asignar") },
+      {
+        header: "Fechas",
+        valor: (t) => [t.fechaInicio ? formatFechaCorta(t.fechaInicio) : "", t.fechaFin ? formatFechaCorta(t.fechaFin) : ""].filter(Boolean).join(" → ")
+      },
+      { header: "Prioridad", valor: (t) => t.prioridad ?? "media" },
+      { header: "Estado", valor: (t) => (t.completada ? "Finalizada" : "Pendiente") }
+    ];
+    const nombre = `${contexto ?? "tareas"}-${proyecto.nombre}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    exportarExcel(nombre || "tareas", contexto ?? "Tareas", columnas, tabla.filas);
+    registrarDescarga({
+      fecha: new Date().toISOString(),
+      usuarioId,
+      vista: `${proyecto.nombre} · ${contexto ?? "tareas"}`,
+      filtros: "filtros de columna aplicados en la tabla",
+      filas: tabla.filas.length
+    });
+  };
+
   return (
     <>
+      <div className="flex justify-end px-2 pt-1">
+        <BotonExportar onClick={descargar} label="Descargar a Excel" />
+      </div>
       <AvisoFiltros control={tabla} unidad="tareas" />
       <Table className="table-fixed">
         <TableHeader>
@@ -463,6 +499,7 @@ export function SeguimientoPresupuesto({
                       <TablaTareasSeguimiento
                         proyecto={proyecto}
                         tareas={[...pendientes, ...hechas]}
+                        contexto={etiquetaBloque(grupo, producto.tipo)}
                         rol={rol}
                         usuarioId={usuarioId}
                         puedeEditar={puedeEditar}

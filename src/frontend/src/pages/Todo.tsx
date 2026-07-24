@@ -22,6 +22,8 @@ import { formatFecha, formatFechaHora } from "@/lib/format";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { PrioridadBadge } from "@/components/app/EstadoBadge";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
+import { BotonExportar } from "@/components/app/BotonExportar";
+import { exportarExcel, registrarDescarga, type ColumnaExport } from "@/lib/exportar-excel";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 import { DialogoNuevaTarea } from "@/components/proyectos/DialogoNuevaTarea";
@@ -148,6 +150,33 @@ export default function Todo() {
     setTareaParaEliminar({ proyecto, tarea });
   };
 
+  const descargarSeguimiento = () => {
+    const columnas: ColumnaExport<SeleccionSeguimiento>[] = [
+      { header: "Tarea", valor: ({ proyecto, tarea }) => tituloTarea(tarea, proyecto) },
+      { header: "Proyecto", valor: ({ proyecto }) => proyecto.nombre },
+      { header: "Bloque", valor: ({ tarea }) => etiquetaBloque(tarea.grupo, tarea.tipoProducto) },
+      { header: "Responsable", valor: ({ tarea }) => usuarioPorId(tarea.responsableId ?? "")?.displayName ?? "Sin asignar" },
+      { header: "Asignado por", valor: ({ tarea }) => usuarioPorId(tarea.asignadaPorId ?? "")?.displayName ?? "" },
+      { header: "Entrega", valor: ({ tarea }) => (tarea.fechaFin ? formatFecha(tarea.fechaFin) : "") },
+      { header: "Prioridad", valor: ({ tarea }) => tarea.prioridad ?? "media" },
+      { header: "Estado", valor: ({ tarea }) => (tarea.completada ? "Finalizada" : "Pendiente") },
+      ...(verAuditoria
+        ? ([
+            { header: "Creación", valor: ({ tarea }) => (tarea.creadaEn ? formatFechaHora(tarea.creadaEn) : "") },
+            { header: "Modificación", valor: ({ tarea }) => (tarea.modificadaEn ? formatFechaHora(tarea.modificadaEn) : "") }
+          ] as ColumnaExport<SeleccionSeguimiento>[])
+        : [])
+    ];
+    exportarExcel("tareas-seguimiento", "Tareas", columnas, tablaSeguimiento.filas);
+    registrarDescarga({
+      fecha: new Date().toISOString(),
+      usuarioId: user.id,
+      vista: "Tareas · seguimiento de proyectos",
+      filtros: `estado=${filtro}; proyecto=${proyectoFiltro}`,
+      filas: tablaSeguimiento.filas.length
+    });
+  };
+
   const eliminarTarea = () => {
     if (!tareaParaEliminar) return;
     const { proyecto, tarea } = tareaParaEliminar;
@@ -201,19 +230,22 @@ export default function Todo() {
               {seguimientoDelProyecto.filter(({ tarea }) => !tarea.completada).length} pendientes
             </span>
           </div>
-          <Select value={proyectoFiltro} onValueChange={setProyectoFiltro}>
-            <SelectTrigger className="w-full sm:w-64" aria-label="Filtrar seguimiento por proyecto">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los proyectos</SelectItem>
-              {proyectos
-                .filter((proyecto) => (proyecto.tareasPresupuesto?.length ?? 0) > 0)
-                .map((proyecto) => (
-                  <SelectItem key={proyecto.id} value={proyecto.id}>{proyecto.nombre}</SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <BotonExportar onClick={descargarSeguimiento} label="Descargar tareas a Excel" />
+            <Select value={proyectoFiltro} onValueChange={setProyectoFiltro}>
+              <SelectTrigger className="w-full sm:w-64" aria-label="Filtrar seguimiento por proyecto">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los proyectos</SelectItem>
+                {proyectos
+                  .filter((proyecto) => (proyecto.tareasPresupuesto?.length ?? 0) > 0)
+                  .map((proyecto) => (
+                    <SelectItem key={proyecto.id} value={proyecto.id}>{proyecto.nombre}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Card>
           <CardContent className="px-0">
