@@ -14,6 +14,8 @@ import Personalizar from "@/pages/Personalizar";
 import Account from "@/pages/Account";
 import Updates from "@/pages/Updates";
 import Reglas from "@/pages/Reglas";
+import Catalogo from "@/pages/Catalogo";
+import Equipos from "@/pages/Equipos";
 import Documentation from "@/pages/Documentation";
 import ContactSupport from "@/pages/ContactSupport";
 
@@ -37,15 +39,17 @@ export default function App() {
               <Route path="/support/documentation" element={<Documentation />} />
               <Route path="/support/contact" element={<ContactSupport />} />
 
-              {/* Clientes: admin + supervisor */}
+              {/* Clientes y equipos: admin + supervisor */}
               <Route element={<RequireRole roles={["administrator", "supervisor"]} />}>
                 <Route path="/clientes" element={<Clientes />} />
+                <Route path="/equipos" element={<Equipos />} />
               </Route>
 
               {/* Usuarios y reglas de negocio: solo admin */}
               <Route element={<RequireRole roles={["administrator"]} />}>
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/reglas" element={<Reglas />} />
+                <Route path="/catalogo" element={<Catalogo />} />
                 <Route path="/settings/planning" element={<Navigate to="/reglas" replace />} />
               </Route>
             </Route>

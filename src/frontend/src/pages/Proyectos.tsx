@@ -12,7 +12,7 @@ import {
   type ConfiguracionProductoProyecto, type EstadoObra, type PlanificacionProducto, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
-import { calcularFechasBackward, obtenerBuffersPlanificacion } from "@/lib/planificacion";
+import { calcularFechasBackward, obtenerBuffersPlanificacion, obtenerReglasPlanificacion, type ReglaPlanificacion } from "@/lib/planificacion";
 import { firmaPresupuestoProyecto } from "@/lib/cronograma";
 import { GanttProyectos } from "@/components/proyectos/GanttProyectos";
 import { formatFecha } from "@/lib/format";
@@ -71,10 +71,16 @@ function crearEtapasConfigurables(nombres: string[], seleccionadas: string[] = n
   }));
 }
 
-function crearConfiguracionProducto(): ConfiguracionProductoFormulario {
+function crearConfiguracionProducto(reglas: ReglaPlanificacion[] = obtenerReglasPlanificacion()): ConfiguracionProductoFormulario {
+  // Las reglas de premarcos obligatorias o marcadas como preseleccionadas activan
+  // por defecto esos grupos al crear un proyecto nuevo.
+  const activaPorRegla = (clave: string) => {
+    const regla = reglas.find((r) => r.clave === clave);
+    return regla ? regla.obligatoria || regla.porDefecto : false;
+  };
   return {
-    fabricaraPremarcos: false,
-    instalaraPremarcos: false,
+    fabricaraPremarcos: activaPorRegla("bloque_fabricacion_premarcos"),
+    instalaraPremarcos: activaPorRegla("bloque_instalacion_premarcos"),
     etapasFabricacionPremarcos: crearEtapasConfigurables(ETAPAS_FABRICACION_PREMARCOS),
     etapasInstalacionPremarcos: crearEtapasConfigurables(ETAPAS_INSTALACION_PREMARCOS),
     etapasFabrica: crearEtapasConfigurables(
@@ -109,8 +115,9 @@ function planificacionDesdeFormulario(formulario: PlanificacionFormulario): Plan
 }
 
 function crearMapaConfiguraciones() {
+  const reglas = obtenerReglasPlanificacion();
   return Object.fromEntries(
-    obtenerCatalogoActivo().map((producto) => [producto.valor, crearConfiguracionProducto()])
+    obtenerCatalogoActivo().map((producto) => [producto.valor, crearConfiguracionProducto(reglas)])
   ) as Record<TipoProducto, ConfiguracionProductoFormulario>;
 }
 
@@ -391,15 +398,12 @@ export default function Proyectos() {
   );
   const [fechaInicio, setFechaInicio] = useState(hoy);
   const [presupuesto, setPresupuesto] = useState<PresupuestoEjecutivo>();
-  const [vista, setVista] = useState<"tarjetas" | "tablero" | "gantt">(() => {
-    const guardada = localStorage.getItem("co-vista-proyectos");
-    return guardada === "tablero" || guardada === "gantt" ? guardada : "tarjetas";
-  });
+  // La vista de cronograma (Gantt) es siempre la predeterminada al abrir Proyectos.
+  const [vista, setVista] = useState<"tarjetas" | "tablero" | "gantt">("gantt");
   if (!user) return null;
 
   const cambiarVista = (nueva: "tarjetas" | "tablero" | "gantt") => {
     setVista(nueva);
-    localStorage.setItem("co-vista-proyectos", nueva);
   };
 
   const actualizarProyecto = (actualizado: Proyecto) => {
@@ -667,15 +671,15 @@ export default function Proyectos() {
           <div className="flex rounded-lg border p-0.5" role="group" aria-label="Cambiar vista">
             <button
               type="button"
-              onClick={() => cambiarVista("tarjetas")}
-              aria-pressed={vista === "tarjetas"}
-              title="Vista de tarjetas"
+              onClick={() => cambiarVista("gantt")}
+              aria-pressed={vista === "gantt"}
+              title="Vista de cronograma"
               className={`grid size-8 place-items-center rounded-md transition-colors ${
-                vista === "tarjetas" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                vista === "gantt" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <LayoutGrid className="size-4" strokeWidth={1.75} />
-              <span className="sr-only">Vista de tarjetas</span>
+              <GanttChartSquare className="size-4" strokeWidth={1.75} />
+              <span className="sr-only">Vista de cronograma</span>
             </button>
             <button
               type="button"
@@ -691,15 +695,15 @@ export default function Proyectos() {
             </button>
             <button
               type="button"
-              onClick={() => cambiarVista("gantt")}
-              aria-pressed={vista === "gantt"}
-              title="Vista de cronograma"
+              onClick={() => cambiarVista("tarjetas")}
+              aria-pressed={vista === "tarjetas"}
+              title="Vista de tarjetas"
               className={`grid size-8 place-items-center rounded-md transition-colors ${
-                vista === "gantt" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                vista === "tarjetas" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <GanttChartSquare className="size-4" strokeWidth={1.75} />
-              <span className="sr-only">Vista de cronograma</span>
+              <LayoutGrid className="size-4" strokeWidth={1.75} />
+              <span className="sr-only">Vista de tarjetas</span>
             </button>
           </div>
           {vista === "tarjetas" && (

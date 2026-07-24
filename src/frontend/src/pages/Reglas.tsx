@@ -1,10 +1,16 @@
-import { useState } from "react";
-import { ArchiveRestore, CalendarClock, Check, Gauge, Package, Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
-  BUFFERS_PREDETERMINADOS,
-  guardarBuffersPlanificacion,
-  obtenerBuffersPlanificacion,
-  type BuffersPlanificacion
+  AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, CalendarClock, Clock, Flag,
+  Gauge, Lock, Plus, RotateCcw, Save, Trash2
+} from "lucide-react";
+import {
+  guardarReglasPlanificacion,
+  obtenerReglasPlanificacion,
+  puedeEliminarRegla,
+  reglasPredeterminadas,
+  validarReglas,
+  type ReglaPlanificacion,
+  type TipoRegla
 } from "@/lib/planificacion";
 import {
   guardarTopesCapacidad,
@@ -12,84 +18,136 @@ import {
   TOPE_FABRICA_PREDETERMINADO,
   TOPE_INSTALACION_PREDETERMINADO
 } from "@/lib/capacidad";
-import {
-  guardarOverridesCatalogo,
-  guardarProductosPersonalizados,
-  nombreTipoProducto,
-  obtenerCatalogoActivo,
-  obtenerCatalogoProductos,
-  obtenerOverridesCatalogo,
-  obtenerProductosPersonalizados,
-  registrarAuditoriaCatalogo,
-  type ProductoCatalogo
-} from "@/mocks/data";
-import { useAuth } from "@/context/auth";
+import { nombreTipoProducto, obtenerCatalogoActivo } from "@/mocks/data";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-const CAMPOS_BRECHAS: { clave: keyof BuffersPlanificacion; label: string; descripcion: string }[] = [
-  {
-    clave: "diasProduccionAInstalacion",
-    label: "Fin de producción → inicio de instalación",
-    descripcion: "La producción debe terminar esta cantidad de días antes de comenzar la instalación."
-  },
-  {
-    clave: "diasAbacoAFabrica",
-    label: "Firma de ábaco → entrada a fábrica",
-    descripcion: "El ábaco debe firmarse esta cantidad de días antes de que el pedido entre a fábrica."
-  },
-  {
-    clave: "diasPremarcosAAbaco",
-    label: "Entrega de premarcos → firma de ábaco",
-    descripcion: "Los premarcos deben entregarse en obra esta cantidad de días antes de la firma del ábaco."
-  }
-];
+const TIPO_META: Record<TipoRegla, { label: string; icono: typeof Flag; cls: string }> = {
+  hito: { label: "Hito", icono: Flag, cls: "bg-primary/10 text-primary" },
+  bloque: { label: "Bloque", icono: Clock, cls: "bg-estado-progreso/12 text-estado-progreso" },
+  brecha: { label: "Brecha", icono: ArrowLeftRight, cls: "bg-estado-pausada/14 text-estado-pausada" }
+};
 
-function slugDeNombre(nombre: string) {
-  return nombre
-    .trim()
-    .toLocaleLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+function ChipToggle({
+  activo, disabled, onClick, children
+}: { activo: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      aria-pressed={activo}
+      className={cn(
+        "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+        activo ? "border-primary/30 bg-primary/10 text-primary" : "border-input text-muted-foreground hover:text-foreground",
+        disabled && "cursor-not-allowed opacity-60"
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
-function SeccionBrechas() {
-  const [valores, setValores] = useState<Record<keyof BuffersPlanificacion, string>>(() => {
-    const actuales = obtenerBuffersPlanificacion();
-    return {
-      diasProduccionAInstalacion: String(actuales.diasProduccionAInstalacion),
-      diasAbacoAFabrica: String(actuales.diasAbacoAFabrica),
-      diasPremarcosAAbaco: String(actuales.diasPremarcosAAbaco)
-    };
-  });
+function SeccionReglas() {
+  const [reglas, setReglas] = useState<ReglaPlanificacion[]>(() =>
+    [...obtenerReglasPlanificacion()].sort((a, b) => a.orden - b.orden)
+  );
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [tipo, setTipo] = useState<TipoRegla>("brecha");
+  const [nombre, setNombre] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [dias, setDias] = useState("");
+  const [obligatoria, setObligatoria] = useState(true);
+  const [porDefecto, setPorDefecto] = useState(true);
 
-  const guardar = () => {
-    const buffers = {} as BuffersPlanificacion;
-    for (const campo of CAMPOS_BRECHAS) {
-      const numero = Number(valores[campo.clave]);
+  const alertas = useMemo(() => validarReglas(reglas), [reglas]);
+  const errores = alertas.filter((a) => a.nivel === "error");
+  const avisos = alertas.filter((a) => a.nivel === "aviso");
+
+  const actualizar = (id: string, cambios: Partial<ReglaPlanificacion>) =>
+    setReglas((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
+
+  const reindex = (lista: ReglaPlanificacion[]) => lista.map((r, indice) => ({ ...r, orden: indice }));
+
+  const mover = (id: string, direccion: -1 | 1) =>
+    setReglas((prev) => {
+      const orden = [...prev].sort((a, b) => a.orden - b.orden);
+      const i = orden.findIndex((r) => r.id === id);
+      const j = i + direccion;
+      if (i < 0 || j < 0 || j >= orden.length) return prev;
+      [orden[i], orden[j]] = [orden[j], orden[i]];
+      return reindex(orden);
+    });
+
+  const eliminar = (regla: ReglaPlanificacion) => {
+    if (!puedeEliminarRegla(regla)) {
+      toast("Regla protegida", { description: `"${regla.nombre}" es parte del mínimo obligatorio y no puede eliminarse.` });
+      return;
+    }
+    setReglas((prev) => reindex(prev.filter((r) => r.id !== regla.id)));
+  };
+
+  const cerrarModal = () => {
+    setModalAbierto(false);
+    setTipo("brecha");
+    setNombre("");
+    setDescripcion("");
+    setDias("");
+    setObligatoria(true);
+    setPorDefecto(true);
+  };
+
+  const agregar = () => {
+    const limpio = nombre.trim();
+    if (!limpio) {
+      toast("Falta el nombre", { description: "La regla necesita un nombre." });
+      return;
+    }
+    if (tipo === "brecha") {
+      const numero = Number(dias);
       if (!Number.isInteger(numero) || numero < 0) {
-        toast("Revisá las brechas", { description: `"${campo.label}" necesita un número entero de días (0 o más).` });
+        toast("Revisá los días", { description: "La brecha necesita un número entero (0 o más)." });
         return;
       }
-      buffers[campo.clave] = numero;
     }
-    guardarBuffersPlanificacion(buffers);
-    toast("Brechas guardadas", { description: "Las nuevas brechas se aplicarán a las próximas estimaciones de fechas." });
+    const maxOrden = reglas.reduce((maximo, r) => Math.max(maximo, r.orden), -1);
+    const nueva: ReglaPlanificacion = {
+      id: `regla-custom-${Date.now()}`,
+      tipo,
+      nombre: limpio,
+      descripcion: descripcion.trim() || undefined,
+      obligatoria,
+      porDefecto,
+      protegida: false,
+      orden: maxOrden + 1,
+      dias: tipo === "brecha" ? Number(dias) : undefined
+    };
+    setReglas((prev) => [...prev, nueva]);
+    cerrarModal();
+    toast("Regla agregada", { description: `"${limpio}" se aplicará a los proyectos nuevos. No olvides guardar.` });
   };
 
-  const restaurar = () => {
-    setValores({
-      diasProduccionAInstalacion: String(BUFFERS_PREDETERMINADOS.diasProduccionAInstalacion),
-      diasAbacoAFabrica: String(BUFFERS_PREDETERMINADOS.diasAbacoAFabrica),
-      diasPremarcosAAbaco: String(BUFFERS_PREDETERMINADOS.diasPremarcosAAbaco)
-    });
+  const guardar = () => {
+    const problemas = validarReglas(reglas).filter((a) => a.nivel === "error");
+    if (problemas.length) {
+      toast("No se puede guardar", { description: problemas[0].mensaje });
+      return;
+    }
+    guardarReglasPlanificacion(reglas);
+    toast("Reglas guardadas", { description: "Se aplicarán a las próximas estimaciones de fecha y a los proyectos nuevos." });
   };
+
+  const restaurar = () => setReglas(reglasPredeterminadas());
+
+  const orden = [...reglas].sort((a, b) => a.orden - b.orden);
 
   return (
     <Card>
@@ -99,50 +157,191 @@ function SeccionBrechas() {
             <CalendarClock className="size-5" />
           </div>
           <div>
-            <CardTitle>Brechas de planificación backward</CardTitle>
+            <CardTitle>Reglas de planificación backward</CardTitle>
             <CardDescription>
-              Días entre hitos al estimar fechas desde el inicio comprometido de instalación.
+              Hitos, bloques de trabajo y brechas entre hitos que ordenan el cálculo de fechas desde el inicio comprometido de instalación.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-1">
-        {CAMPOS_BRECHAS.map((campo) => (
-          <div key={campo.clave} className="flex flex-col gap-2 rounded-xl border p-4 sm:flex-row sm:items-center">
-            <div className="flex-1">
-              <Label htmlFor={`buffer-${campo.clave}`} className="text-sm font-semibold">{campo.label}</Label>
-              <p className="mt-0.5 text-xs text-muted-foreground">{campo.descripcion}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                id={`buffer-${campo.clave}`}
-                type="number"
-                min={0}
-                step={1}
-                value={valores[campo.clave]}
-                onChange={(evento) => setValores((previos) => ({ ...previos, [campo.clave]: evento.target.value }))}
-                className="w-24 text-right"
-              />
-              <span className="text-sm text-muted-foreground">días</span>
-            </div>
+        {(errores.length > 0 || avisos.length > 0) && (
+          <div className="space-y-2">
+            {errores.map((a, i) => (
+              <div key={`e-${i}`} className="flex items-start gap-2 rounded-lg border border-estado-riesgo/30 bg-estado-riesgo/8 p-2.5 text-xs text-estado-riesgo">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {a.mensaje}
+              </div>
+            ))}
+            {avisos.map((a, i) => (
+              <div key={`a-${i}`} className="flex items-start gap-2 rounded-lg border border-estado-pausada/30 bg-estado-pausada/8 p-2.5 text-xs text-estado-pausada">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" /> {a.mensaje}
+              </div>
+            ))}
           </div>
-        ))}
+        )}
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" className="gap-2" onClick={restaurar}>
-            <RotateCcw className="size-4" /> Restaurar predeterminados
+        <div className="space-y-2">
+          {orden.map((r, indice) => {
+            const meta = TIPO_META[r.tipo];
+            const Icono = meta.icono;
+            return (
+              <div key={r.id} className="flex items-center gap-3 rounded-xl border p-3">
+                <div className="flex flex-col text-muted-foreground">
+                  <button
+                    type="button"
+                    className="grid size-5 place-items-center rounded hover:text-foreground disabled:opacity-30"
+                    disabled={indice === 0}
+                    onClick={() => mover(r.id, -1)}
+                    aria-label={`Subir ${r.nombre}`}
+                  >
+                    <ArrowUp className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="grid size-5 place-items-center rounded hover:text-foreground disabled:opacity-30"
+                    disabled={indice === orden.length - 1}
+                    onClick={() => mover(r.id, 1)}
+                    aria-label={`Bajar ${r.nombre}`}
+                  >
+                    <ArrowDown className="size-3.5" />
+                  </button>
+                </div>
+
+                <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", meta.cls)} title={meta.label}>
+                  <Icono className="size-4" />
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-medium">{r.nombre}</span>
+                    {r.protegida && <Lock className="size-3 shrink-0 text-muted-foreground" aria-label="Mínimo obligatorio" />}
+                  </div>
+                  {r.descripcion && <p className="mt-0.5 text-xs text-muted-foreground">{r.descripcion}</p>}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <ChipToggle activo={r.obligatoria} disabled={r.protegida} onClick={() => actualizar(r.id, { obligatoria: !r.obligatoria })}>
+                      Obligatoria
+                    </ChipToggle>
+                    <ChipToggle activo={r.porDefecto} onClick={() => actualizar(r.id, { porDefecto: !r.porDefecto })}>
+                      Preseleccionada
+                    </ChipToggle>
+                  </div>
+                </div>
+
+                {r.tipo === "brecha" ? (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={String(r.dias ?? 0)}
+                      onChange={(evento) => {
+                        const numero = Math.trunc(Number(evento.target.value));
+                        actualizar(r.id, { dias: Number.isFinite(numero) && numero >= 0 ? numero : 0 });
+                      }}
+                      className="w-20 text-right"
+                      aria-label={`Días de ${r.nombre}`}
+                    />
+                    <span className="text-xs text-muted-foreground">días</span>
+                  </div>
+                ) : (
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {r.tipo === "bloque" ? "días por proyecto" : "fecha por proyecto"}
+                  </span>
+                )}
+
+                {puedeEliminarRegla(r) ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => eliminar(r)}
+                    aria-label={`Eliminar ${r.nombre}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                ) : (
+                  <span className="grid size-9 shrink-0 place-items-center text-muted-foreground" title="Regla protegida">
+                    <Lock className="size-4" />
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="outline" className="gap-1.5" onClick={() => setModalAbierto(true)}>
+            <Plus className="size-4" /> Agregar regla
           </Button>
-          <Button className="gap-2" onClick={guardar}>
-            <Save className="size-4" /> Guardar brechas
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" className="gap-2" onClick={restaurar}>
+              <RotateCcw className="size-4" /> Restaurar
+            </Button>
+            <Button className="gap-2" onClick={guardar} disabled={errores.length > 0}>
+              <Save className="size-4" /> Guardar reglas
+            </Button>
+          </div>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Los cambios afectan solo a las estimaciones futuras; las fechas ya asignadas a tareas existentes no se recalculan.
-          Para una excepción puntual, ajustá los plazos dentro del proyecto: en la planificación del producto al crearlo,
-          o editando las fechas de sus tareas desde el seguimiento.
+          Las reglas con candado son el mínimo obligatorio: se pueden ajustar pero no eliminar, porque sin ellas la planificación
+          backward no puede calcularse. Los cambios aplican solo a proyectos nuevos; los existentes conservan sus fechas.
         </p>
       </CardContent>
+
+      <Dialog open={modalAbierto} onOpenChange={(abierto) => (abierto ? setModalAbierto(true) : cerrarModal())}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Agregar regla</DialogTitle>
+            <DialogDescription>
+              Definí un hito, un bloque de trabajo o una brecha entre hitos. Se aplica a los proyectos nuevos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <Select value={tipo} onValueChange={(valor) => setTipo(valor as TipoRegla)}>
+                <SelectTrigger className="w-full" aria-label="Tipo de regla">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hito">Hito — la fecha se define por proyecto</SelectItem>
+                  <SelectItem value="bloque">Bloque — los días de trabajo se definen por proyecto</SelectItem>
+                  <SelectItem value="brecha">Brecha — días entre dos hitos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="regla-nombre">Nombre</Label>
+              <Input id="regla-nombre" value={nombre} onChange={(evento) => setNombre(evento.target.value)} placeholder="Ej.: Inspección de calidad" />
+            </div>
+            {tipo === "brecha" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="regla-dias">Días de separación</Label>
+                <Input id="regla-dias" type="number" min={0} step={1} value={dias} onChange={(evento) => setDias(evento.target.value)} className="w-28" />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="regla-desc">Descripción</Label>
+              <Textarea id="regla-desc" rows={2} value={descripcion} onChange={(evento) => setDescripcion(evento.target.value)} placeholder="Para qué sirve este hito o regla, para contextualizar al equipo" />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <div className="flex items-center gap-2">
+                <Switch id="regla-oblig" checked={obligatoria} onCheckedChange={setObligatoria} />
+                <Label htmlFor="regla-oblig" className="text-sm">Obligatoria para todos</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="regla-def" checked={porDefecto} onCheckedChange={setPorDefecto} />
+                <Label htmlFor="regla-def" className="text-sm">Preseleccionada</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={cerrarModal}>Cancelar</Button>
+            <Button onClick={agregar}>Agregar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -254,310 +453,19 @@ function SeccionCapacidad() {
   );
 }
 
-function SeccionCatalogo() {
-  const { user } = useAuth();
-  const [nombreNuevo, setNombreNuevo] = useState("");
-  const [llevaPremarcos, setLlevaPremarcos] = useState(true);
-  const [editando, setEditando] = useState<string | null>(null);
-  const [nombreEdicion, setNombreEdicion] = useState("");
-  const [fabricacionEdicion, setFabricacionEdicion] = useState(true);
-  const [instalacionEdicion, setInstalacionEdicion] = useState(true);
-  // Contador para releer el catálogo tras cada cambio persistido.
-  const [refresco, setRefresco] = useState(0);
-  const catalogo = obtenerCatalogoProductos();
-  void refresco;
-
-  const usuarioId = user?.id ?? "";
-
-  const comenzarEdicion = (producto: ProductoCatalogo) => {
-    setEditando(String(producto.valor));
-    setNombreEdicion(producto.label);
-    setFabricacionEdicion(producto.llevaFabricacionPremarcos ?? producto.llevaPremarcos);
-    setInstalacionEdicion(producto.llevaInstalacionPremarcos ?? producto.llevaPremarcos);
-  };
-
-  /** Persiste cambios de un producto: overrides para estándar, lista para personalizados. */
-  const aplicarCambio = (
-    producto: ProductoCatalogo,
-    cambios: { label?: string; llevaFabricacionPremarcos?: boolean; llevaInstalacionPremarcos?: boolean; activo?: boolean }
-  ) => {
-    if (producto.base) {
-      const overrides = obtenerOverridesCatalogo();
-      overrides[String(producto.valor)] = { ...overrides[String(producto.valor)], ...cambios };
-      guardarOverridesCatalogo(overrides);
-    } else {
-      guardarProductosPersonalizados(
-        obtenerProductosPersonalizados().map((item) =>
-          item.valor === producto.valor
-            ? { ...item, ...cambios, llevaPremarcos: (cambios.llevaFabricacionPremarcos ?? item.llevaFabricacionPremarcos ?? item.llevaPremarcos) || (cambios.llevaInstalacionPremarcos ?? item.llevaInstalacionPremarcos ?? item.llevaPremarcos) }
-            : item
-        )
-      );
-    }
-    setRefresco((n) => n + 1);
-  };
-
-  const guardarEdicion = () => {
-    const objetivo = catalogo.find((producto) => producto.valor === editando);
-    if (!objetivo) return;
-    const label = nombreEdicion.trim();
-    if (!label) {
-      toast("Falta el nombre", { description: "El producto necesita un nombre." });
-      return;
-    }
-    const duplicado = catalogo.find(
-      (producto) => producto.valor !== editando && producto.label.toLocaleLowerCase() === label.toLocaleLowerCase()
-    );
-    if (duplicado) {
-      toast("Nombre duplicado", { description: `Ya existe "${duplicado.label}" en el catálogo.` });
-      return;
-    }
-    aplicarCambio(objetivo, {
-      label,
-      llevaFabricacionPremarcos: fabricacionEdicion,
-      llevaInstalacionPremarcos: instalacionEdicion
-    });
-    registrarAuditoriaCatalogo({
-      usuarioId,
-      accion: "editar",
-      valor: String(objetivo.valor),
-      detalle: `Nombre: ${label} · Fabricación de premarcos: ${fabricacionEdicion ? "sí" : "no"} · Instalación de premarcos: ${instalacionEdicion ? "sí" : "no"}`
-    });
-    setEditando(null);
-    toast("Producto actualizado", { description: `"${label}" se aplicará así en los próximos proyectos.` });
-  };
-
-  const agregar = () => {
-    const label = nombreNuevo.trim();
-    if (!label) {
-      toast("Falta el nombre", { description: "Ingresá el nombre del nuevo tipo de producto." });
-      return;
-    }
-    const valor = slugDeNombre(label);
-    if (!valor) {
-      toast("Nombre inválido", { description: "El nombre necesita al menos una letra o número." });
-      return;
-    }
-    const existente = catalogo.find(
-      (producto) => producto.valor === valor || producto.label.toLocaleLowerCase() === label.toLocaleLowerCase()
-    );
-    if (existente) {
-      toast("Producto duplicado", { description: `Ya existe "${existente.label}" en el catálogo.` });
-      return;
-    }
-    guardarProductosPersonalizados([
-      ...obtenerProductosPersonalizados(),
-      { valor, label, llevaPremarcos, llevaFabricacionPremarcos: llevaPremarcos, llevaInstalacionPremarcos: llevaPremarcos }
-    ]);
-    registrarAuditoriaCatalogo({ usuarioId, accion: "crear", valor, detalle: `Nombre: ${label}` });
-    setRefresco((n) => n + 1);
-    setNombreNuevo("");
-    setLlevaPremarcos(true);
-    toast("Producto agregado", { description: `"${label}" ya está disponible al crear proyectos.` });
-  };
-
-  const desactivar = (producto: ProductoCatalogo) => {
-    aplicarCambio(producto, { activo: false });
-    registrarAuditoriaCatalogo({ usuarioId, accion: "desactivar", valor: String(producto.valor) });
-    toast("Producto retirado", {
-      description: `"${producto.label}" ya no se ofrece en proyectos nuevos. Los proyectos existentes no cambian.`
-    });
-  };
-
-  const reactivar = (producto: ProductoCatalogo) => {
-    aplicarCambio(producto, { activo: true });
-    registrarAuditoriaCatalogo({ usuarioId, accion: "reactivar", valor: String(producto.valor) });
-    toast("Producto restaurado", { description: `"${producto.label}" vuelve a ofrecerse al crear proyectos.` });
-  };
-
-  return (
-    <Card>
-      <CardHeader className="border-b">
-        <div className="flex items-center gap-3">
-          <div className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
-            <Package className="size-5" />
-          </div>
-          <div>
-            <CardTitle>Catálogo de productos</CardTitle>
-            <CardDescription>
-              Los tipos agregados acá aparecen al crear proyectos, con o sin etapas de premarcos según se indique.
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 pt-1">
-        <ul className="divide-y rounded-xl border">
-          {catalogo.map((producto) => {
-            const esServicios = producto.valor === "servicios";
-            const inactivo = producto.activo === false;
-            const etiquetaEtapas = esServicios
-              ? "Sin etapas de seguimiento"
-              : [
-                  producto.llevaFabricacionPremarcos ? "Fabricación de premarcos" : null,
-                  producto.llevaInstalacionPremarcos ? "Instalación de premarcos" : null
-                ].filter(Boolean).join(" + ") || "Sin premarcos";
-
-            return (
-              <li key={producto.valor} className={`flex items-center gap-3 px-4 py-2.5 ${inactivo ? "opacity-55" : ""}`}>
-                {editando === producto.valor ? (
-                  <>
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <Input
-                        value={nombreEdicion}
-                        onChange={(evento) => setNombreEdicion(evento.target.value)}
-                        onKeyDown={(evento) => {
-                          if (evento.key === "Enter") {
-                            evento.preventDefault();
-                            guardarEdicion();
-                          }
-                          if (evento.key === "Escape") setEditando(null);
-                        }}
-                        aria-label={`Nuevo nombre de ${producto.label}`}
-                        autoFocus
-                      />
-                      {!esServicios && (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              id={`editar-fab-premarcos-${producto.valor}`}
-                              checked={fabricacionEdicion}
-                              onCheckedChange={setFabricacionEdicion}
-                            />
-                            <Label htmlFor={`editar-fab-premarcos-${producto.valor}`} className="text-xs">
-                              Ofrece fabricación de premarcos
-                            </Label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              id={`editar-inst-premarcos-${producto.valor}`}
-                              checked={instalacionEdicion}
-                              onCheckedChange={setInstalacionEdicion}
-                            />
-                            <Label htmlFor={`editar-inst-premarcos-${producto.valor}`} className="text-xs">
-                              Ofrece instalación de premarcos
-                            </Label>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-primary"
-                      onClick={guardarEdicion}
-                      aria-label={`Guardar cambios de ${producto.label}`}
-                    >
-                      <Check className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-muted-foreground"
-                      onClick={() => setEditando(null)}
-                      aria-label={`Cancelar edición de ${producto.label}`}
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{producto.label}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {producto.base ? "Estándar" : "Personalizado"}
-                        {" · "}
-                        {etiquetaEtapas}
-                        {inactivo && " · Retirado"}
-                      </div>
-                    </div>
-                    {inactivo ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => reactivar(producto)}
-                        aria-label={`Restaurar ${producto.label} al catálogo`}
-                      >
-                        <ArchiveRestore className="size-4" />
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="shrink-0 text-muted-foreground hover:text-foreground"
-                          onClick={() => comenzarEdicion(producto)}
-                          aria-label={`Editar ${producto.label}`}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="shrink-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => desactivar(producto)}
-                          aria-label={`Retirar ${producto.label} del catálogo`}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </>
-                    )}
-                  </>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-
-        <div className="rounded-xl border p-4">
-          <h4 className="font-heading text-sm font-semibold">Nuevo tipo de producto</h4>
-          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-            <div className="space-y-1.5">
-              <Label htmlFor="catalogo-nombre">Nombre</Label>
-              <Input
-                id="catalogo-nombre"
-                value={nombreNuevo}
-                onChange={(evento) => setNombreNuevo(evento.target.value)}
-                onKeyDown={(evento) => {
-                  if (evento.key === "Enter") {
-                    evento.preventDefault();
-                    agregar();
-                  }
-                }}
-                placeholder="Ej.: Aberturas de madera"
-              />
-            </div>
-            <div className="flex items-center gap-2 pb-2">
-              <Switch id="catalogo-premarcos" checked={llevaPremarcos} onCheckedChange={setLlevaPremarcos} />
-              <Label htmlFor="catalogo-premarcos" className="text-sm">Lleva premarcos</Label>
-            </div>
-            <Button className="gap-1.5" onClick={agregar} disabled={!nombreNuevo.trim()}>
-              <Plus className="size-4" /> Agregar
-            </Button>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Si no lleva premarcos, los grupos de fabricación e instalación de premarcos no se ofrecen para este producto.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function Reglas() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
         <div className="senal">Administración</div>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">Reglas y catálogo</h1>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Reglas de planificación</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Reglas de negocio editables: brechas del cálculo backward de fechas y catálogo de tipos de producto.
+          Reglas de negocio editables: hitos, bloques y brechas del cálculo backward de fechas, y capacidad de producción.
         </p>
       </header>
 
-      <SeccionBrechas />
+      <SeccionReglas />
       <SeccionCapacidad />
-      <SeccionCatalogo />
     </div>
   );
 }

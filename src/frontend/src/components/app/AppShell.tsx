@@ -2,8 +2,8 @@ import { useEffect, useId, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import {
   BookOpen, Building2, ChevronDown, CircleHelp, Headphones,
-  LayoutGrid, ListTodo, LogOut, Menu, Palette, RefreshCw,
-  Settings, SlidersHorizontal, UserCog, UserRound, Users
+  LayoutGrid, ListTodo, LogOut, Menu, Package, Palette, RefreshCw,
+  Settings, SlidersHorizontal, UserCog, UserRound, Users, UsersRound
 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos, ROLE_LABELS, type Role } from "@/lib/roles";
@@ -23,7 +23,9 @@ const NAV = [
   { to: "/proyectos", label: "Proyectos", icon: Building2, visible: () => true },
   { to: "/tareas", label: "Tareas", icon: ListTodo, visible: () => true },
   { to: "/usuarios", label: "Usuarios", icon: UserCog, visible: (role: Role) => permisos.verUsuarios(role) },
-  { to: "/reglas", label: "Reglas y catálogo", icon: SlidersHorizontal, visible: (role: Role) => permisos.gestionarReglasNegocio(role) }
+  { to: "/equipos", label: "Equipos", icon: UsersRound, visible: (role: Role) => role === "administrator" || role === "supervisor" },
+  { to: "/reglas", label: "Reglas", icon: SlidersHorizontal, visible: (role: Role) => permisos.gestionarReglasNegocio(role) },
+  { to: "/catalogo", label: "Catálogo", icon: Package, visible: (role: Role) => permisos.gestionarReglasNegocio(role) }
 ];
 
 interface UtilityItem {
