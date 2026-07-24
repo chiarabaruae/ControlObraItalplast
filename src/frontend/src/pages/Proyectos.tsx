@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { CalendarClock, Check, Columns3, Factory, GanttChartSquare, Hammer, HardHat, LayoutGrid, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/auth";
-import { permisos } from "@/lib/roles";
+import { puede } from "@/lib/permisos-usuario";
 import {
   clientes, usuarios, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, etapas,
   ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
@@ -718,7 +718,7 @@ export default function Proyectos() {
               </SelectContent>
             </Select>
           )}
-          {permisos.crearProyecto(user.role) && (
+          {puede(user, "crearProyecto") && (
             <Button className="gap-2" onClick={() => setModalAbierto(true)}>
               <Plus className="size-4" /> Nuevo proyecto
             </Button>
@@ -729,9 +729,9 @@ export default function Proyectos() {
       {vista === "tablero" && (
         <TableroProyectos
           proyectos={listaProyectos}
-          puedeMover={permisos.cambiarEstadoProyecto(user.role)}
-          puedeCancelar={permisos.cancelarProyecto(user.role)}
-          puedeReabrir={permisos.reabrirProyecto(user.role)}
+          puedeMover={puede(user, "cambiarEstadoProyecto")}
+          puedeCancelar={puede(user, "cancelarProyecto")}
+          puedeReabrir={puede(user, "reabrirProyecto")}
           usuarioId={user.id}
           alGuardar={actualizarProyecto}
         />

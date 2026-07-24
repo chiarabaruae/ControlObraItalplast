@@ -1,6 +1,6 @@
 import { Plus, Pencil, Trash2, Phone, Mail } from "lucide-react";
 import { useAuth } from "@/context/auth";
-import { permisos } from "@/lib/roles";
+import { puede } from "@/lib/permisos-usuario";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { clientes } from "@/mocks/data";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
@@ -20,7 +20,7 @@ export default function Clientes() {
   });
   if (!user) return null;
 
-  const gestiona = permisos.gestionarClientes(user.role);
+  const gestiona = puede(user, "gestionarClientes");
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

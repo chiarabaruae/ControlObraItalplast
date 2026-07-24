@@ -4,6 +4,7 @@ import { useAuth } from "@/context/auth";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { usuarios as usuariosMock, obtenerCargos, guardarCargos, type Usuario } from "@/mocks/data";
+import { PermisosPorAccion } from "@/components/app/PermisosPorAccion";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -248,6 +249,8 @@ export default function Usuarios() {
           )}
         </CardContent>
       </Card>
+
+      <PermisosPorAccion usuarios={lista} otorganteId={user.id} />
 
       <Dialog open={editorAbierto} onOpenChange={cambiarEditor}>
         <DialogContent className="sm:max-w-lg">

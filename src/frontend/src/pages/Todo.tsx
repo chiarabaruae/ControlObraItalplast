@@ -10,6 +10,7 @@ import { Plus, Check, ClipboardList, Pencil, Trash2, Archive } from "lucide-reac
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
+import { puede } from "@/lib/permisos-usuario";
 import { etiquetaBloque } from "@/lib/seguimiento-presupuesto";
 import {
   usuarioPorId, obtenerProyectos, guardarProyecto, aplicarCambioTarea, eliminarTareaConAuditoria, tituloTarea,
@@ -50,9 +51,9 @@ export default function Todo() {
   const [verArchivadas, setVerArchivadas] = useState(false);
 
   const esViewer = user?.role === "viewer";
-  const puedeEditarTarea = user ? permisos.editarTarea(user.role) : false;
-  const puedeEliminarTarea = user ? permisos.eliminarTarea(user.role) : false;
-  const puedePrioridad = user ? permisos.definirPrioridadTarea(user.role) : false;
+  const puedeEditarTarea = puede(user, "editarTarea");
+  const puedeEliminarTarea = puede(user, "eliminarTarea");
+  const puedePrioridad = puede(user, "definirPrioridadTarea");
   const verAuditoria = user ? permisos.verAuditoriaTareas(user.role) : false;
 
   // Tareas de seguimiento de todos los proyectos activos.
@@ -182,7 +183,7 @@ export default function Todo() {
               </button>
             ))}
           </div>
-          {permisos.crearTarea(user.role) && (
+          {puede(user, "crearTarea") && (
             <Button className="gap-2" onClick={() => setNuevaTareaAbierta(true)}>
               <Plus className="size-4" /> Nueva tarea
             </Button>

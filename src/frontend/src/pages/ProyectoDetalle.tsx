@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
+import { puede } from "@/lib/permisos-usuario";
 import {
   proyectoPorId, clientePorId, usuarioPorId, avanceGeneral, avanceGrupo, guardarProyecto,
   nombreTipoProducto, aplicarCambioTarea, eliminarTareaConAuditoria, type Proyecto, type TareaPresupuesto
@@ -271,9 +272,9 @@ export default function ProyectoDetalle() {
           <TabsContent value="tareas" className="mt-4">
             <TareasGenerales
               proyecto={p}
-              puedeEditar={permisos.editarTarea(user.role)}
-              puedeEliminar={permisos.eliminarTarea(user.role)}
-              puedePrioridad={permisos.definirPrioridadTarea(user.role)}
+              puedeEditar={puede(user, "editarTarea")}
+              puedeEliminar={puede(user, "eliminarTarea")}
+              puedePrioridad={puede(user, "definirPrioridadTarea")}
               verAuditoria={permisos.verAuditoriaTareas(user.role)}
               usuarioId={user.id}
               rol={user.role}
@@ -296,9 +297,9 @@ export default function ProyectoDetalle() {
               <SeguimientoPresupuesto
                 proyecto={p}
                 lado="fabrica"
-                puedeEditar={permisos.editarTarea(user.role)}
-                puedeEliminar={permisos.eliminarTarea(user.role)}
-                puedePrioridad={permisos.definirPrioridadTarea(user.role)}
+                puedeEditar={puede(user, "editarTarea")}
+                puedeEliminar={puede(user, "eliminarTarea")}
+                puedePrioridad={puede(user, "definirPrioridadTarea")}
                 verAuditoria={permisos.verAuditoriaTareas(user.role)}
                 usuarioId={user.id}
                 rol={user.role}
@@ -317,9 +318,9 @@ export default function ProyectoDetalle() {
               <SeguimientoPresupuesto
                 proyecto={p}
                 lado="instalacion"
-                puedeEditar={permisos.editarTarea(user.role)}
-                puedeEliminar={permisos.eliminarTarea(user.role)}
-                puedePrioridad={permisos.definirPrioridadTarea(user.role)}
+                puedeEditar={puede(user, "editarTarea")}
+                puedeEliminar={puede(user, "eliminarTarea")}
+                puedePrioridad={puede(user, "definirPrioridadTarea")}
                 verAuditoria={permisos.verAuditoriaTareas(user.role)}
                 usuarioId={user.id}
                 rol={user.role}
@@ -372,12 +373,12 @@ export default function ProyectoDetalle() {
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="font-heading text-base">Documentos</CardTitle>
               <div className="flex gap-2">
-                {permisos.subirOferta(user.role) && (
+                {puede(user, "subirOferta") && (
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={() => pendiente("Subir oferta PDF")}>
                     <Upload className="size-3.5" /> Oferta PDF
                   </Button>
                 )}
-                {permisos.gestionarPresupuesto(user.role) && (
+                {puede(user, "gestionarPresupuesto") && (
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={() => pendiente("Reemplazar presupuesto ejecutivo")}>
                     <Upload className="size-3.5" /> Presupuesto ejecutivo
                   </Button>
