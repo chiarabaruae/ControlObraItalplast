@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
-  AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, CalendarClock, Clock, Flag,
-  Gauge, Lock, Plus, RotateCcw, Save, Trash2
+  AlertTriangle, ArrowDown, ArrowLeftRight, ArrowUp, CalendarClock, ChevronDown, Clock, Flag,
+  Gauge, HelpCircle, Lock, Plus, RotateCcw, Save, Trash2
 } from "lucide-react";
 import {
   guardarReglasPlanificacion,
@@ -36,6 +36,40 @@ const TIPO_META: Record<TipoRegla, { label: string; icono: typeof Flag; cls: str
   brecha: { label: "Brecha", icono: ArrowLeftRight, cls: "bg-estado-pausada/14 text-estado-pausada" }
 };
 
+const TIPO_AYUDA: Record<TipoRegla, { resumen: string; badge: string; ejemplo: string }> = {
+  hito: { resumen: "Ponés una fecha fija y el sistema calcula los días.", badge: "fecha → días", ejemplo: "Confirmación del cliente." },
+  bloque: { resumen: "Ponés los días de trabajo y el sistema calcula las fechas.", badge: "días → fechas", ejemplo: "Fabricación, instalación." },
+  brecha: { resumen: "Ponés los días de separación entre dos hitos.", badge: "días vacíos", ejemplo: "Fin de producción → inicio de instalación." }
+};
+
+function AyudaTipos() {
+  return (
+    <div className="space-y-2">
+      {(Object.keys(TIPO_META) as TipoRegla[]).map((tipo) => {
+        const meta = TIPO_META[tipo];
+        const ayuda = TIPO_AYUDA[tipo];
+        const Icono = meta.icono;
+        return (
+          <div key={tipo} className="flex items-start gap-2.5 rounded-lg border bg-card p-2.5">
+            <span className={cn("grid size-7 shrink-0 place-items-center rounded-md", meta.cls)}>
+              <Icono className="size-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-[13px] font-medium">{meta.label}</span>
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", meta.cls)}>{ayuda.badge}</span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {ayuda.resumen} <span className="text-muted-foreground/70">Ej.: {ayuda.ejemplo}</span>
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChipToggle({
   activo, disabled, onClick, children
 }: { activo: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -61,6 +95,7 @@ function SeccionReglas() {
     [...obtenerReglasPlanificacion()].sort((a, b) => a.orden - b.orden)
   );
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [ayudaAbierta, setAyudaAbierta] = useState(false);
   const [tipo, setTipo] = useState<TipoRegla>("brecha");
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -165,6 +200,24 @@ function SeccionReglas() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-1">
+        <div className="overflow-hidden rounded-xl border border-primary/25 bg-primary/[0.04]">
+          <button
+            type="button"
+            onClick={() => setAyudaAbierta((valor) => !valor)}
+            aria-expanded={ayudaAbierta}
+            className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm font-medium text-primary"
+          >
+            <HelpCircle className="size-4 shrink-0" />
+            <span className="flex-1">¿Qué significa cada tipo de regla?</span>
+            <ChevronDown className={cn("size-4 shrink-0 transition-transform", ayudaAbierta && "rotate-180")} />
+          </button>
+          {ayudaAbierta && (
+            <div className="border-t border-primary/15 p-3">
+              <AyudaTipos />
+            </div>
+          )}
+        </div>
+
         {(errores.length > 0 || avisos.length > 0) && (
           <div className="space-y-2">
             {errores.map((a, i) => (
@@ -207,7 +260,7 @@ function SeccionReglas() {
                   </button>
                 </div>
 
-                <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", meta.cls)} title={meta.label}>
+                <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", meta.cls)} title={`${meta.label} — ${TIPO_AYUDA[r.tipo].resumen}`}>
                   <Icono className="size-4" />
                 </span>
 
@@ -310,6 +363,21 @@ function SeccionReglas() {
                   <SelectItem value="brecha">Brecha — días entre dos hitos</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 p-2.5">
+                {(() => {
+                  const meta = TIPO_META[tipo];
+                  const Icono = meta.icono;
+                  return (
+                    <span className={cn("grid size-7 shrink-0 place-items-center rounded-md", meta.cls)}>
+                      <Icono className="size-3.5" />
+                    </span>
+                  );
+                })()}
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{TIPO_META[tipo].label}:</span> {TIPO_AYUDA[tipo].resumen}{" "}
+                  <span className="text-muted-foreground/70">Ej.: {TIPO_AYUDA[tipo].ejemplo}</span>
+                </p>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="regla-nombre">Nombre</Label>
