@@ -253,7 +253,7 @@ export function DialogoNuevaTarea({ abierto, proyectos, rol, usuarioId, alCerrar
                   </SelectContent>
                 </Select>
               </div>
-              <SelectorResponsableTarea rol={rol} valor={responsableId} onChange={setResponsableId} />
+              <SelectorResponsableTarea rol={rol} proyectoId={proyectoId} valor={responsableId} onChange={setResponsableId} />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="nueva-tarea-inicio">Fecha de inicio</Label>

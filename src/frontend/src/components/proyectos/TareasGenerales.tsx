@@ -241,6 +241,7 @@ export function TareasGenerales({
               </div>
               <SelectorResponsableTarea
                 rol={rol}
+                proyectoId={proyecto.id}
                 valor={formulario.responsableId}
                 onChange={(responsableId) => setFormulario({ ...formulario, responsableId })}
               />

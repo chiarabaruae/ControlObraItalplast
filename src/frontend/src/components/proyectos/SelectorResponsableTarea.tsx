@@ -2,6 +2,7 @@ import { UserAvatar } from "@/components/app/UserAvatar";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { permisos, type Role } from "@/lib/roles";
+import { idsAsignablesEnProyecto } from "@/lib/equipos";
 import { usuarioConAvatarPorId, usuarios } from "@/mocks/data";
 
 function usuariosAsignables(rol: Role) {
@@ -12,14 +13,19 @@ export function SelectorResponsableTarea({
   rol,
   valor,
   onChange,
-  id = "responsable-tarea"
+  id = "responsable-tarea",
+  proyectoId
 }: {
   rol: Role;
   valor?: string;
   onChange: (responsableId: string | undefined) => void;
   id?: string;
+  proyectoId?: string;
 }) {
-  const disponibles = usuariosAsignables(rol);
+  // Si el proyecto tiene equipos asignados, solo sus integrantes (y recursos
+  // adicionales vigentes) pueden recibir la tarea. Sin equipos ⇒ sin restricción.
+  const permitidos = proyectoId ? idsAsignablesEnProyecto(proyectoId) : null;
+  const disponibles = usuariosAsignables(rol).filter((usuario) => !permitidos || permitidos.has(usuario.id));
   if (!permisos.asignarTarea(rol)) return null;
   const seleccionado = valor ? usuarioConAvatarPorId(valor) : undefined;
 
@@ -54,9 +60,11 @@ export function SelectorResponsableTarea({
         </SelectContent>
       </Select>
       <p className="text-xs text-muted-foreground">
-        {rol === "administrator"
-          ? "Podés asignar a supervisores o usuarios."
-          : "Como supervisor, podés asignar únicamente a usuarios."}
+        {permitidos
+          ? "Limitado a los integrantes de los equipos del proyecto y sus recursos adicionales."
+          : rol === "administrator"
+            ? "Podés asignar a supervisores o usuarios."
+            : "Como supervisor, podés asignar únicamente a usuarios."}
       </p>
     </div>
   );
