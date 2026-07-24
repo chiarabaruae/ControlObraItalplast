@@ -5,6 +5,7 @@ const ESTADOS: Record<EstadoObra, { label: string; cls: string }> = {
   planificada: { label: "Planificada", cls: "bg-muted text-muted-foreground border-transparent" },
   en_progreso: { label: "En progreso", cls: "bg-estado-progreso/12 text-estado-progreso border-estado-progreso/25" },
   pausada: { label: "Pausada", cls: "bg-estado-pausada/12 text-estado-pausada border-estado-pausada/25" },
+  pendiente: { label: "Pendiente", cls: "bg-estado-pendiente/12 text-estado-pendiente border-estado-pendiente/25" },
   finalizada: { label: "Finalizada", cls: "bg-primary/10 text-primary border-primary/25" },
   cancelada: { label: "Cancelada", cls: "bg-estado-riesgo/12 text-estado-riesgo border-estado-riesgo/25" }
 };

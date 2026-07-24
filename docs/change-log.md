@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-change-log
 context_type: implementation_history
-last_updated: 2026-07-22
+last_updated: 2026-07-23
 tags:
   - changelog
   - commits
@@ -17,6 +17,26 @@ tags:
 # Registro contextual de cambios
 
 Este registro resume cambios materiales. Git continúa siendo la fuente exacta de diffs y autores.
+
+## 2026-07-23 — Cronograma general (Gantt de capacidad) por proyecto × producto
+
+**Alcance:** nueva tercera vista de Proyectos que cruza la carga de fábrica e instalación de todas las obras contra la capacidad instalada (D-033).
+
+**Impacto:** el Gantt general (`GanttProyectos.tsx`, alimentado por `lib/cronograma.ts`) dibuja una fila por proyecto × producto operativo con las barras de premarcos/fábrica/instalación y los diamantes de firma (rojo) y confirmación del cliente (gris), derivados del cálculo backward (D-023). Tiene zoom Día/Semana/Mes (semana por defecto), filtros por producto/líder/cliente y sección "Sin compromiso". Un carril superior suma la demanda de aberturas/día por línea de producto en fábrica y en instalación, y resalta en rojo los buckets que superan el tope. Los topes se configuran en Reglas y catálogo (`lib/capacidad.ts`): por línea para fábrica y uno único para instalación (predet. 6 y 10 ab./día). La planificación backward pasa a ser **obligatoria** por producto operativo al crear el proyecto, y el alta autogenera la tarea genérica "Firma de Presupuesto Ejecutivo" con la fecha de firma más temprana. Los cuatro proyectos demo se enriquecieron con planificación para exhibir el flujo. Backend: migración `020_capacidad_produccion.sql` (espejo 1:1).
+
+**Archivos clave:** `src/frontend/src/components/proyectos/GanttProyectos.tsx` (nuevo), `src/frontend/src/lib/cronograma.ts` (nuevo), `src/frontend/src/lib/capacidad.ts` (nuevo), `src/frontend/src/pages/Proyectos.tsx` (tercera vista, planificación obligatoria, hito de firma), `src/frontend/src/pages/Reglas.tsx` (sección Capacidad), `src/frontend/src/mocks/data.ts` (planificación demo), `src/backend/migrations/020_capacidad_produccion.sql`, `docs/decisions.md` (D-033).
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos (solo advertencias Fast Refresh preexistentes). Recorrida en navegador como administrador: el cronograma muestra las 5 filas por producto con barras e hitos, el carril de capacidad marca en rojo Fábrica·Aluminio (8 > 6) e Instalación (12 > 10), el zoom Mes agrupa por mes, y al subir el tope de aluminio a 8 en Reglas la celda deja de estar en rojo. El estado demo de `localStorage` se restauró al terminar.
+
+## 2026-07-23 — Estado "Pendiente" del proyecto y tooltips explicativos con delay
+
+**Alcance:** nuevo estado de proyecto para diferenciar la detención por dependencia del cliente de la pausa por causa interna, más ayudas contextuales sobre estados del tablero y etapas de producto (D-032).
+
+**Impacto:** `EstadoObra` suma `pendiente`, que en el tablero es una columna propia entre Planificadas y En progreso. Pasar a Pendiente exige un motivo ("qué se espera del cliente", mínimo 50 caracteres) y guarda un `RegistroPendiente` en `proyecto.pendientes`; reanudar vuelve a En progreso con observación obligatoria y cierra el registro abierto. "Pausada" se redefine en la UI como detención por causa interna. El estado suma token de color propio (`--estado-pendiente`, violeta) en `EstadoBadge`, la tarjeta del tablero y el filtro de la vista Tarjetas. Se introduce por primera vez el componente `Tooltip` (`TooltipProvider delayDuration={1000}`): al pasar el cursor 1 s sobre el encabezado de columna del tablero se explica cada estado, y sobre el título de bloque de Fábrica/Instalación se explica cada etapa (`descripcionGrupo`). Backend: migración `019_estado_pendiente_proyecto.sql` amplía el `check` de `proyectos.estado` y crea `proyecto_pendientes` (espejo 1:1, D-027).
+
+**Archivos clave:** `src/frontend/src/mocks/data.ts` (`EstadoObra`, `RegistroPendiente`, `proyecto.pendientes`), `src/frontend/src/components/proyectos/TableroProyectos.tsx` (columna, diálogo, transiciones y tooltips de estado), `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx` (tooltip de etapa), `src/frontend/src/lib/seguimiento-presupuesto.ts` (`descripcionGrupo`), `src/frontend/src/components/app/EstadoBadge.tsx`, `src/frontend/src/pages/Proyectos.tsx` (filtro), `src/frontend/src/index.css` (token `--estado-pendiente`), `src/backend/migrations/019_estado_pendiente_proyecto.sql`, `docs/decisions.md` (D-032).
+
+**Validaciones:** `tsc -b` y `npm run lint` sin errores nuevos (solo advertencias Fast Refresh preexistentes). Recorrida en navegador como administrador: se movió "Torre Aviadores" a Pendientes con motivo (columna, tarjeta violeta y toast correctos), el orden de columnas quedó Planificadas → Pendientes → En progreso → Pausadas → Finalizadas, el tooltip de estado apareció tras 1 s sobre "En progreso" y el de etapa sobre "PVC · Fabricación"; sin errores de consola. El estado demo de `localStorage` se restauró al terminar.
 
 ## 2026-07-23 — Evidencia multi-formato acotada a las tareas generales del proyecto
 

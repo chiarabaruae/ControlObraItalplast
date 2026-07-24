@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { CalendarClock, Check, Columns3, Factory, Hammer, HardHat, LayoutGrid, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
+import { CalendarClock, Check, Columns3, Factory, GanttChartSquare, Hammer, HardHat, LayoutGrid, MapPin, Plus, Ruler, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { permisos } from "@/lib/roles";
 import {
@@ -8,10 +8,13 @@ import {
   ETAPAS_FABRICA, ETAPAS_FABRICA_OPCIONALES, ETAPAS_OBRA,
   ETAPAS_FABRICACION_PREMARCOS, ETAPAS_INSTALACION_PREMARCOS,
   obtenerCatalogoActivo, productoCatalogo, nombreTipoProducto, obtenerProyectos, guardarProyectos, guardarProyecto,
+  TIPO_TAREA_GENERAL,
   type ConfiguracionProductoProyecto, type EstadoObra, type PlanificacionProducto, type PresupuestoEjecutivo, type Proyecto, type TipoProducto
 } from "@/mocks/data";
 import { generarTareasDesdePresupuesto } from "@/lib/seguimiento-presupuesto";
 import { calcularFechasBackward, obtenerBuffersPlanificacion } from "@/lib/planificacion";
+import { firmaPresupuestoProyecto } from "@/lib/cronograma";
+import { GanttProyectos } from "@/components/proyectos/GanttProyectos";
 import { formatFecha } from "@/lib/format";
 import { AvanceMeter } from "@/components/app/AvanceMeter";
 import { EstadoBadge } from "@/components/app/EstadoBadge";
@@ -30,6 +33,7 @@ const FILTROS: { valor: EstadoObra | "todas"; label: string }[] = [
   { valor: "todas", label: "Todas" },
   { valor: "en_progreso", label: "En progreso" },
   { valor: "pausada", label: "Pausadas" },
+  { valor: "pendiente", label: "Pendientes" },
   { valor: "planificada", label: "Planificadas" },
   { valor: "finalizada", label: "Finalizadas" },
   { valor: "cancelada", label: "Canceladas" }
@@ -261,13 +265,14 @@ function PlanificacionEditor({
         <CalendarClock className="size-4 text-primary" strokeWidth={1.75} /> Planificación de fechas
       </h4>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        Opcional: con la fecha comprometida de inicio de instalación se estiman hacia atrás las fechas de cada bloque,
-        usando las brechas configuradas por administración. Las tareas nacen con esas fechas y siguen siendo editables.
+        Obligatoria: con la fecha comprometida de inicio de instalación se estiman hacia atrás las fechas de cada bloque,
+        usando las brechas configuradas por administración. Con estas fechas el producto carga en el cronograma general;
+        las tareas nacen con ellas y siguen siendo editables.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor={`${tipo}-plan-inicio-instalacion`}>Inicio comprometido de instalación</Label>
+          <Label htmlFor={`${tipo}-plan-inicio-instalacion`}>Inicio comprometido de instalación *</Label>
           <Input
             id={`${tipo}-plan-inicio-instalacion`}
             type="date"
@@ -277,7 +282,7 @@ function PlanificacionEditor({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={`${tipo}-plan-dias-instalacion`}>Días de instalación</Label>
+          <Label htmlFor={`${tipo}-plan-dias-instalacion`}>Días de instalación *</Label>
           <Input
             id={`${tipo}-plan-dias-instalacion`}
             type="number"
@@ -289,7 +294,7 @@ function PlanificacionEditor({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={`${tipo}-plan-dias-fabrica`}>Días de fábrica</Label>
+          <Label htmlFor={`${tipo}-plan-dias-fabrica`}>Días de fábrica *</Label>
           <Input
             id={`${tipo}-plan-dias-fabrica`}
             type="number"
@@ -302,7 +307,7 @@ function PlanificacionEditor({
         </div>
         {conPremarcos && (
           <div className="space-y-1.5">
-            <Label htmlFor={`${tipo}-plan-dias-premarcos`}>Días de fabricación de premarcos</Label>
+            <Label htmlFor={`${tipo}-plan-dias-premarcos`}>Días de fabricación de premarcos *</Label>
             <Input
               id={`${tipo}-plan-dias-premarcos`}
               type="number"
@@ -386,12 +391,13 @@ export default function Proyectos() {
   );
   const [fechaInicio, setFechaInicio] = useState(hoy);
   const [presupuesto, setPresupuesto] = useState<PresupuestoEjecutivo>();
-  const [vista, setVista] = useState<"tarjetas" | "tablero">(
-    () => (localStorage.getItem("co-vista-proyectos") === "tablero" ? "tablero" : "tarjetas")
-  );
+  const [vista, setVista] = useState<"tarjetas" | "tablero" | "gantt">(() => {
+    const guardada = localStorage.getItem("co-vista-proyectos");
+    return guardada === "tablero" || guardada === "gantt" ? guardada : "tarjetas";
+  });
   if (!user) return null;
 
-  const cambiarVista = (nueva: "tarjetas" | "tablero") => {
+  const cambiarVista = (nueva: "tarjetas" | "tablero" | "gantt") => {
     setVista(nueva);
     localStorage.setItem("co-vista-proyectos", nueva);
   };
@@ -514,6 +520,22 @@ export default function Proyectos() {
         });
         return;
       }
+
+      // Planificación backward obligatoria (D-033): sin ancla ni duraciones el
+      // producto no cargaría en el cronograma general.
+      const plan = configuracion.planificacion;
+      if (!plan.fechaInicioInstalacion || !numeroDias(plan.diasInstalacion) || !numeroDias(plan.diasFabrica)) {
+        toast(`Planificá ${etiquetaProducto}`, {
+          description: "Cargá la fecha comprometida de inicio de instalación y los días de instalación y de fábrica."
+        });
+        return;
+      }
+      if (configuracion.fabricaraPremarcos && !numeroDias(plan.diasFabricacionPremarcos)) {
+        toast(`Planificá ${etiquetaProducto}`, {
+          description: "Indicá los días de fabricación de premarcos para estimar sus fechas."
+        });
+        return;
+      }
     }
 
     const productos: ConfiguracionProductoProyecto[] = tiposSeleccionados.map((tipo) => {
@@ -558,10 +580,30 @@ export default function Proyectos() {
       ].map((etapa) => ({ etapa: `${etiquetaProducto} · ${etapa}`, inicio: fechaInicio, fin: fechaInicio }));
     });
     const soloServicios = productos.every((producto) => producto.tipo === "servicios");
-    const tareasPresupuesto = generarTareasDesdePresupuesto(productos, presupuesto.items).map((tarea) => ({
+    const tareasGeneradas = generarTareasDesdePresupuesto(productos, presupuesto.items).map((tarea) => ({
       ...tarea,
       creadaPorId: user.id
     }));
+    // Hito "Firma de Presupuesto Ejecutivo" (D-033): tarea genérica autogenerada
+    // con la fecha de firma más temprana entre los productos (un presupuesto por proyecto).
+    const firmaFecha = firmaPresupuestoProyecto(productos);
+    const tareaFirma = firmaFecha
+      ? [{
+          id: `general-firma-${Date.now()}`,
+          itemId: "",
+          tipoProducto: TIPO_TAREA_GENERAL,
+          grupo: "generales" as const,
+          etapa: "Hito del proyecto",
+          titulo: "Firma de Presupuesto Ejecutivo",
+          fechaFin: firmaFecha,
+          prioridad: "alta" as const,
+          creadaPorId: user.id,
+          creadaEn: new Date().toISOString(),
+          version: 1,
+          completada: false
+        }]
+      : [];
+    const tareasPresupuesto = [...tareaFirma, ...tareasGeneradas];
     const aberturas = presupuesto.items
       .filter((item) => item.tipoProducto === "aberturas_aluminio" || item.tipoProducto === "aberturas_pvc")
       .map((item) => ({
@@ -647,6 +689,18 @@ export default function Proyectos() {
               <Columns3 className="size-4" strokeWidth={1.75} />
               <span className="sr-only">Vista de tablero</span>
             </button>
+            <button
+              type="button"
+              onClick={() => cambiarVista("gantt")}
+              aria-pressed={vista === "gantt"}
+              title="Vista de cronograma"
+              className={`grid size-8 place-items-center rounded-md transition-colors ${
+                vista === "gantt" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <GanttChartSquare className="size-4" strokeWidth={1.75} />
+              <span className="sr-only">Vista de cronograma</span>
+            </button>
           </div>
           {vista === "tarjetas" && (
             <Select value={filtro} onValueChange={(valor) => setFiltro(valor as EstadoObra | "todas")}>
@@ -678,6 +732,8 @@ export default function Proyectos() {
           alGuardar={actualizarProyecto}
         />
       )}
+
+      {vista === "gantt" && <GanttProyectos proyectos={listaProyectos} />}
 
       <Dialog open={modalAbierto} onOpenChange={cambiarModal}>
         <DialogContent className="sm:max-w-5xl">

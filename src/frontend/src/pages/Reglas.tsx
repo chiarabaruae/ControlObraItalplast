@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArchiveRestore, CalendarClock, Check, Package, Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { ArchiveRestore, CalendarClock, Check, Gauge, Package, Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
 import {
   BUFFERS_PREDETERMINADOS,
   guardarBuffersPlanificacion,
@@ -7,8 +7,16 @@ import {
   type BuffersPlanificacion
 } from "@/lib/planificacion";
 import {
+  guardarTopesCapacidad,
+  obtenerTopesCapacidad,
+  TOPE_FABRICA_PREDETERMINADO,
+  TOPE_INSTALACION_PREDETERMINADO
+} from "@/lib/capacidad";
+import {
   guardarOverridesCatalogo,
   guardarProductosPersonalizados,
+  nombreTipoProducto,
+  obtenerCatalogoActivo,
   obtenerCatalogoProductos,
   obtenerOverridesCatalogo,
   obtenerProductosPersonalizados,
@@ -133,6 +141,113 @@ function SeccionBrechas() {
           Los cambios afectan solo a las estimaciones futuras; las fechas ya asignadas a tareas existentes no se recalculan.
           Para una excepción puntual, ajustá los plazos dentro del proyecto: en la planificación del producto al crearlo,
           o editando las fechas de sus tareas desde el seguimiento.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SeccionCapacidad() {
+  const productos = obtenerCatalogoActivo().filter((producto) => producto.valor !== "servicios");
+  const [fabrica, setFabrica] = useState<Record<string, string>>(() => {
+    const topes = obtenerTopesCapacidad();
+    const inicial: Record<string, string> = {};
+    for (const producto of productos) {
+      const valor = topes.fabrica[String(producto.valor)];
+      inicial[String(producto.valor)] = valor ? String(valor) : "";
+    }
+    return inicial;
+  });
+  const [instalacion, setInstalacion] = useState(() => String(obtenerTopesCapacidad().instalacion));
+
+  const guardar = () => {
+    const fab: Record<string, number> = {};
+    for (const producto of productos) {
+      const bruto = fabrica[String(producto.valor)]?.trim();
+      if (!bruto) continue;
+      const numero = Number(bruto);
+      if (!Number.isInteger(numero) || numero <= 0) {
+        toast("Revisá la capacidad", { description: `El tope de fábrica de "${producto.label}" necesita un número entero mayor a 0.` });
+        return;
+      }
+      fab[String(producto.valor)] = numero;
+    }
+    const inst = Number(instalacion);
+    if (!Number.isInteger(inst) || inst <= 0) {
+      toast("Revisá la capacidad", { description: "El tope de instalación necesita un número entero mayor a 0." });
+      return;
+    }
+    guardarTopesCapacidad({ fabrica: fab, instalacion: inst });
+    toast("Capacidad guardada", { description: "El cronograma general marcará las semanas que superen estos topes." });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <div className="flex items-center gap-3">
+          <div className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Gauge className="size-5" />
+          </div>
+          <div>
+            <CardTitle>Capacidad de producción</CardTitle>
+            <CardDescription>
+              Aberturas por día que la operación puede sostener. El cronograma general resalta cuándo la demanda supera el tope.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-1">
+        <div>
+          <h4 className="font-heading text-sm font-semibold">Fábrica — por línea de producto</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">Cada línea (PVC, aluminio, etc.) tiene su propia capacidad diaria.</p>
+          <div className="mt-3 space-y-2">
+            {productos.map((producto) => (
+              <div key={producto.valor} className="flex items-center gap-3 rounded-xl border p-3">
+                <Label htmlFor={`cap-fab-${producto.valor}`} className="flex-1 text-sm font-medium">
+                  {producto.label}
+                </Label>
+                <Input
+                  id={`cap-fab-${producto.valor}`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={fabrica[String(producto.valor)] ?? ""}
+                  onChange={(evento) => setFabrica((previos) => ({ ...previos, [String(producto.valor)]: evento.target.value }))}
+                  placeholder={`Predet. ${TOPE_FABRICA_PREDETERMINADO}`}
+                  className="w-28 text-right"
+                />
+                <span className="w-16 text-sm text-muted-foreground">ab./día</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
+          <div className="flex-1">
+            <Label htmlFor="cap-instalacion" className="text-sm font-semibold">Instalación (cuadrillas)</Label>
+            <p className="mt-0.5 text-xs text-muted-foreground">Tope único, sin distinguir producto.</p>
+          </div>
+          <Input
+            id="cap-instalacion"
+            type="number"
+            min={1}
+            step={1}
+            value={instalacion}
+            onChange={(evento) => setInstalacion(evento.target.value)}
+            placeholder={`Predet. ${TOPE_INSTALACION_PREDETERMINADO}`}
+            className="w-28 text-right"
+          />
+          <span className="w-16 text-sm text-muted-foreground">ab./día</span>
+        </div>
+
+        <div className="flex justify-end">
+          <Button className="gap-2" onClick={guardar}>
+            <Save className="size-4" /> Guardar capacidad
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          La demanda se calcula repartiendo el total de aberturas de cada producto entre los días de su etapa
+          ({nombreTipoProducto("aberturas_pvc")}, aluminio, etc.). Los topes vacíos usan el valor predeterminado.
         </p>
       </CardContent>
     </Card>
@@ -441,6 +556,7 @@ export default function Reglas() {
       </header>
 
       <SeccionBrechas />
+      <SeccionCapacidad />
       <SeccionCatalogo />
     </div>
   );

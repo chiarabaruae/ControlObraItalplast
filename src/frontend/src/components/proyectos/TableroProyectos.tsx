@@ -18,6 +18,7 @@ import {
   CircleAlert,
   Flag,
   GripVertical,
+  Hourglass,
   ImagePlus,
   MapPin,
   PauseCircle,
@@ -60,20 +61,48 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type EstadoTablero = Exclude<EstadoObra, "cancelada">;
 
-const COLUMNAS: { estado: EstadoTablero; titulo: string; descripcion: string }[] = [
-  { estado: "planificada", titulo: "Planificadas", descripcion: "Creadas, sin avance todavía" },
-  { estado: "en_progreso", titulo: "En progreso", descripcion: "Con avance registrado" },
-  { estado: "pausada", titulo: "Pausadas", descripcion: "Detenidas con motivo" },
-  { estado: "finalizada", titulo: "Finalizadas", descripcion: "Cerradas al 100%" }
+const COLUMNAS: { estado: EstadoTablero; titulo: string; descripcion: string; ayuda: string }[] = [
+  {
+    estado: "planificada",
+    titulo: "Planificadas",
+    descripcion: "Creadas, sin avance todavía",
+    ayuda: "Proyecto creado y presupuestado, todavía sin ninguna tarea completada. Al registrar el primer avance pasa solo a En progreso."
+  },
+  {
+    estado: "pendiente",
+    titulo: "Pendientes",
+    descripcion: "A la espera del cliente",
+    ayuda: "Proyecto detenido a la espera de una acción del cliente (aprobación, pago o definición). Se distingue de Pausada, que responde a una causa interna."
+  },
+  {
+    estado: "en_progreso",
+    titulo: "En progreso",
+    descripcion: "Con avance registrado",
+    ayuda: "Proyecto activo, con al menos una tarea completada y su evidencia registrada."
+  },
+  {
+    estado: "pausada",
+    titulo: "Pausadas",
+    descripcion: "Detenidas por una causa interna",
+    ayuda: "Proyecto detenido por una decisión interna de Italplast (por ejemplo, falta de material o reprogramación de la cuadrilla). El motivo queda en el historial."
+  },
+  {
+    estado: "finalizada",
+    titulo: "Finalizadas",
+    descripcion: "Cerradas al 100%",
+    ayuda: "Proyecto cerrado con todos los avances al 100% y su evidencia. Solo administración puede reabrirlo."
+  }
 ];
 
 const TITULOS_ESTADO: Record<EstadoObra, string> = {
   planificada: "Planificada",
   en_progreso: "En progreso",
   pausada: "Pausada",
+  pendiente: "Pendiente",
   finalizada: "Finalizada",
   cancelada: "Cancelada"
 };
@@ -83,6 +112,7 @@ type Movimiento =
   | { tipo: "bloqueado_con_avance"; proyecto: Proyecto }
   | { tipo: "confirmacion"; proyecto: Proyecto; destino: EstadoTablero }
   | { tipo: "pausa"; proyecto: Proyecto }
+  | { tipo: "pendiente"; proyecto: Proyecto }
   | { tipo: "reanudacion"; proyecto: Proyecto }
   | { tipo: "cierre"; proyecto: Proyecto }
   | { tipo: "cancelacion"; proyecto: Proyecto }
@@ -93,12 +123,14 @@ function ColumnaTablero({
   estado,
   titulo,
   descripcion,
+  ayuda,
   cantidad,
   children
 }: {
   estado: EstadoTablero;
   titulo: string;
   descripcion: string;
+  ayuda: string;
   cantidad: number;
   children: React.ReactNode;
 }) {
@@ -113,11 +145,18 @@ function ColumnaTablero({
       )}
     >
       <header className="border-b px-4 py-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-heading text-sm font-semibold">{titulo}</h2>
-          <span className="cifra text-xs text-muted-foreground">{cantidad}</span>
-        </div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{descripcion}</p>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex cursor-help items-baseline justify-between">
+              <div className="min-w-0">
+                <h2 className="font-heading text-sm font-semibold">{titulo}</h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{descripcion}</p>
+              </div>
+              <span className="cifra text-xs text-muted-foreground">{cantidad}</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs">{ayuda}</TooltipContent>
+        </Tooltip>
       </header>
       <div className="flex flex-1 flex-col gap-2.5 p-2.5">{children}</div>
     </section>
@@ -150,6 +189,7 @@ function TarjetaProyecto({
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
   const ultimaPausa = proyecto.pausas?.at(-1);
+  const ultimoPendiente = proyecto.pendientes?.at(-1);
 
   return (
     <article
@@ -197,6 +237,7 @@ function TarjetaProyecto({
                     <DropdownMenuItem key={columna.estado} onClick={() => alPedirMovimiento(proyecto, columna.estado)}>
                       {columna.estado === "en_progreso" && <PlayCircle className="size-4" />}
                       {columna.estado === "pausada" && <PauseCircle className="size-4" />}
+                      {columna.estado === "pendiente" && <Hourglass className="size-4" />}
                       {columna.estado === "planificada" && <ArrowRightLeft className="size-4" />}
                       {columna.titulo}
                     </DropdownMenuItem>
@@ -243,6 +284,11 @@ function TarjetaProyecto({
       {proyecto.estado === "pausada" && ultimaPausa && (
         <p className="mt-2 rounded-md bg-estado-pausada/10 px-2 py-1 text-[11px] text-estado-pausada">
           {formatFecha(ultimaPausa.fecha)}: {ultimaPausa.motivo}
+        </p>
+      )}
+      {proyecto.estado === "pendiente" && ultimoPendiente && (
+        <p className="mt-2 rounded-md bg-estado-pendiente/10 px-2 py-1 text-[11px] text-estado-pendiente">
+          {formatFecha(ultimoPendiente.fecha)}: {ultimoPendiente.motivo}
         </p>
       )}
       {proyecto.estado === "finalizada" && (
@@ -294,12 +340,16 @@ export function TableroProyectos({
       setMovimiento({ tipo: "bloqueado_sin_avance", proyecto });
       return;
     }
-    if (proyecto.estado === "pausada" && destino === "en_progreso") {
+    if ((proyecto.estado === "pausada" || proyecto.estado === "pendiente") && destino === "en_progreso") {
       setMovimiento({ tipo: "reanudacion", proyecto });
       return;
     }
     if (destino === "pausada") {
       setMovimiento({ tipo: "pausa", proyecto });
+      return;
+    }
+    if (destino === "pendiente") {
+      setMovimiento({ tipo: "pendiente", proyecto });
       return;
     }
     if (destino === "finalizada") {
@@ -342,6 +392,22 @@ export function TableroProyectos({
     cerrarDialogo();
   };
 
+  const confirmarPendiente = () => {
+    if (movimiento?.tipo !== "pendiente") return;
+    const motivoLimpio = motivo.trim();
+    if (!justificacionValida(motivoLimpio)) {
+      toast("Justificación insuficiente", { description: `Registrá qué se espera del cliente. ${descripcionJustificacion(motivoLimpio)}` });
+      return;
+    }
+    const proyectoPendiente = registrarCambioEstado(movimiento.proyecto, "pendiente", usuarioId, motivoLimpio);
+    alGuardar({
+      ...proyectoPendiente,
+      pendientes: [...(movimiento.proyecto.pendientes ?? []), { fecha: hoy, usuarioId, motivo: motivoLimpio }]
+    });
+    toast("Proyecto en pendiente", { description: `${movimiento.proyecto.nombre} · ${motivoLimpio}` });
+    cerrarDialogo();
+  };
+
   const confirmarReanudacion = () => {
     if (movimiento?.tipo !== "reanudacion") return;
     const motivoLimpio = motivo.trim();
@@ -349,20 +415,35 @@ export function TableroProyectos({
       toast("Justificación insuficiente", { description: `Registrá por qué se reanuda el proyecto. ${descripcionJustificacion(motivoLimpio)}` });
       return;
     }
+    const proyecto = movimiento.proyecto;
     const ahora = new Date().toISOString();
-    const pausas = [...(movimiento.proyecto.pausas ?? [])];
-    const indiceAbierto = pausas.findLastIndex((pausa) => !pausa.reanudadaEn);
-    if (indiceAbierto >= 0) {
-      pausas[indiceAbierto] = {
-        ...pausas[indiceAbierto],
-        reanudadaEn: ahora,
-        reanudadaPorId: usuarioId,
-        motivoReanudacion: motivoLimpio
-      };
+    const reanudado = registrarCambioEstado(proyecto, "en_progreso", usuarioId, motivoLimpio);
+    if (proyecto.estado === "pendiente") {
+      const pendientes = [...(proyecto.pendientes ?? [])];
+      const indiceAbierto = pendientes.findLastIndex((registro) => !registro.resueltaEn);
+      if (indiceAbierto >= 0) {
+        pendientes[indiceAbierto] = {
+          ...pendientes[indiceAbierto],
+          resueltaEn: ahora,
+          resueltaPorId: usuarioId,
+          motivoResolucion: motivoLimpio
+        };
+      }
+      alGuardar({ ...reanudado, pendientes });
+    } else {
+      const pausas = [...(proyecto.pausas ?? [])];
+      const indiceAbierto = pausas.findLastIndex((pausa) => !pausa.reanudadaEn);
+      if (indiceAbierto >= 0) {
+        pausas[indiceAbierto] = {
+          ...pausas[indiceAbierto],
+          reanudadaEn: ahora,
+          reanudadaPorId: usuarioId,
+          motivoReanudacion: motivoLimpio
+        };
+      }
+      alGuardar({ ...reanudado, pausas });
     }
-    const reanudado = registrarCambioEstado(movimiento.proyecto, "en_progreso", usuarioId, motivoLimpio);
-    alGuardar({ ...reanudado, pausas });
-    toast("Proyecto reanudado", { description: movimiento.proyecto.nombre });
+    toast("Proyecto reanudado", { description: proyecto.nombre });
     cerrarDialogo();
   };
 
@@ -465,7 +546,7 @@ export function TableroProyectos({
   const cancelados = proyectos.filter((proyecto) => proyecto.estado === "cancelada");
 
   return (
-    <>
+    <TooltipProvider delayDuration={1000}>
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         <GripVertical className="size-4" />
         Arrastrá una tarjeta por su asa. El cambio se aplica solamente después de confirmar o cumplir su condición.
@@ -616,14 +697,42 @@ export function TableroProyectos({
         </DialogContent>
       </Dialog>
 
+      <Dialog open={movimiento?.tipo === "pendiente"} onOpenChange={(abierto) => !abierto && cerrarDialogo()}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="mb-1 grid size-10 place-items-center rounded-xl bg-estado-pendiente/15 text-estado-pendiente"><Hourglass className="size-5" /></div>
+            <DialogTitle>Marcar como pendiente del cliente</DialogTitle>
+            <DialogDescription>«{proyectoEnMovimiento?.nombre}» pasa a <strong>Pendiente</strong>: queda detenido a la espera de una acción del cliente. A diferencia de Pausada (causa interna), acá la traba depende del cliente.</DialogDescription>
+          </DialogHeader>
+          <CampoMotivo id="motivo-pendiente" etiqueta="¿Qué se espera del cliente? *" valor={motivo} alCambiar={setMotivo} placeholder="Ej. A la espera de que el cliente apruebe la adenda de vidrios y confirme el pago del anticipo." />
+          <DialogFooter>
+            <Button variant="outline" onClick={cerrarDialogo}>Cancelar</Button>
+            <Button onClick={confirmarPendiente}>Marcar pendiente</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={movimiento?.tipo === "reanudacion"} onOpenChange={(abierto) => !abierto && cerrarDialogo()}>
         <DialogContent>
           <DialogHeader>
             <div className="mb-1 grid size-10 place-items-center rounded-xl bg-primary/10 text-primary"><PlayCircle className="size-5" /></div>
             <DialogTitle>Reanudar proyecto</DialogTitle>
-            <DialogDescription>«{proyectoEnMovimiento?.nombre}» vuelve a <strong>En progreso</strong>. Registrá la razón de la reanudación.</DialogDescription>
+            <DialogDescription>
+              «{proyectoEnMovimiento?.nombre}» vuelve a <strong>En progreso</strong>.{" "}
+              {proyectoEnMovimiento?.estado === "pendiente"
+                ? "Registrá cómo se resolvió la dependencia del cliente."
+                : "Registrá la razón de la reanudación."}
+            </DialogDescription>
           </DialogHeader>
-          <CampoMotivo id="motivo-reanudacion" etiqueta="Observación de reanudación *" valor={motivo} alCambiar={setMotivo} placeholder="Ej. El cliente aprobó la adenda y se retoman los trabajos." />
+          <CampoMotivo
+            id="motivo-reanudacion"
+            etiqueta="Observación de reanudación *"
+            valor={motivo}
+            alCambiar={setMotivo}
+            placeholder={proyectoEnMovimiento?.estado === "pendiente"
+              ? "Ej. El cliente aprobó la adenda y confirmó el pago, se retoman los trabajos."
+              : "Ej. Llegó el material pendiente y se retoma la producción."}
+          />
           <DialogFooter>
             <Button variant="outline" onClick={cerrarDialogo}>Cancelar</Button>
             <Button onClick={confirmarReanudacion}>Reanudar proyecto</Button>
@@ -694,7 +803,7 @@ export function TableroProyectos({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </TooltipProvider>
   );
 }
 

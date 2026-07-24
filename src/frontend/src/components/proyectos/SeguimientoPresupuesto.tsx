@@ -7,7 +7,7 @@
 import { useMemo, useState } from "react";
 import { Check, Factory, HardHat, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { etiquetaBloque, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
+import { descripcionGrupo, etiquetaBloque, porcentajeTareas } from "@/lib/seguimiento-presupuesto";
 import { formatFechaCorta, formatFechaHora } from "@/lib/format";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DialogoCompletarTarea } from "@/components/proyectos/DialogoCompletarTarea";
 import { DialogoEditarTarea } from "@/components/proyectos/DialogoEditarTarea";
 import { DialogoConfirmarCambioTarea } from "@/components/proyectos/DialogoConfirmarCambioTarea";
@@ -383,6 +384,7 @@ export function SeguimientoPresupuesto({
     : "";
 
   return (
+    <TooltipProvider delayDuration={1000}>
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
         <div className="flex items-center gap-3">
@@ -422,7 +424,14 @@ export function SeguimientoPresupuesto({
                 <Card key={`${producto.tipo}-${grupo}`}>
                   <CardHeader className="gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <CardTitle className="font-heading text-base">{etiquetaBloque(grupo, producto.tipo)}</CardTitle>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="w-fit cursor-help">
+                            <CardTitle className="font-heading text-base">{etiquetaBloque(grupo, producto.tipo)}</CardTitle>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">{descripcionGrupo(grupo)}</TooltipContent>
+                      </Tooltip>
                       <div className="flex items-center gap-3">
                         <span className="cifra text-sm font-semibold">{porcentajeTareas(tareasGrupo)}%</span>
                         {puedeEditar && (
@@ -602,5 +611,6 @@ export function SeguimientoPresupuesto({
         alConfirmar={confirmarEliminar}
       />
     </div>
+    </TooltipProvider>
   );
 }

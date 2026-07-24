@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-project-context
 context_type: current_project_state
-last_updated: 2026-07-22
+last_updated: 2026-07-23
 branch: feature/frontend-react-migration
 tags:
   - italplast
@@ -125,7 +125,7 @@ Cada subetapa puede seleccionarse, renombrarse, eliminarse o agregarse antes de 
 
 Servicios no genera etapas de premarcos, fábrica o instalación, pero puede coexistir con otros productos que sí las tengan.
 
-El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de premarcos y del producto; **Instalación** reúne instalación de premarcos y del producto. Dentro de cada pestaña, las tareas se muestran como lista con fechas de inicio/entrega, separadas por producto y bloque; el supervisor puede agregar, renombrar, refechar o eliminar tareas.
+El detalle usa dos pestañas operativas. **Fábrica** reúne fabricación de premarcos y del producto; **Instalación** reúne instalación de premarcos y del producto. Dentro de cada pestaña, las tareas se muestran como lista con fechas de inicio/entrega, separadas por producto y bloque; el supervisor puede agregar, renombrar, refechar o eliminar tareas. Al pasar el cursor 1 segundo sobre el título de un bloque (ej. "PVC · Fabricación"), un tooltip explica qué significa esa etapa (D-032; `descripcionGrupo` en `src/frontend/src/lib/seguimiento-presupuesto.ts`).
 
 ## Tareas, evidencia y avance automático
 
@@ -155,7 +155,7 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 
 ## Estimación backward de fechas (cronograma de fábrica)
 
-- Cada producto operativo del alta puede cargar una **planificación opcional**: fecha comprometida de inicio de instalación, días de instalación, días de fábrica, días de fabricación de premarcos y días de instalación de premarcos (visible con ese grupo activo; si se carga, reemplaza a la brecha global entrega→ábaco).
+- Cada producto operativo del alta exige una **planificación obligatoria (D-033)**: fecha comprometida de inicio de instalación, días de instalación y días de fábrica (más días de fabricación de premarcos si ese grupo está activo; los días de instalación de premarcos siguen siendo opcionales). Sin estos datos el alta se bloquea, para que todo proyecto nuevo cargue en el cronograma general. Servicios queda exento. Al crear el proyecto se autogenera la tarea genérica **"Firma de Presupuesto Ejecutivo"** (grupo `generales`) con la fecha de firma más temprana entre sus productos.
 - Con esa ancla se calculan hacia atrás (backward) los hitos: fin de producción, inicio de fábrica, firma de ábaco, entrega de premarcos e inicio de fabricación de premarcos, usando tres **brechas configurables** (predeterminadas 3/1/3 días).
 - Las tareas generadas desde el presupuesto nacen con `fechaInicio`/`fechaFin` según el bloque; siguen siendo editables tarea por tarea. Sin planificación cargada, nacen sin fechas como antes.
 - Las brechas se editan solo por administradores en **Reglas y catálogo** (`/reglas`; `/settings/planning` redirige ahí) y persisten en `localStorage` (`control-obras-planificacion`). Cambiarlas no recalcula tareas existentes.
@@ -164,7 +164,8 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 ## Reglas y catálogo (sección admin)
 
 - Nueva entrada del menú principal debajo de Usuarios, visible solo para administradores (permiso `gestionarReglasNegocio`).
-- Reúne las **brechas de planificación backward** y el **catálogo de productos**: los seis tipos estándar más los personalizados que agregue administración.
+- Reúne las **brechas de planificación backward**, la **capacidad de producción** y el **catálogo de productos**: los seis tipos estándar más los personalizados que agregue administración.
+- **Capacidad de producción (D-033):** topes diarios de aberturas para el cronograma general — uno **por línea de producto** para fábrica y un **tope único** para instalación (predeterminados 6 y 10 ab./día). Persisten en `localStorage` (`control-obras-capacidad`); PostgreSQL los espeja en `capacidad_fabrica` y `capacidad_instalacion` (migración 020). Fuente: `src/frontend/src/lib/capacidad.ts`.
 - **Todos los productos —estándar incluidos— pueden editarse y retirarse** (D-029). Editar permite cambiar el nombre y configurar por separado si el producto ofrece **fabricación de premarcos** e **instalación de premarcos** (Servicios no muestra estos switches). Retirar es baja lógica: la fila queda "Retirado" con botón de restaurar y los proyectos existentes conservan la referencia.
 - Los cambios sobre estándar persisten como overrides (`control-obras-catalogo-overrides`); los personalizados en `control-obras-catalogo-productos`. Cada alta/edición/baja/reactivación sella auditoría (fecha, usuario, acción, detalle) en `control-obras-catalogo-auditoria` — solo datos, sin interfaz; PostgreSQL la persiste en `catalogo_auditoria` (migración 017).
 - El alta de proyectos ofrece solo productos activos (`obtenerCatalogoActivo`) y muestra cada editor de premarcos según el flag de su grupo.
@@ -184,14 +185,25 @@ Las fuentes principales son `src/frontend/src/lib/seguimiento-presupuesto.ts`, `
 - El selector de vista de Proyectos (Tarjetas/Tablero) quedó solo con íconos, con tooltip y texto accesible.
 - Fuentes: hook `src/frontend/src/lib/tabla-filtros.ts` (`useTablaFiltrable`, con tipos de columna) y `src/frontend/src/components/app/EncabezadoFiltrable.tsx` (`EncabezadoFiltrable`, `AvisoFiltros`). El estado de orden/filtro no se persiste entre sesiones.
 
+## Cronograma general (Gantt de capacidad)
+
+- Tercera vista de Proyectos (junto a Tarjetas y Tablero): **Cronograma**, un Gantt de toda la empresa con **una fila por proyecto × producto operativo** (D-033). Servicios y las obras finalizadas/canceladas no cargan.
+- Cada fila dibuja las ventanas de **fabricación de premarcos**, **fábrica** e **instalación** como barras, más los hitos **Firma de Presupuesto Ejecutivo** (diamante rojo) y **confirmación del cliente** (diamante gris), todo derivado del cálculo backward (D-023).
+- **Eje temporal con zoom Día / Semana / Mes** (semana por defecto, persistido en `localStorage`), filtros por producto/líder/cliente y sección **"Sin compromiso"** para productos operativos sin planificación. Es **solo lectura** (las fechas se editan en el detalle) y visible para **todos los roles**.
+- **Carril de capacidad** arriba: por cada línea de producto en fábrica y para la instalación, suma la demanda diaria de aberturas (`aberturas/día = total ÷ días de la etapa`) y toma el **pico por bucket**, resaltándolo en **rojo cuando supera el tope**.
+- **Topes de capacidad** editables en Reglas y catálogo: **por línea de producto** para fábrica y un **tope único** para instalación (predeterminados 6 y 10 ab./día).
+- Fuentes: `src/frontend/src/components/proyectos/GanttProyectos.tsx`, `src/frontend/src/lib/cronograma.ts` y `src/frontend/src/lib/capacidad.ts`.
+
 ## Tablero de proyectos y cambios de estado
 
 - Proyectos permite alternar entre Tarjetas y Tablero.
-- El tablero presenta Planificadas, En progreso, Pausadas y Finalizadas como columnas horizontales contiguas, con desplazamiento lateral en pantallas angostas.
+- El tablero presenta Planificadas, Pendientes, En progreso, Pausadas y Finalizadas como columnas horizontales contiguas, con desplazamiento lateral en pantallas angostas.
+- **Estados del tablero (D-032):** al pasar el cursor 1 segundo sobre el encabezado de cada columna, un tooltip explica qué significa ese estado (`TooltipProvider delayDuration={1000}`).
 - Administradores y supervisores pueden arrastrar una tarjeta por su asa o usar su menú accesible. Ningún cambio manual se aplica sin confirmación, validación o dato obligatorio.
 - Pasar a En progreso se bloquea si no existe avance; el primer cierre de tarea realiza esa transición automáticamente.
 - Un proyecto con avance no puede volver a Planificada.
-- Pasar a Pausada exige motivo y agrega un registro a `pausas`; reanudar exige una observación y cierra el registro de pausa abierto.
+- Pasar a Pausada exige motivo y agrega un registro a `pausas`; reanudar exige una observación y cierra el registro de pausa abierto. **Pausada es la detención por una cuestión interna** de Italplast (falta de material, reprogramación de cuadrilla).
+- **Pendiente (D-032):** columna propia entre Planificadas y En progreso para proyectos detenidos a la espera de una **acción del cliente** (aprobación, pago, definición). Pasar a Pendiente exige un motivo (qué se espera del cliente, mínimo 50 caracteres) y agrega un registro a `pendientes` (`RegistroPendiente`, análogo a `pausas`); reanudar vuelve a En progreso con observación obligatoria y cierra el registro abierto. Tiene token de color propio (`--estado-pendiente`, violeta).
 - Pasar a Finalizada advierte que las tareas pendientes quedarán completas, exige al menos una evidencia y registra `cierre`.
 - Finalizada no es un origen de arrastre. Solo un administrador puede reabrirla mediante una acción especial con motivo; vuelve a En progreso y conserva los cierres de tareas existentes.
 - Cancelar es una acción administrativa separada del flujo de columnas, exige motivo y mueve el proyecto al bloque de cancelados. Reactivar también exige motivo y devuelve a Planificada o En progreso según conserve avance.
@@ -204,7 +216,7 @@ La fuente principal es `src/frontend/src/components/proyectos/TableroProyectos.t
 - Los proyectos mock se guardan bajo la clave `control-obras-proyectos` en `localStorage`.
 - El modelo nuevo usa `productos`, con una configuración de etapas por tipo.
 - `tipoProducto` se conserva temporalmente para migrar proyectos creados con el modelo anterior.
-- `presupuestoEjecutivo` conserva metadata e ítems revisados; `tareasPresupuesto` conserva las tareas (con fechas, prioridad, auditoría y manuales) y sus cierres; `tareasEliminadas` guarda el borrado lógico; `pausas`, `cierre`, `cancelacion` e `historialEstados` registran las transiciones de estado.
+- `presupuestoEjecutivo` conserva metadata e ítems revisados; `tareasPresupuesto` conserva las tareas (con fechas, prioridad, auditoría y manuales) y sus cierres; `tareasEliminadas` guarda el borrado lógico; `pausas`, `pendientes`, `cierre`, `cancelacion` e `historialEstados` registran las transiciones de estado.
 - Las etapas agregadas al proyecto también se consolidan en las listas superiores de fábrica e instalación para mantener compatibles las tarjetas y métricas existentes.
 
 La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
@@ -216,6 +228,7 @@ La fuente principal del modelo mock es `src/frontend/src/mocks/data.ts`.
 - `src/frontend/src/components/proyectos/PresupuestoUploader.tsx`: carga y revisión del PDF.
 - `src/frontend/src/components/proyectos/SeguimientoPresupuesto.tsx`: lista de tareas y cierre con evidencia.
 - `src/frontend/src/components/proyectos/TableroProyectos.tsx`: tablero horizontal arrastrable y transiciones condicionadas.
+- `src/frontend/src/components/proyectos/GanttProyectos.tsx`: cronograma general con carril de capacidad; `src/frontend/src/lib/cronograma.ts` deriva filas, hitos y demanda; `src/frontend/src/lib/capacidad.ts` guarda los topes.
 - `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx`: alta de tareas en cascada (cliente→proyecto→producto→etapa).
 - `src/frontend/src/lib/tabla-filtros.ts` y `src/frontend/src/components/app/EncabezadoFiltrable.tsx`: filtro y orden por columna reutilizables.
 - `src/frontend/src/lib/presupuesto-parser.ts`: detección y parsing de los tres formatos.

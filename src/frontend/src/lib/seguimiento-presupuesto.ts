@@ -70,3 +70,21 @@ export function etiquetaBloque(grupo: GrupoTareaPresupuesto, tipoProducto: TipoP
   return `${nombreCortoTipoProducto(tipoProducto)} · ${SUFIJOS_BLOQUE[grupo]}`;
 }
 
+/** Explicación breve de cada etapa, para el tooltip de ayuda del detalle de proyecto. */
+const DESCRIPCIONES_GRUPO: Record<GrupoTareaPresupuesto, string> = {
+  fabricacion_premarcos:
+    "Construcción en planta de los premarcos: los marcos que se colocan primero en el vano para dejarlo a nivel y escuadra antes de instalar la abertura.",
+  instalacion_premarcos:
+    "Colocación de los premarcos en obra, fijándolos a plomo y escuadra en cada vano para recibir después la abertura.",
+  fabrica:
+    "Producción de la abertura en planta: corte de perfiles, armado, colocación de vidrios y control de calidad antes de despachar a obra.",
+  instalacion:
+    "Montaje final de la abertura en obra sobre el premarco, con ajustes, sellado y terminación.",
+  generales:
+    "Gestiones del proyecto que no dependen de fábrica ni instalación: trámites, permisos, coordinaciones y otras tareas administrativas."
+};
+
+export function descripcionGrupo(grupo: GrupoTareaPresupuesto) {
+  return DESCRIPCIONES_GRUPO[grupo];
+}
+

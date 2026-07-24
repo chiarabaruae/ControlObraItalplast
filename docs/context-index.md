@@ -1,7 +1,7 @@
 ---
 context_id: controlobra-context-index
 context_type: retrieval_index
-last_updated: 2026-07-22
+last_updated: 2026-07-23
 tags:
   - agents
   - context
@@ -35,6 +35,7 @@ Este archivo es el punto de entrada para recuperar contexto sin revisar todo el 
 | Crear o modificar proyectos y etapas | `docs/project-context.md` + `docs/flujo-roles.md` |
 | Entender presupuestos PDF, tareas y evidencia | `docs/project-context.md` + decisiones D-009 a D-014, D-018 |
 | Revisar tablero y cambios de estado | `docs/project-context.md` + decisiones D-015, D-017 + `docs/flujo-roles.md` |
+| Ver el cronograma general y la carga de capacidad | `docs/project-context.md` + decisión D-033 + `src/frontend/src/components/proyectos/GanttProyectos.tsx` + `src/frontend/src/lib/cronograma.ts` |
 | Crear tareas nuevas (cascada cliente→proyecto→producto→etapa) | `docs/project-context.md` + decisión D-020 + `src/frontend/src/components/proyectos/DialogoNuevaTarea.tsx` |
 | Filtrar y ordenar tablas de gestión | `docs/project-context.md` + decisión D-019 + `src/frontend/src/lib/tabla-filtros.ts` |
 | Revisar permisos por rol | `docs/flujo-roles.md` + `src/frontend/src/lib/roles.ts` |

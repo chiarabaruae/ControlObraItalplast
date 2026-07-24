@@ -27,7 +27,7 @@ export interface Cliente {
   proyectos: number;
 }
 
-export type EstadoObra = "planificada" | "en_progreso" | "pausada" | "finalizada" | "cancelada";
+export type EstadoObra = "planificada" | "en_progreso" | "pausada" | "pendiente" | "finalizada" | "cancelada";
 
 export type TipoProductoBase =
   | "aberturas_aluminio"
@@ -314,6 +314,15 @@ export interface RegistroPausa {
   motivoReanudacion?: string;
 }
 
+export interface RegistroPendiente {
+  fecha: string;
+  usuarioId: string;
+  motivo: string;
+  resueltaEn?: string;
+  resueltaPorId?: string;
+  motivoResolucion?: string;
+}
+
 export interface RegistroCierre {
   fecha: string;
   usuarioId: string;
@@ -385,8 +394,10 @@ export interface Proyecto {
   tareasPresupuesto?: TareaPresupuesto[];
   /** Borrado lógico: las tareas eliminadas se conservan acá, sin UI que las muestre. */
   tareasEliminadas?: TareaPresupuesto[];
-  /** Historial de pausas: cada cambio a "pausada" exige un motivo. */
+  /** Historial de pausas: detención por una cuestión interna, siempre con motivo. */
   pausas?: RegistroPausa[];
+  /** Historial de "pendiente": detención a la espera de una acción del cliente, con motivo. */
+  pendientes?: RegistroPendiente[];
   /** Registro del cierre manual desde el tablero (avances al 100%). */
   cierre?: RegistroCierre;
   /** Cancelación vigente o histórica, siempre con motivo. */
@@ -611,18 +622,42 @@ function fechaInterpolada(inicio: string, fin: string, indice: number, total: nu
   return new Date(inicioMs + (finMs - inicioMs) * proporcion).toISOString().slice(0, 10);
 }
 
+// Ancla de instalación por proyecto para la planificación backward demostrativa
+// (D-033): permite que los proyectos demo carguen en el cronograma general.
+const ANCLA_INSTALACION_DEMO: Record<string, string> = {
+  "p-aviadores": "2026-07-13",
+  "p-ykua": "2026-08-03",
+  "p-nasaindy": "2026-07-20"
+};
+
 function crearSeguimientoDemostrativo(proyecto: Proyecto): Proyecto {
   const tipos = [...new Set(proyecto.aberturas.map((abertura) =>
     abertura.material === "PVC" ? "aberturas_pvc" as const : "aberturas_aluminio" as const
   ))];
+  const ancla = ANCLA_INSTALACION_DEMO[proyecto.id];
   const productos: ConfiguracionProductoProyecto[] = tipos.map((tipo) => {
     const llevaPremarcos = proyecto.id === "p-aviadores" && tipo === "aberturas_aluminio";
+    const totalTipo = proyecto.aberturas
+      .filter((abertura) => (abertura.material === "PVC" ? "aberturas_pvc" : "aberturas_aluminio") === tipo)
+      .reduce((suma, abertura) => suma + abertura.cantidad, 0);
+    const esPvc = tipo === "aberturas_pvc";
+    const diasFabrica = Math.min(Math.max(Math.ceil(totalTipo / (esPvc ? 6 : 4)), 4), 20);
+    const diasInstalacion = Math.min(Math.max(Math.ceil(totalTipo / (esPvc ? 7 : 5)), 3), 15);
     return {
       tipo,
       etapasFabricacionPremarcos: llevaPremarcos ? ETAPAS_DEMO_PREMARCO_FABRICA : [],
       etapasInstalacionPremarcos: llevaPremarcos ? ETAPAS_DEMO_PREMARCO_INSTALACION : [],
       etapasFabrica: proyecto.etapasFabrica,
-      etapasObra: proyecto.etapasObra
+      etapasObra: proyecto.etapasObra,
+      planificacion: ancla
+        ? {
+            fechaInicioInstalacion: ancla,
+            diasInstalacion,
+            diasFabrica,
+            diasFabricacionPremarcos: llevaPremarcos ? 4 : undefined,
+            diasInstalacionPremarcos: llevaPremarcos ? 3 : undefined
+          }
+        : undefined
     };
   });
   const items: ItemPresupuesto[] = proyecto.aberturas.map((abertura, indice) => ({
