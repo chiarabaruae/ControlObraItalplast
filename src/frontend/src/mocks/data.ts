@@ -428,15 +428,43 @@ export const usuarios: Usuario[] = [
   { id: "u-walter", username: "6500067", displayName: "Walter Alonso", role: "viewer", department: "Fábrica", positionTitle: "Operario Producción PVC", isActive: true },
   { id: "u-oscar", username: "5017916", displayName: "Oscar Casco", role: "viewer", department: "Obra", positionTitle: "Auxiliar de Obra", isActive: true },
   { id: "u-veronica", username: "5960688", displayName: "Verónica Gaona", role: "viewer", department: "Administración", positionTitle: "Asistente Administrativo", isActive: true },
-  { id: "u-natanahel", username: "4045897", displayName: "Natanahel Falcón", role: "viewer", department: "Comercial", positionTitle: "Jefe Comercial", isActive: false }
+  { id: "u-natanahel", username: "4045897", displayName: "Natanahel Falcón", role: "viewer", department: "Comercial", positionTitle: "Jefe Comercial", isActive: false },
+  { id: "u-soporte", username: "0000001", displayName: "Soporte TI", role: "ti", department: "TI", positionTitle: "Soporte / Desarrollo", isActive: true }
 ];
 
 // Usuarios de acceso rápido en el login mock
 export const usuariosDemo: Record<Role, Usuario> = {
+  ti: usuarios.find((u) => u.role === "ti") ?? usuarios[0],
   administrator: usuarios[0],
   supervisor: usuarios[2],
   viewer: usuarios[7]
 };
+
+// ── Catálogo de cargos (lista gestionada) ───────────────────────
+// El "Cargo" (positionTitle) es descriptivo: se usa para gobernanza y auditoría,
+// no otorga permisos por sí solo. La lista arranca de los cargos ya cargados.
+const CARGOS_STORAGE_KEY = "control-obras-cargos";
+
+export function cargosPredeterminados(): string[] {
+  return [...new Set(usuarios.map((u) => u.positionTitle).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
+export function obtenerCargos(): string[] {
+  if (typeof window === "undefined") return cargosPredeterminados();
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(CARGOS_STORAGE_KEY) ?? "null");
+    if (Array.isArray(parsed) && parsed.every((valor) => typeof valor === "string") && parsed.length) {
+      return parsed as string[];
+    }
+  } catch {
+    // cae a la semilla
+  }
+  return cargosPredeterminados();
+}
+
+export function guardarCargos(cargos: string[]) {
+  window.localStorage.setItem(CARGOS_STORAGE_KEY, JSON.stringify(cargos));
+}
 
 // ── Clientes ────────────────────────────────────────────────────
 export const clientes: Cliente[] = [

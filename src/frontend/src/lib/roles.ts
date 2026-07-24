@@ -1,15 +1,18 @@
 // Matriz de permisos por rol — fuente: docs/flujo-roles.md (Fase 1)
 // Los botones que un rol no puede usar NO se muestran (no se deshabilitan).
 
-export type Role = "administrator" | "supervisor" | "viewer";
+export type Role = "ti" | "administrator" | "supervisor" | "viewer";
 
 export const ROLE_LABELS: Record<Role, string> = {
+  ti: "TI · Soporte",
   administrator: "Administrador",
   supervisor: "Supervisor",
   viewer: "Usuario"
 };
 
-export const permisos = {
+// Chequeos base por rol. El rol TI (soporte y desarrollo) tiene acceso total:
+// el proxy de más abajo hace que cualquier permiso devuelva true cuando el rol es "ti".
+const reglasPermisos = {
   // Navegación
   verClientes: (r: Role) => r === "administrator" || r === "supervisor",
   verUsuarios: (r: Role) => r === "administrator",
@@ -59,3 +62,16 @@ export const permisos = {
   configurarPlanificacion: (r: Role) => r === "administrator",
   gestionarReglasNegocio: (r: Role) => r === "administrator"
 };
+
+type ReglasPermisos = typeof reglasPermisos;
+
+// El rol TI es omnipotente: cualquier permiso devuelve true si el primer
+// argumento (el rol) es "ti", sin tener que repetirlo en cada regla.
+export const permisos: ReglasPermisos = new Proxy(reglasPermisos, {
+  get(target, prop) {
+    const fn = Reflect.get(target, prop);
+    if (typeof fn !== "function") return fn;
+    return (...args: unknown[]) =>
+      args[0] === "ti" ? true : (fn as (...a: unknown[]) => boolean)(...args);
+  }
+}) as ReglasPermisos;

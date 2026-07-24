@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { Plus, Pencil, KeyRound, Archive, ArchiveRestore } from "lucide-react";
+import { Plus, Pencil, KeyRound, Archive, ArchiveRestore, Tags, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
-import { usuarios as usuariosMock, type Usuario } from "@/mocks/data";
+import { usuarios as usuariosMock, obtenerCargos, guardarCargos, type Usuario } from "@/mocks/data";
 import { AvisoFiltros, EncabezadoFiltrable } from "@/components/app/EncabezadoFiltrable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +21,7 @@ function iniciales(nombre: string) {
 
 interface FormularioUsuario {
   nombre: string;
+  cargo: string;
   area: string;
   rol: Role;
   correo: string;
@@ -29,6 +30,7 @@ interface FormularioUsuario {
 
 const FORMULARIO_VACIO: FormularioUsuario = {
   nombre: "",
+  cargo: "",
   area: "",
   rol: "viewer",
   correo: "",
@@ -42,8 +44,12 @@ export default function Usuarios() {
   const [usuarioEnEdicion, setUsuarioEnEdicion] = useState<Usuario | null>(null);
   const [formulario, setFormulario] = useState<FormularioUsuario>(FORMULARIO_VACIO);
   const [errorFormulario, setErrorFormulario] = useState("");
+  const [cargos, setCargos] = useState<string[]>(() => obtenerCargos());
+  const [gestorCargosAbierto, setGestorCargosAbierto] = useState(false);
+  const [nuevoCargo, setNuevoCargo] = useState("");
   const tabla = useTablaFiltrable(lista, {
     usuario: (u) => u.displayName,
+    cargo: (u) => u.positionTitle,
     area: (u) => u.department,
     rol: (u) => ROLE_LABELS[u.role]
   });
@@ -62,6 +68,7 @@ export default function Usuarios() {
     setUsuarioEnEdicion(usuario);
     setFormulario({
       nombre: usuario.displayName,
+      cargo: usuario.positionTitle ?? "",
       area: usuario.department,
       rol: usuario.role,
       correo: usuario.email ?? "",
@@ -84,13 +91,15 @@ export default function Usuarios() {
 
     const nombre = formulario.nombre.trim();
     const area = formulario.area.trim();
-    if (!nombre || !area) {
-      setErrorFormulario("Completá el nombre y el área para guardar el usuario.");
+    const cargo = formulario.cargo.trim();
+    if (!nombre || !area || !cargo) {
+      setErrorFormulario("Completá el nombre, el cargo y el área para guardar el usuario.");
       return;
     }
 
     const datosActualizados = {
       displayName: nombre,
+      positionTitle: cargo,
       department: area,
       role: formulario.rol,
       email: formulario.correo.trim() || undefined,
@@ -109,7 +118,6 @@ export default function Usuarios() {
         {
           id: `u-${identificador}`,
           username: `pendiente-${identificador}`,
-          positionTitle: area,
           isActive: true,
           ...datosActualizados
         }
@@ -131,6 +139,34 @@ export default function Usuarios() {
     });
   };
 
+  const agregarCargo = () => {
+    const limpio = nuevoCargo.trim();
+    if (!limpio) return;
+    if (cargos.some((c) => c.toLocaleLowerCase() === limpio.toLocaleLowerCase())) {
+      toast("Cargo duplicado", { description: `"${limpio}" ya existe en la lista.` });
+      return;
+    }
+    const actualizados = [...cargos, limpio].sort((a, b) => a.localeCompare(b));
+    setCargos(actualizados);
+    guardarCargos(actualizados);
+    setNuevoCargo("");
+  };
+
+  const quitarCargo = (cargo: string) => {
+    if (lista.some((u) => u.positionTitle === cargo)) {
+      toast("Cargo en uso", { description: `"${cargo}" está asignado a alguien. Cambiá ese usuario antes de quitarlo.` });
+      return;
+    }
+    const actualizados = cargos.filter((c) => c !== cargo);
+    setCargos(actualizados);
+    guardarCargos(actualizados);
+  };
+
+  // Garantiza que el cargo actual del formulario siempre sea seleccionable.
+  const opcionesCargo = formulario.cargo && !cargos.includes(formulario.cargo)
+    ? [formulario.cargo, ...cargos]
+    : cargos;
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -142,9 +178,14 @@ export default function Usuarios() {
             <span className="cifra">{lista.length}</span> · el rol define qué ve y qué puede hacer cada persona.
           </p>
         </div>
-        <Button className="gap-2" onClick={abrirNuevoUsuario}>
-          <Plus className="size-4" /> Nuevo usuario
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => { setNuevoCargo(""); setGestorCargosAbierto(true); }}>
+            <Tags className="size-4" /> Gestionar cargos
+          </Button>
+          <Button className="gap-2" onClick={abrirNuevoUsuario}>
+            <Plus className="size-4" /> Nuevo usuario
+          </Button>
+        </div>
       </header>
 
       <Card>
@@ -154,6 +195,7 @@ export default function Usuarios() {
             <TableHeader>
               <TableRow>
                 <EncabezadoFiltrable columna="usuario" control={tabla}>Usuario</EncabezadoFiltrable>
+                <EncabezadoFiltrable columna="cargo" control={tabla}>Cargo</EncabezadoFiltrable>
                 <EncabezadoFiltrable columna="area" control={tabla}>Área</EncabezadoFiltrable>
                 <EncabezadoFiltrable columna="rol" control={tabla}>Rol</EncabezadoFiltrable>
                 <TableHead className="w-36 text-center">Acciones</TableHead>
@@ -179,6 +221,7 @@ export default function Usuarios() {
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{u.positionTitle}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{u.department}</TableCell>
                   <TableCell className="text-sm">{ROLE_LABELS[u.role]}</TableCell>
                   <TableCell>
@@ -237,6 +280,26 @@ export default function Usuarios() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="usuario-cargo">Cargo <span className="text-destructive">*</span></Label>
+                <Select
+                  value={formulario.cargo}
+                  onValueChange={(cargo) => {
+                    setFormulario((actual) => ({ ...actual, cargo }));
+                    setErrorFormulario("");
+                  }}
+                >
+                  <SelectTrigger id="usuario-cargo" className="w-full" aria-label="Cargo del usuario">
+                    <SelectValue placeholder="Seleccionar cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcionesCargo.map((cargo) => (
+                      <SelectItem key={cargo} value={cargo}>{cargo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="usuario-area">Área <span className="text-destructive">*</span></Label>
                 <Input
                   id="usuario-area"
@@ -257,9 +320,11 @@ export default function Usuarios() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(ROLE_LABELS) as Role[]).map((rol) => (
-                      <SelectItem key={rol} value={rol}>{ROLE_LABELS[rol]}</SelectItem>
-                    ))}
+                    {(Object.keys(ROLE_LABELS) as Role[])
+                      .filter((rol) => rol !== "ti" || user.role === "ti")
+                      .map((rol) => (
+                        <SelectItem key={rol} value={rol}>{ROLE_LABELS[rol]}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -296,6 +361,59 @@ export default function Usuarios() {
               <Button type="submit">{usuarioEnEdicion ? "Guardar cambios" : "Crear usuario"}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={gestorCargosAbierto} onOpenChange={setGestorCargosAbierto}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gestionar cargos</DialogTitle>
+            <DialogDescription>
+              Lista de cargos disponibles al crear o editar usuarios. Es descriptiva: no otorga permisos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                value={nuevoCargo}
+                onChange={(event) => setNuevoCargo(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    agregarCargo();
+                  }
+                }}
+                placeholder="Nuevo cargo"
+                aria-label="Nuevo cargo"
+              />
+              <Button type="button" className="shrink-0 gap-1.5" onClick={agregarCargo} disabled={!nuevoCargo.trim()}>
+                <Plus className="size-4" /> Agregar
+              </Button>
+            </div>
+            <ul className="divide-y rounded-xl border">
+              {opcionesCargo.map((cargo) => (
+                <li key={cargo} className="flex items-center gap-2 px-3 py-2">
+                  <span className="flex-1 text-sm">{cargo}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-muted-foreground hover:text-destructive"
+                    aria-label={`Quitar ${cargo}`}
+                    onClick={() => quitarCargo(cargo)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </li>
+              ))}
+              {opcionesCargo.length === 0 && (
+                <li className="px-3 py-6 text-center text-sm text-muted-foreground">No hay cargos. Agregá el primero.</li>
+              )}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGestorCargosAbierto(false)}>Cerrar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -12,6 +12,7 @@ export function RequireAuth() {
 export function RequireRole({ roles }: { roles: Role[] }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (!roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+  // El rol TI (soporte/desarrollo) accede a todas las rutas.
+  if (user.role !== "ti" && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }
