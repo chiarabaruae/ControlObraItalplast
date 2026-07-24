@@ -25,7 +25,9 @@ const reglasPermisos = {
   editarProyecto: (r: Role) => r === "administrator",
   eliminarProyecto: (r: Role) => r === "administrator",
   subirOferta: (r: Role) => r === "administrator",
-  gestionarPresupuesto: (r: Role) => r === "administrator" || r === "supervisor",
+  // Gestionar el presupuesto ejecutivo quedó como acción de Administrador; un
+  // supervisor puede recibirla puntualmente vía permisos por acción (excepción).
+  gestionarPresupuesto: (r: Role) => r === "administrator",
   generarSeguimiento: (r: Role) => r === "administrator" || r === "supervisor",
   editarAvance: (r: Role) => r === "administrator" || r === "supervisor",
   cambiarEstadoProyecto: (r: Role) => r === "administrator" || r === "supervisor",

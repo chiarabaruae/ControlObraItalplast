@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/app/UserAvatar";
+import { CampanaNotificaciones } from "@/components/app/CampanaNotificaciones";
 
 const NAV = [
   { to: "/dashboard", label: "Inicio", icon: LayoutGrid, visible: () => true },
@@ -247,7 +248,9 @@ export function AppShell() {
             <Menu className="size-5" />
           </Button>
           <div className="hidden lg:block" />
-          <DropdownMenu>
+          <div className="flex items-center gap-1">
+            <CampanaNotificaciones />
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 rounded-full py-1 pr-1 pl-3 transition-colors hover:bg-muted" aria-label="Menú de usuario">
                 <span className="hidden text-sm font-medium sm:block">{user.displayName}</span>
@@ -271,7 +274,8 @@ export function AppShell() {
                 <LogOut className="size-4" /> Cerrar sesión
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
+          </div>
         </header>
 
         <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
