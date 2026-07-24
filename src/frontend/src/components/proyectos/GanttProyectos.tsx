@@ -4,12 +4,14 @@
 // topes de capacidad configurados. Solo lectura; las fechas se editan en el
 // detalle del proyecto.
 import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 import {
   clientePorId,
   nombreCortoTipoProducto,
   nombreTipoProducto,
   usuarioPorId,
+  type EstadoObra,
   type Proyecto,
   type TipoProducto
 } from "@/mocks/data";
@@ -73,17 +75,39 @@ interface Bucket {
   instPeak: number;
 }
 
+// Paleta categórica (ColorHunt-inspired), pensada para que las 4 barras + 2 hitos
+// + sobrecapacidad sean claramente distinguibles entre sí.
+const PALETA = {
+  fabricacionPremarcos: "#E8963A", // naranja
+  instalacionPremarcos: "#8155BA", // violeta
+  fabricaAberturas: "#2F9E6B", // verde
+  instalacion: "#2D6CC0", // azul
+  confirmacionCliente: "#5B6B7C", // pizarra (hito)
+  firmaPresupuesto: "#E11D48", // rosa fuerte (hito)
+  sobrecapacidad: "#B91C1C" // rojo (alerta)
+} as const;
+
 const COLOR_SEG: Record<TipoSegmento, string> = {
-  fabricacion_premarcos: "bg-estado-pausada",
-  instalacion_premarcos: "bg-estado-pausada/70",
-  fabrica: "bg-estado-progreso",
-  instalacion: "bg-primary"
+  fabricacion_premarcos: "bg-[#E8963A]",
+  instalacion_premarcos: "bg-[#8155BA]",
+  fabrica: "bg-[#2F9E6B]",
+  instalacion: "bg-[#2D6CC0]"
 };
 const LABEL_SEG: Record<TipoSegmento, string> = {
   fabricacion_premarcos: "Fab. premarcos",
   instalacion_premarcos: "Inst. premarcos",
   fabrica: "Fábrica",
   instalacion: "Instalación"
+};
+
+// Punto de estado del proyecto: mínimo, con tooltip, para no recargar el cronograma.
+const ESTADO_DOT: Record<EstadoObra, { color: string; label: string }> = {
+  planificada: { color: "bg-muted-foreground/45", label: "Planificada" },
+  pendiente: { color: "bg-estado-pendiente", label: "Pendiente" },
+  en_progreso: { color: "bg-estado-progreso", label: "En progreso" },
+  pausada: { color: "bg-estado-pausada", label: "Pausada" },
+  finalizada: { color: "bg-primary", label: "Finalizada" },
+  cancelada: { color: "bg-estado-riesgo", label: "Cancelada" }
 };
 
 export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
@@ -93,6 +117,8 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
   const [fProducto, setFProducto] = useState<string>("todos");
   const [fLider, setFLider] = useState<string>("todos");
   const [fCliente, setFCliente] = useState<string>("todos");
+  // La capacidad arranca colapsada: lo principal es "Proyectos con compromiso".
+  const [capacidadAbierta, setCapacidadAbierta] = useState(false);
 
   const cambiarZoom = (z: Zoom) => {
     setZoom(z);
@@ -262,12 +288,13 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
 
       {/* Referencias */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
-        <Referencia clase="bg-estado-pausada" texto="Fabricación premarcos" />
-        <Referencia clase="bg-estado-progreso" texto="Fabricación aberturas" />
-        <Referencia clase="bg-primary" texto="Instalación" />
-        <ReferenciaHito clase="bg-muted-foreground" texto="Confirmación del cliente" />
-        <ReferenciaHito clase="bg-estado-riesgo" texto="Firma de Presupuesto Ejecutivo" />
-        <Referencia clase="bg-estado-riesgo" texto="Sobrecapacidad" />
+        <Referencia clase="bg-[#E8963A]" texto="Fabricación premarcos" />
+        <Referencia clase="bg-[#8155BA]" texto="Instalación de premarcos" />
+        <Referencia clase="bg-[#2F9E6B]" texto="Fabricación aberturas" />
+        <Referencia clase="bg-[#2D6CC0]" texto="Instalación" />
+        <ReferenciaHito clase="bg-[#5B6B7C]" texto="Confirmación del cliente" />
+        <ReferenciaHito clase="bg-[#E11D48]" texto="Firma de Presupuesto Ejecutivo" />
+        <Referencia clase="bg-[#B91C1C]" texto="Sobrecapacidad" />
       </div>
 
       {filas.length === 0 ? (
@@ -281,7 +308,7 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
               {/* Encabezado */}
               <div className="sticky top-0 z-20 flex h-[52px] border-b bg-muted/40">
                 <div
-                  className="sticky left-0 z-30 flex items-center border-r bg-muted/40 px-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"
+                  className="sticky left-0 z-30 flex items-center border-r bg-muted px-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)]"
                   style={{ width: HEADW, minWidth: HEADW }}
                 >
                   Proyecto / Producto
@@ -311,23 +338,29 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
                 </div>
               </div>
 
-              {/* Capacidad */}
-              <SectionLabel texto="Capacidad — demanda pico vs. tope" nota="aberturas/día" />
-              {lineasFabrica.map((tipo) => (
+              {/* Capacidad (colapsable; oculta por defecto para priorizar los proyectos) */}
+              <SectionLabel
+                texto="Capacidad — demanda pico vs. tope"
+                nota="aberturas/día"
+                colapsable
+                abierta={capacidadAbierta}
+                onToggle={() => setCapacidadAbierta((v) => !v)}
+              />
+              {capacidadAbierta && lineasFabrica.map((tipo) => (
                 <CapacidadRow
                   key={`fab-${tipo}`}
                   nombre={`Fábrica · ${nombreCortoTipoProducto(tipo as TipoProducto)}`}
-                  color="var(--color-estado-progreso)"
+                  color={PALETA.fabricaAberturas}
                   tope={topeFabrica(tipo as TipoProducto, topes)}
                   buckets={buckets}
                   valorDe={(b) => b.fabPeak[tipo] ?? 0}
                   totalPx={totalPx}
                 />
               ))}
-              {hayInstalacion && (
+              {capacidadAbierta && hayInstalacion && (
                 <CapacidadRow
                   nombre="Instalación (cuadrillas)"
-                  color="var(--color-primary)"
+                  color={PALETA.instalacion}
                   tope={topeInstalacion(topes)}
                   buckets={buckets}
                   valorDe={(b) => b.instPeak}
@@ -400,9 +433,14 @@ function FilaGantt({
   return (
     <div className="group flex h-11 border-t">
       <div
-        className="sticky left-0 z-10 flex items-center gap-2 border-r bg-card px-3 group-hover:bg-muted/40"
+        className="sticky left-0 z-10 flex items-center gap-2 border-r bg-card px-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] group-hover:bg-muted"
         style={{ width: HEADW, minWidth: HEADW }}
       >
+        <span
+          className={cn("mt-0.5 size-2.5 shrink-0 self-start rounded-full", ESTADO_DOT[fila.proyecto.estado].color)}
+          title={`Estado: ${ESTADO_DOT[fila.proyecto.estado].label}`}
+          aria-label={`Estado: ${ESTADO_DOT[fila.proyecto.estado].label}`}
+        />
         <div className="min-w-0 flex-1">
           <Link to={`/proyectos/${fila.proyecto.id}`} className="block truncate text-[12.5px] font-semibold hover:text-primary">
             {fila.proyecto.nombre}
@@ -442,7 +480,7 @@ function FilaGantt({
             key={i}
             className={cn(
               "absolute top-1/2 z-[2] size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-[1.5px] border-card",
-              h.tipo === "firma" ? "bg-estado-riesgo" : "bg-muted-foreground"
+              h.tipo === "firma" ? "bg-[#E11D48]" : "bg-[#5B6B7C]"
             )}
             style={{ left: xDe(h.fecha) + pxDia / 2 }}
             title={`${h.tipo === "firma" ? "Firma de Presupuesto Ejecutivo" : "Confirmación del cliente"}: ${formatFecha(h.fecha)}`}
@@ -475,7 +513,7 @@ function CapacidadRow({
   return (
     <div className="flex h-9 border-t bg-muted/20">
       <div
-        className="sticky left-0 z-10 flex items-center gap-2 border-r bg-muted/40 px-3"
+        className="sticky left-0 z-10 flex items-center gap-2 border-r bg-muted px-3 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)]"
         style={{ width: HEADW, minWidth: HEADW }}
       >
         <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: color }} />
@@ -497,7 +535,7 @@ function CapacidadRow({
                 <span
                   className={cn(
                     "flex min-w-[22px] items-center justify-center rounded px-1 py-0.5 text-[10px] font-bold tabular-nums",
-                    over ? "bg-estado-riesgo text-white ring-2 ring-estado-riesgo/30" : alTope ? "bg-estado-riesgo/15 text-estado-riesgo" : "bg-muted text-foreground/80"
+                    over ? "bg-[#B91C1C] text-white ring-2 ring-[#B91C1C]/30" : alTope ? "bg-[#B91C1C]/15 text-[#B91C1C]" : "bg-muted text-foreground/80"
                   )}
                   title={`Demanda pico ${v}/día · tope ${tope}/día${over ? " · SOBRECAPACIDAD" : ""}`}
                 >
@@ -512,11 +550,48 @@ function CapacidadRow({
   );
 }
 
-function SectionLabel({ texto, nota }: { texto: string; nota?: string }) {
-  return (
-    <div className="sticky left-0 flex items-center gap-2 border-t bg-muted/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+function SectionLabel({
+  texto,
+  nota,
+  colapsable,
+  abierta,
+  onToggle
+}: {
+  texto: string;
+  nota?: string;
+  colapsable?: boolean;
+  abierta?: boolean;
+  onToggle?: () => void;
+}) {
+  const contenido = (
+    <>
+      {colapsable && (
+        <ChevronRight className={cn("size-3.5 shrink-0 transition-transform", abierta && "rotate-90")} />
+      )}
       {texto}
       {nota && <span className="font-semibold normal-case text-muted-foreground/70">· {nota}</span>}
+    </>
+  );
+
+  // La barra ocupa todo el ancho, pero el contenido va en una celda sticky para
+  // que el rótulo quede fijo al desplazar horizontalmente (no se "mueve").
+  const claseCelda =
+    "sticky left-0 z-[5] flex w-max items-center gap-2 pr-4 pl-3 text-left text-[10px] font-bold uppercase tracking-wide text-muted-foreground";
+
+  return (
+    <div className="flex border-t bg-muted/50 py-1.5">
+      {colapsable ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={abierta}
+          className={cn(claseCelda, "transition-colors hover:text-foreground")}
+        >
+          {contenido}
+        </button>
+      ) : (
+        <div className={claseCelda}>{contenido}</div>
+      )}
     </div>
   );
 }
