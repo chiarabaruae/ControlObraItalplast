@@ -103,10 +103,16 @@ function numeroDias(valor: string): number | undefined {
   return valor.trim() !== "" && Number.isInteger(numero) && numero > 0 ? numero : undefined;
 }
 
-function planificacionDesdeFormulario(formulario: PlanificacionFormulario): PlanificacionProducto | undefined {
-  if (!formulario.fechaInicioInstalacion) return undefined;
+function planificacionDesdeFormulario(
+  formulario: PlanificacionFormulario,
+  fechaPorDefecto = ""
+): PlanificacionProducto | undefined {
+  // La fecha de inicio de instalación del proyecto alcanza para el producto
+  // principal; cada producto puede sobrescribirla si su instalación arranca antes.
+  const fechaInicioInstalacion = formulario.fechaInicioInstalacion || fechaPorDefecto;
+  if (!fechaInicioInstalacion) return undefined;
   return {
-    fechaInicioInstalacion: formulario.fechaInicioInstalacion,
+    fechaInicioInstalacion,
     diasFabricacionPremarcos: numeroDias(formulario.diasFabricacionPremarcos),
     diasInstalacionPremarcos: numeroDias(formulario.diasInstalacionPremarcos),
     diasFabrica: numeroDias(formulario.diasFabrica),
@@ -256,6 +262,7 @@ function PlanificacionEditor({
   valor,
   conPremarcos,
   conInstalacionPremarcos,
+  fechaProyecto,
   alCambiar
 }: {
   tipo: string;
@@ -263,23 +270,26 @@ function PlanificacionEditor({
   valor: PlanificacionFormulario;
   conPremarcos: boolean;
   conInstalacionPremarcos: boolean;
+  fechaProyecto: string;
   alCambiar: (cambios: Partial<PlanificacionFormulario>) => void;
 }) {
-  const estimacion = calcularFechasBackward(planificacionDesdeFormulario(valor));
+  const estimacion = calcularFechasBackward(planificacionDesdeFormulario(valor, fechaProyecto));
   return (
     <section className="rounded-xl border bg-card/60 p-4">
       <h4 className="flex items-center gap-2 font-heading text-sm font-semibold">
         <CalendarClock className="size-4 text-primary" strokeWidth={1.75} /> Planificación de fechas
       </h4>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        Obligatoria: con la fecha comprometida de inicio de instalación se estiman hacia atrás las fechas de cada bloque,
+        Desde la fecha de inicio de instalación del proyecto se estiman hacia atrás las fechas de cada bloque,
         usando las brechas configuradas por administración. Con estas fechas el producto carga en el cronograma general;
         las tareas nacen con ellas y siguen siendo editables.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor={`${tipo}-plan-inicio-instalacion`}>Inicio comprometido de instalación *</Label>
+          <Label htmlFor={`${tipo}-plan-inicio-instalacion`}>
+            Inicio de instalación <span className="font-normal text-muted-foreground">(opcional)</span>
+          </Label>
           <Input
             id={`${tipo}-plan-inicio-instalacion`}
             type="date"
@@ -287,6 +297,11 @@ function PlanificacionEditor({
             onChange={(evento) => alCambiar({ fechaInicioInstalacion: evento.target.value })}
             aria-label={`Fecha comprometida de inicio de instalación de ${contexto}`}
           />
+          <p className="text-xs text-muted-foreground">
+            {fechaProyecto
+              ? `Si lo dejás vacío usa la del proyecto (${formatFecha(fechaProyecto)}).`
+              : "Si lo dejás vacío usa la fecha de inicio de instalación del proyecto."}
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={`${tipo}-plan-dias-instalacion`}>Días de instalación *</Label>
@@ -422,6 +437,21 @@ export default function Proyectos() {
   const productosConfigurables = tiposSeleccionados.filter((tipo) => tipo !== "servicios");
   const incluyeServicios = tiposSeleccionados.includes("servicios");
 
+  /**
+   * El presupuesto manda: al leerlo se preseleccionan los tipos de producto
+   * detectados por código. Quedan editables por si la lectura del PDF falla.
+   */
+  const alCambiarPresupuesto = (nuevo?: PresupuestoEjecutivo) => {
+    setPresupuesto(nuevo);
+    if (!nuevo?.items.length) return;
+    const detectados = [...new Set(nuevo.items.map((item) => item.tipoProducto))].filter(Boolean);
+    if (!detectados.length) return;
+    setTiposSeleccionados((actuales) => {
+      const faltantes = detectados.filter((tipo) => !actuales.includes(tipo));
+      return faltantes.length ? [...actuales, ...faltantes] : actuales;
+    });
+  };
+
   const alternarTipoProducto = (tipo: TipoProducto) => {
     setTiposSeleccionados((actuales) =>
       actuales.includes(tipo) ? actuales.filter((seleccionado) => seleccionado !== tipo) : [...actuales, tipo]
@@ -461,7 +491,15 @@ export default function Proyectos() {
     const ubicacionLimpia = ubicacion.trim();
 
     if (!nombreLimpio || !clienteId || tiposSeleccionados.length === 0 || !fechaInicio) {
-      toast("Faltan datos", { description: "Nombre, cliente, al menos un producto y fecha de inicio son obligatorios." });
+      toast("Faltan datos", {
+        description: "Nombre, cliente, al menos un producto y fecha de inicio de instalación son obligatorios."
+      });
+      return;
+    }
+    if (ubicacionLimpia.length < 10) {
+      toast("Revisá la dirección", {
+        description: "Ingresá una dirección de obra de al menos 10 caracteres (calle, número y ciudad)."
+      });
       return;
     }
     if (!presupuesto || presupuesto.items.length === 0) {
@@ -528,9 +566,9 @@ export default function Proyectos() {
       // Planificación backward obligatoria (D-033): sin ancla ni duraciones el
       // producto no cargaría en el cronograma general.
       const plan = configuracion.planificacion;
-      if (!plan.fechaInicioInstalacion || !numeroDias(plan.diasInstalacion) || !numeroDias(plan.diasFabrica)) {
+      if (!numeroDias(plan.diasInstalacion) || !numeroDias(plan.diasFabrica)) {
         toast(`Planificá ${etiquetaProducto}`, {
-          description: "Cargá la fecha comprometida de inicio de instalación y los días de instalación y de fábrica."
+          description: "Cargá los días de instalación y de fábrica."
         });
         return;
       }
@@ -566,7 +604,7 @@ export default function Proyectos() {
         ),
         etapasFabrica: etapas(etapasSeleccionadas(configuracion.etapasFabrica), []),
         etapasObra: etapas(etapasSeleccionadas(configuracion.etapasObra), []),
-        planificacion: planificacionDesdeFormulario(configuracion.planificacion)
+        planificacion: planificacionDesdeFormulario(configuracion.planificacion, fechaInicio)
       };
     });
 
@@ -780,10 +818,21 @@ export default function Proyectos() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <PresupuestoUploader
+              valor={presupuesto}
+              tiposSeleccionados={tiposSeleccionados}
+              alCambiar={alCambiarPresupuesto}
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <div>
                   <Label>Tipos de producto *</Label>
-                  <p className="mt-1 text-xs text-muted-foreground">Podés seleccionar varios. Cada uno conserva sus propias etapas.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Se preseleccionan según los códigos del presupuesto. Ajustalos si la lectura del PDF no fue exacta.
+                  </p>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {catalogoProductos.map((producto) => {
@@ -808,20 +857,25 @@ export default function Proyectos() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ubicacion-proyecto">Ubicación</Label>
-                <Input id="ubicacion-proyecto" value={ubicacion} onChange={(evento) => setUbicacion(evento.target.value)} placeholder="Ciudad, obra o dirección" />
+                <Label htmlFor="ubicacion-proyecto">Dirección de la obra *</Label>
+                <Input
+                  id="ubicacion-proyecto"
+                  value={ubicacion}
+                  onChange={(evento) => setUbicacion(evento.target.value)}
+                  placeholder="Calle, número y ciudad"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Mínimo 10 caracteres. Ej.: Avda. Aviadores del Chaco 1234, Asunción.
+                </p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="fecha-inicio-proyecto">Fecha de inicio *</Label>
+                <Label htmlFor="fecha-inicio-proyecto">Fecha de inicio de instalación *</Label>
                 <Input id="fecha-inicio-proyecto" type="date" value={fechaInicio} onChange={(evento) => setFechaInicio(evento.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Es el ancla del cronograma: desde acá se estiman hacia atrás las fechas de cada bloque.
+                </p>
               </div>
             </div>
-
-            <PresupuestoUploader
-              valor={presupuesto}
-              tiposSeleccionados={tiposSeleccionados}
-              alCambiar={setPresupuesto}
-            />
 
             {incluyeServicios && (
               <div className="rounded-xl border border-primary/25 bg-primary/8 p-4">
@@ -899,6 +953,7 @@ export default function Proyectos() {
                     valor={configuracion.planificacion}
                     conPremarcos={configuracion.fabricaraPremarcos}
                     conInstalacionPremarcos={configuracion.instalaraPremarcos}
+                    fechaProyecto={fechaInicio}
                     alCambiar={(cambios) =>
                       actualizarConfiguracion(tipo, { planificacion: { ...configuracion.planificacion, ...cambios } })
                     }

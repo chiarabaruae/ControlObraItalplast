@@ -15,8 +15,9 @@ export interface SegmentoGantt {
 }
 
 export interface HitoGantt {
-  /** "firma" = Firma de Presupuesto Ejecutivo; "cliente" = confirmación de medidas del cliente. */
-  tipo: "firma" | "cliente";
+  /** "firma" = Firma de Presupuesto Ejecutivo; "cliente" = confirmación del cliente;
+   *  "relevamiento" = relevamiento técnico (medidas finales). */
+  tipo: "firma" | "cliente" | "relevamiento";
   fecha: string;
 }
 
@@ -88,9 +89,9 @@ export function filaCronograma(proyecto: Proyecto, producto: ConfiguracionProduc
 
   const hitos: HitoGantt[] = [];
   if (fechas.firmaAbaco) hitos.push({ tipo: "firma", fecha: fechas.firmaAbaco });
-  // Confirmación del cliente: al inicio de la cadena de premarcos (cuando existe).
-  const confirmacion = fechas.inicioFabricacionPremarcos ?? fechas.entregaPremarcos;
-  if (confirmacion) hitos.push({ tipo: "cliente", fecha: confirmacion });
+  if (fechas.relevamientoTecnico) hitos.push({ tipo: "relevamiento", fecha: fechas.relevamientoTecnico });
+  // La confirmación del cliente abre la cadena, un día antes de los premarcos.
+  if (fechas.confirmacionCliente) hitos.push({ tipo: "cliente", fecha: fechas.confirmacionCliente });
 
   const total = totalAberturasProducto(proyecto, producto.tipo);
   const diasFabrica = producto.planificacion?.diasFabrica ?? 0;

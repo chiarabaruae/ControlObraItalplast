@@ -16,10 +16,13 @@ export type TipoRegla = "hito" | "bloque" | "brecha";
 /** Claves estables de las reglas del núcleo que el solver reconoce. */
 export type ClaveReglaNucleo =
   | "hito_confirmacion_cliente"
+  | "brecha_confirmacion_fabricacion"
   | "bloque_fabricacion_premarcos"
   | "brecha_premarcos_fab_inst"
   | "bloque_instalacion_premarcos"
-  | "brecha_premarcos_abaco"
+  | "brecha_instpremarcos_relevamiento"
+  | "hito_relevamiento_tecnico"
+  | "brecha_relevamiento_firma"
   | "hito_firma_abaco"
   | "brecha_abaco_fabrica"
   | "bloque_fabrica"
@@ -64,63 +67,87 @@ export function reglasPredeterminadas(): ReglaPlanificacion[] {
       obligatoria: true, porDefecto: true, protegida: true
     }),
     regla(1, {
+      clave: "brecha_confirmacion_fabricacion", tipo: "brecha",
+      nombre: "Confirmación del cliente → fabricación de premarcos",
+      descripcion: "Al día siguiente de la confirmación del cliente ya arranca la fabricación de premarcos.",
+      obligatoria: true, porDefecto: true, protegida: false, dias: 1,
+      desde: "Confirmación del cliente", hasta: "Inicio fabricación de premarcos"
+    }),
+    regla(2, {
       clave: "bloque_fabricacion_premarcos", tipo: "bloque", nombre: "Fabricación de premarcos",
       descripcion: "Días de fabricación de premarcos. La duración se define por proyecto.",
       obligatoria: false, porDefecto: false, protegida: false
     }),
-    regla(2, {
+    regla(3, {
       clave: "brecha_premarcos_fab_inst", tipo: "brecha",
       nombre: "Fin fabricación premarcos → inicio instalación premarcos",
       descripcion: "La fabricación de premarcos debe terminar esta cantidad de días antes de instalarlos.",
       obligatoria: false, porDefecto: false, protegida: false, dias: 1,
       desde: "Fin fabricación de premarcos", hasta: "Inicio instalación de premarcos"
     }),
-    regla(3, {
+    regla(4, {
       clave: "bloque_instalacion_premarcos", tipo: "bloque", nombre: "Instalación de premarcos",
-      descripcion: "Días de instalación de premarcos. La duración se define por proyecto.",
+      descripcion: "Días de instalación de premarcos, propia o a cargo del cliente.",
       obligatoria: false, porDefecto: false, protegida: false
     }),
-    regla(4, {
-      clave: "brecha_premarcos_abaco", tipo: "brecha", nombre: "Entrega de premarcos → firma de ábaco",
-      descripcion: "Los premarcos deben entregarse en obra esta cantidad de días antes de la firma del ábaco.",
-      obligatoria: true, porDefecto: true, protegida: false, dias: 3,
-      desde: "Entrega de premarcos", hasta: "Firma de ábaco"
-    }),
     regla(5, {
-      clave: "hito_firma_abaco", tipo: "hito", nombre: "Firma de ábaco",
-      descripcion: "Bisagra entre fábrica y obra; debe firmarse antes de entrar a fábrica.",
-      obligatoria: true, porDefecto: true, protegida: true
+      clave: "brecha_instpremarcos_relevamiento", tipo: "brecha",
+      nombre: "Fin instalación de premarcos → relevamiento técnico",
+      descripcion: "El relevamiento técnico se hace un día después de terminar la instalación de premarcos.",
+      obligatoria: true, porDefecto: true, protegida: false, dias: 1,
+      desde: "Fin instalación de premarcos", hasta: "Relevamiento técnico"
     }),
     regla(6, {
-      clave: "brecha_abaco_fabrica", tipo: "brecha", nombre: "Firma de ábaco → entrada a fábrica",
-      descripcion: "El ábaco debe firmarse esta cantidad de días antes de que el pedido entre a fábrica.",
-      obligatoria: true, porDefecto: true, protegida: false, dias: 1,
-      desde: "Firma de ábaco", hasta: "Entrada a fábrica"
+      clave: "hito_relevamiento_tecnico", tipo: "hito", nombre: "Relevamiento técnico",
+      descripcion: "Toma de medidas finales en obra. De acá salen las medidas definitivas del presupuesto.",
+      obligatoria: true, porDefecto: true, protegida: true
     }),
     regla(7, {
-      clave: "bloque_fabrica", tipo: "bloque", nombre: "Fábrica",
+      clave: "brecha_relevamiento_firma", tipo: "brecha",
+      nombre: "Relevamiento técnico → firma de Presupuesto Ejecutivo",
+      descripcion: "Con las medidas del relevamiento se cierra el presupuesto: dos días después se firma.",
+      obligatoria: true, porDefecto: true, protegida: false, dias: 2,
+      desde: "Relevamiento técnico", hasta: "Firma de Presupuesto Ejecutivo"
+    }),
+    regla(8, {
+      clave: "hito_firma_abaco", tipo: "hito", nombre: "Firma de Presupuesto Ejecutivo",
+      descripcion: "Bisagra entre relevamiento y fábrica; debe firmarse antes de entrar a fábrica.",
+      obligatoria: true, porDefecto: true, protegida: true
+    }),
+    regla(9, {
+      clave: "brecha_abaco_fabrica", tipo: "brecha", nombre: "Firma de Presupuesto Ejecutivo → entrada a fábrica",
+      descripcion: "El presupuesto debe firmarse esta cantidad de días antes de que el pedido entre a fábrica.",
+      obligatoria: true, porDefecto: true, protegida: false, dias: 1,
+      desde: "Firma de Presupuesto Ejecutivo", hasta: "Entrada a fábrica"
+    }),
+    regla(10, {
+      clave: "bloque_fabrica", tipo: "bloque", nombre: "Fabricación de aberturas",
       descripcion: "Días de producción en fábrica. La duración se define por proyecto.",
       obligatoria: true, porDefecto: true, protegida: true
     }),
-    regla(8, {
+    regla(11, {
       clave: "brecha_produccion_instalacion", tipo: "brecha", nombre: "Fin de producción → inicio de instalación",
       descripcion: "La producción debe terminar esta cantidad de días antes de comenzar la instalación.",
       obligatoria: true, porDefecto: true, protegida: false, dias: 3,
       desde: "Fin de producción", hasta: "Inicio de instalación"
     }),
-    regla(9, {
-      clave: "bloque_instalacion", tipo: "bloque", nombre: "Instalación",
+    regla(12, {
+      clave: "bloque_instalacion", tipo: "bloque", nombre: "Instalación de aberturas",
       descripcion: "Días de instalación en obra. La duración se define por proyecto.",
       obligatoria: true, porDefecto: true, protegida: true
     })
   ];
 }
 
-/** Reincorpora las reglas protegidas que falten y ordena por posición. */
+/**
+ * Reincorpora las reglas del núcleo que falten y ordena por posición. Se suman
+ * todas (no solo las protegidas) para que un conjunto guardado con una semilla
+ * vieja incorpore los hitos y brechas nuevos en lugar de quedar incompleto.
+ */
 function normalizarReglas(reglas: ReglaPlanificacion[]): ReglaPlanificacion[] {
   const base = reglasPredeterminadas();
   const claves = new Set(reglas.map((r) => r.clave).filter(Boolean));
-  const faltantes = base.filter((r) => r.protegida && !claves.has(r.clave));
+  const faltantes = base.filter((r) => r.clave && !claves.has(r.clave));
   return [...reglas, ...faltantes].sort((a, b) => a.orden - b.orden);
 }
 
@@ -149,7 +176,6 @@ export function obtenerReglasPlanificacion(): ReglaPlanificacion[] {
       };
       setDias("brecha_produccion_instalacion", b.diasProduccionAInstalacion);
       setDias("brecha_abaco_fabrica", b.diasAbacoAFabrica);
-      setDias("brecha_premarcos_abaco", b.diasPremarcosAAbaco);
     } catch {
       // ignora, usa defaults
     }
@@ -212,19 +238,28 @@ export function validarReglas(reglas: ReglaPlanificacion[]): AlertaRegla[] {
 export interface BuffersPlanificacion {
   /** Días entre el fin de producción y el inicio de instalación. */
   diasProduccionAInstalacion: number;
-  /** Días entre la firma del ábaco y la entrada a fábrica. */
+  /** Días entre la firma del Presupuesto Ejecutivo y la entrada a fábrica. */
   diasAbacoAFabrica: number;
-  /** Días entre la entrega de premarcos en obra y la firma del ábaco. */
+  /** Días entre la entrega de premarcos en obra y la firma (compatibilidad). */
   diasPremarcosAAbaco: number;
   /** Días entre el fin de fabricación de premarcos y el inicio de su instalación. */
   diasPremarcosFabAInstalacion: number;
+  /** Días entre la confirmación del cliente y el inicio de fabricación de premarcos. */
+  diasConfirmacionAFabricacion: number;
+  /** Días entre el fin de instalación de premarcos y el relevamiento técnico. */
+  diasInstPremarcosARelevamiento: number;
+  /** Días entre el relevamiento técnico y la firma del Presupuesto Ejecutivo. */
+  diasRelevamientoAFirma: number;
 }
 
 export const BUFFERS_PREDETERMINADOS: BuffersPlanificacion = {
   diasProduccionAInstalacion: 3,
   diasAbacoAFabrica: 1,
   diasPremarcosAAbaco: 3,
-  diasPremarcosFabAInstalacion: 1
+  diasPremarcosFabAInstalacion: 1,
+  diasConfirmacionAFabricacion: 1,
+  diasInstPremarcosARelevamiento: 1,
+  diasRelevamientoAFirma: 2
 };
 
 function diasDeRegla(reglas: ReglaPlanificacion[], clave: ClaveReglaNucleo, predeterminado: number): number {
@@ -239,8 +274,12 @@ export function obtenerBuffersPlanificacion(
   return {
     diasProduccionAInstalacion: diasDeRegla(reglas, "brecha_produccion_instalacion", BUFFERS_PREDETERMINADOS.diasProduccionAInstalacion),
     diasAbacoAFabrica: diasDeRegla(reglas, "brecha_abaco_fabrica", BUFFERS_PREDETERMINADOS.diasAbacoAFabrica),
-    diasPremarcosAAbaco: diasDeRegla(reglas, "brecha_premarcos_abaco", BUFFERS_PREDETERMINADOS.diasPremarcosAAbaco),
-    diasPremarcosFabAInstalacion: diasDeRegla(reglas, "brecha_premarcos_fab_inst", BUFFERS_PREDETERMINADOS.diasPremarcosFabAInstalacion)
+    // Legado: la cadena ahora pasa por el relevamiento técnico, no por esta brecha.
+    diasPremarcosAAbaco: BUFFERS_PREDETERMINADOS.diasPremarcosAAbaco,
+    diasPremarcosFabAInstalacion: diasDeRegla(reglas, "brecha_premarcos_fab_inst", BUFFERS_PREDETERMINADOS.diasPremarcosFabAInstalacion),
+    diasConfirmacionAFabricacion: diasDeRegla(reglas, "brecha_confirmacion_fabricacion", BUFFERS_PREDETERMINADOS.diasConfirmacionAFabricacion),
+    diasInstPremarcosARelevamiento: diasDeRegla(reglas, "brecha_instpremarcos_relevamiento", BUFFERS_PREDETERMINADOS.diasInstPremarcosARelevamiento),
+    diasRelevamientoAFirma: diasDeRegla(reglas, "brecha_relevamiento_firma", BUFFERS_PREDETERMINADOS.diasRelevamientoAFirma)
   };
 }
 
@@ -260,7 +299,12 @@ export interface FechasEstimadas {
   finInstalacion: string;
   finProduccion: string;
   inicioFabrica?: string;
+  /** Firma del Presupuesto Ejecutivo. */
   firmaAbaco?: string;
+  /** Relevamiento técnico: medidas finales, un día después de los premarcos. */
+  relevamientoTecnico?: string;
+  /** Confirmación del cliente: arranca la cadena de premarcos. */
+  confirmacionCliente?: string;
   entregaPremarcos?: string;
   inicioFabricacionPremarcos?: string;
   porGrupo: Partial<Record<GrupoTareaPresupuesto, RangoFechas>>;
@@ -289,26 +333,37 @@ export function calcularFechasBackward(
 
   if (!plan.diasFabrica || plan.diasFabrica <= 0) return resultado;
 
+  // Cadena hacia atrás: fábrica ← firma ← relevamiento ← premarcos ← confirmación.
   const inicioFabrica = sumarDias(finProduccion, -plan.diasFabrica);
   const firmaAbaco = sumarDias(inicioFabrica, -buffers.diasAbacoAFabrica);
-  // El plazo de instalación de premarcos del producto reemplaza a la brecha global
-  // entrega→ábaco cuando fue cargado: los premarcos se entregan al iniciar su instalación.
-  const ventanaPremarcos = plan.diasInstalacionPremarcos && plan.diasInstalacionPremarcos > 0
-    ? plan.diasInstalacionPremarcos
-    : buffers.diasPremarcosAAbaco;
-  const entregaPremarcos = sumarDias(firmaAbaco, -ventanaPremarcos);
+  const relevamientoTecnico = sumarDias(firmaAbaco, -buffers.diasRelevamientoAFirma);
   porGrupo.fabrica = { inicio: inicioFabrica, fin: finProduccion };
-  porGrupo.instalacion_premarcos = { inicio: entregaPremarcos, fin: firmaAbaco };
   resultado.inicioFabrica = inicioFabrica;
   resultado.firmaAbaco = firmaAbaco;
-  resultado.entregaPremarcos = entregaPremarcos;
+  resultado.relevamientoTecnico = relevamientoTecnico;
+
+  // El relevamiento se hace un día después de terminar la instalación de premarcos.
+  const finInstalacionPremarcos = sumarDias(relevamientoTecnico, -buffers.diasInstPremarcosARelevamiento);
+  resultado.entregaPremarcos = finInstalacionPremarcos;
+
+  // Punto donde termina la cadena de premarcos y arranca lo anterior.
+  let anclaPremarcos = finInstalacionPremarcos;
+  const diasInstPremarcos = plan.diasInstalacionPremarcos && plan.diasInstalacionPremarcos > 0
+    ? plan.diasInstalacionPremarcos
+    : 0;
+  if (diasInstPremarcos > 0) {
+    const inicioInstalacionPremarcos = sumarDias(finInstalacionPremarcos, -diasInstPremarcos);
+    porGrupo.instalacion_premarcos = { inicio: inicioInstalacionPremarcos, fin: finInstalacionPremarcos };
+    anclaPremarcos = sumarDias(inicioInstalacionPremarcos, -buffers.diasPremarcosFabAInstalacion);
+  }
 
   if (plan.diasFabricacionPremarcos && plan.diasFabricacionPremarcos > 0) {
-    // Brecha diferenciada fin fabricación → inicio instalación de premarcos.
-    const finFabricacionPremarcos = sumarDias(entregaPremarcos, -buffers.diasPremarcosFabAInstalacion);
-    const inicioFabricacionPremarcos = sumarDias(finFabricacionPremarcos, -plan.diasFabricacionPremarcos);
-    porGrupo.fabricacion_premarcos = { inicio: inicioFabricacionPremarcos, fin: finFabricacionPremarcos };
+    const inicioFabricacionPremarcos = sumarDias(anclaPremarcos, -plan.diasFabricacionPremarcos);
+    porGrupo.fabricacion_premarcos = { inicio: inicioFabricacionPremarcos, fin: anclaPremarcos };
     resultado.inicioFabricacionPremarcos = inicioFabricacionPremarcos;
+    resultado.confirmacionCliente = sumarDias(inicioFabricacionPremarcos, -buffers.diasConfirmacionAFabricacion);
+  } else {
+    resultado.confirmacionCliente = sumarDias(anclaPremarcos, -buffers.diasConfirmacionAFabricacion);
   }
 
   return resultado;

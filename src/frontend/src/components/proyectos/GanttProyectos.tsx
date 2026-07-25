@@ -88,6 +88,7 @@ const PALETA = {
   fabricaAberturas: "#2F9E6B", // verde
   instalacion: "#2D6CC0", // azul
   confirmacionCliente: "#5B6B7C", // pizarra (hito)
+  relevamientoTecnico: "#0E9AA7", // turquesa (hito)
   firmaPresupuesto: "#E11D48", // rosa fuerte (hito)
   sobrecapacidad: "#B91C1C" // rojo (alerta)
 } as const;
@@ -103,6 +104,12 @@ const LABEL_SEG: Record<TipoSegmento, string> = {
   instalacion_premarcos: "Inst. premarcos",
   fabrica: "Fábrica",
   instalacion: "Instalación"
+};
+
+const LABEL_HITO: Record<"firma" | "cliente" | "relevamiento", string> = {
+  firma: "Firma de Presupuesto Ejecutivo",
+  cliente: "Confirmación del cliente",
+  relevamiento: "Relevamiento técnico"
 };
 
 // Punto de estado del proyecto: mínimo, con tooltip, para no recargar el cronograma.
@@ -321,6 +328,7 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
         <Referencia clase="bg-[#2F9E6B]" texto="Fabricación aberturas" />
         <Referencia clase="bg-[#2D6CC0]" texto="Instalación" />
         <ReferenciaHito clase="bg-[#5B6B7C]" texto="Confirmación del cliente" />
+        <ReferenciaHito clase="bg-[#0E9AA7]" texto="Relevamiento técnico" />
         <ReferenciaHito clase="bg-[#E11D48]" texto="Firma de Presupuesto Ejecutivo" />
         <Referencia clase="bg-[#B91C1C]" texto="Sobrecapacidad" />
       </div>
@@ -528,10 +536,10 @@ function FilaGantt({
             key={i}
             className={cn(
               "absolute top-1/2 z-[2] size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-[1.5px] border-card",
-              h.tipo === "firma" ? "bg-[#E11D48]" : "bg-[#5B6B7C]"
+              h.tipo === "firma" ? "bg-[#E11D48]" : h.tipo === "relevamiento" ? "bg-[#0E9AA7]" : "bg-[#5B6B7C]"
             )}
             style={{ left: xDe(h.fecha) + pxDia / 2 }}
-            title={`${h.tipo === "firma" ? "Firma de Presupuesto Ejecutivo" : "Confirmación del cliente"}: ${formatFecha(h.fecha)}`}
+            title={`${LABEL_HITO[h.tipo]}: ${formatFecha(h.fecha)}`}
           />
         ))}
       </div>

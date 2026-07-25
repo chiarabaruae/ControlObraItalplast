@@ -31,19 +31,27 @@ brecha entre el hito y el bloque siguiente.
 
 ```
 Confirmación del cliente
-   └─ brecha
+   └─ +1 día
 Fabricación de premarcos            (bloque, si el proyecto lleva premarcos)
-   └─ brecha
+   └─ +1 día
 Instalación de premarcos            (bloque, interna o del cliente)
    └─ +1 día
 Relevamiento técnico                (hito, automático)
    └─ +2 días
 Firma de Presupuesto Ejecutivo      (hito)
-   └─ brecha
+   └─ +1 día
 Fabricación de aberturas            (bloque)
-   └─ brecha
+   └─ +3 días
 Instalación de aberturas            (bloque)
 ```
+
+Todas las brechas son configurables desde **Reglas**; los días indicados son los
+valores predeterminados.
+
+### Confirmación del cliente
+
+**Al día siguiente** de la confirmación del cliente ya arranca la fabricación de
+premarcos.
 
 ### Relevamiento técnico (hito nuevo)
 
@@ -69,6 +77,8 @@ A veces el cliente instala las aberturas (se fabriquen o no internamente).
   **un día antes** de la fecha estimada de relevamiento técnico.
 - Cargar esta fecha es **obligatorio** para todos los proyectos que tengan
   premarcos pero **no** tengan marcada la etapa *Instalación de premarcos*.
+- Este bloque **reemplaza** a la instalación de premarcos interna: ocupa el mismo
+  lugar en la cadena y se identifica como **“Instalación de premarcos (cliente)”**.
 
 ## Capacidad (demanda pico vs. tope)
 
@@ -101,12 +111,8 @@ Situaciones administrativas (no describen desempeño):
 - **Reapertura:** en todos los casos se mantiene la regla de reabrir con
   justificación, limitada a los roles habilitados.
 
-## Preguntas abiertas
+## Pendiente de implementación
 
-1. La brecha entre **Confirmación del cliente** y el inicio de fabricación de
-   premarcos, ¿cuántos días es?
-2. En el escenario "el cliente instala", ¿el bloque estimativo reemplaza al
-   bloque de *Instalación de premarcos* o convive con él?
-3. ¿La firma del presupuesto se cuenta desde el **relevamiento técnico**
-   (+2 días) siempre, o puede anclarse a la finalización de la instalación de
-   premarcos en algunos casos?
+- Identificar el bloque como **“Instalación de premarcos (cliente)”** cuando la
+  instalación queda a cargo del cliente, y hacer obligatoria su fecha de
+  compromiso en los proyectos con premarcos sin instalación propia.
