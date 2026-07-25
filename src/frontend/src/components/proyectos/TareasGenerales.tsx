@@ -131,13 +131,13 @@ export function TareasGenerales({
           <div>
             <h2 className="font-heading font-semibold">Tareas del proyecto</h2>
             <p className="text-xs text-muted-foreground">
-              Tareas genéricas del proyecto, independientes de las etapas de fábrica e instalación. Visibles solo para administración y supervisión.
+              Tareas genéricas del proyecto, independientes de las etapas de fábrica e instalación.
             </p>
           </div>
         </div>
         <div className="text-right">
           <div className="cifra text-xl font-bold">{porcentajeTareas(tareas)}%</div>
-          <div className="text-xs text-muted-foreground">avance automático</div>
+          <div className="text-xs text-muted-foreground">avance</div>
         </div>
       </div>
 

@@ -427,7 +427,10 @@ export function SeguimientoPresupuesto({
           <div className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary"><Icono className="size-5" /></div>
           <div>
             <h2 className="font-heading font-semibold">Seguimiento de {lado === "fabrica" ? "fábrica" : "instalación"}</h2>
-            <p className="text-xs text-muted-foreground">Cada tarea exige evidencia fotográfica para quedar completada.</p>
+            {/* Fábrica se completa solo con el check; la evidencia se exige en obra. */}
+            {lado !== "fabrica" && (
+              <p className="text-xs text-muted-foreground">Cada tarea exige evidencia fotográfica para quedar completada.</p>
+            )}
           </div>
         </div>
         <div className="text-right">

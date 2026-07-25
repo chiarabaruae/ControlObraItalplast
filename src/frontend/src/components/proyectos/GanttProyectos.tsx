@@ -3,7 +3,7 @@
 // aberturas/día en fábrica (por línea) e instalación y la compara contra los
 // topes de capacidad configurados. Solo lectura; las fechas se editan en el
 // detalle del proyecto.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 import {
@@ -21,7 +21,10 @@ import {
   type FilaCronograma,
   type TipoSegmento
 } from "@/lib/cronograma";
-import { obtenerTopesCapacidad, topeFabrica, topeInstalacion } from "@/lib/capacidad";
+import {
+  obtenerTopesCapacidad, topeFabrica, topeInstalacion,
+  topePremarcosFabricacion, topePremarcosInstalacion
+} from "@/lib/capacidad";
 import { formatFecha } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,6 +76,8 @@ interface Bucket {
   anio: number;
   fabPeak: Record<string, number>;
   instPeak: number;
+  preFabPeak: number;
+  preInstPeak: number;
 }
 
 // Paleta categórica (ColorHunt-inspired), pensada para que las 4 barras + 2 hitos
@@ -147,6 +152,18 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
   const pxDia = PX_POR_DIA[zoom];
   const hoy = new Date().toISOString().slice(0, 10);
 
+  // Ancho visible del área desplazable: con él se extiende el rango para que la
+  // escala (semana/mes) siempre cubra todo el ancho con fechas consecutivas.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [anchoVisible, setAnchoVisible] = useState(0);
+  useEffect(() => {
+    const nodo = scrollRef.current;
+    if (!nodo || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entrada]) => setAnchoVisible(entrada.contentRect.width));
+    observer.observe(nodo);
+    return () => observer.disconnect();
+  }, []);
+
   // rango temporal a partir de segmentos + hitos (siempre incluye "hoy")
   const { inicio: rangoInicio, totalDias } = useMemo(() => {
     let min: string | undefined;
@@ -161,14 +178,16 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
         if (!max || h.fecha > max) max = h.fecha;
       }
     }
-    if (!min || !max) return { inicio: lunesDe(hoy), totalDias: 84 };
+    // Días mínimos para que la escala llene todo el ancho visible sin huecos.
+    const diasParaLlenar = anchoVisible > HEADW ? Math.ceil((anchoVisible - HEADW) / pxDia) : 0;
+    if (!min || !max) return { inicio: lunesDe(hoy), totalDias: Math.max(84, diasParaLlenar) };
     const desde = min < hoy ? min : hoy;
     const hasta = max > hoy ? max : hoy;
     const inicio = lunesDe(sumar(desde, -3));
     let total = diff(inicio, sumar(hasta, 7));
-    total = Math.min(Math.max(total, 42), MAX_DIAS);
+    total = Math.min(Math.max(total, 42, diasParaLlenar), MAX_DIAS);
     return { inicio, totalDias: total };
-  }, [filas, hoy]);
+  }, [filas, hoy, anchoVisible, pxDia]);
 
   const totalPx = totalDias * pxDia;
   const xDe = (fecha: string) => Math.max(0, Math.min(totalPx, diff(rangoInicio, fecha) * pxDia));
@@ -189,11 +208,15 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
     return lista.map((b) => {
       const fabPeak: Record<string, number> = {};
       let instPeak = 0;
+      let preFabPeak = 0;
+      let preInstPeak = 0;
       const limite = b.fin < rangoFin ? b.fin : sumar(rangoFin, -1);
       for (let d = b.inicio; d <= limite; d = sumar(d, 1)) {
         const dem = demandaDiaria(filas, d);
         for (const [t, v] of Object.entries(dem.fabrica)) fabPeak[t] = Math.max(fabPeak[t] ?? 0, v);
         instPeak = Math.max(instPeak, dem.instalacion);
+        preFabPeak = Math.max(preFabPeak, dem.premarcosFabricacion);
+        preInstPeak = Math.max(preInstPeak, dem.premarcosInstalacion);
       }
       const anio = Number(b.inicio.slice(0, 4));
       const mes = Number(b.inicio.slice(5, 7)) - 1;
@@ -207,7 +230,9 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
         mes,
         anio,
         fabPeak,
-        instPeak
+        instPeak,
+        preFabPeak,
+        preInstPeak
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -242,6 +267,9 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
     return [...set];
   }, [filas]);
   const hayInstalacion = filas.some((f) => f.segmentos.some((s) => s.tipo === "instalacion"));
+  // Los premarcos también son carga operativa: se muestran como líneas propias.
+  const hayFabPremarcos = filas.some((f) => f.segmentos.some((s) => s.tipo === "fabricacion_premarcos"));
+  const hayInstPremarcos = filas.some((f) => f.segmentos.some((s) => s.tipo === "instalacion_premarcos"));
 
   const opcionesProducto = useMemo(() => {
     const set = new Map<string, string>();
@@ -303,7 +331,7 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border bg-card shadow-xs">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" ref={scrollRef}>
             <div style={{ minWidth: HEADW + totalPx }}>
               {/* Encabezado */}
               <div className="sticky top-0 z-20 flex h-[52px] border-b bg-muted/40">
@@ -346,6 +374,26 @@ export function GanttProyectos({ proyectos }: { proyectos: Proyecto[] }) {
                 abierta={capacidadAbierta}
                 onToggle={() => setCapacidadAbierta((v) => !v)}
               />
+              {capacidadAbierta && hayFabPremarcos && (
+                <CapacidadRow
+                  nombre="Premarcos · fabricación"
+                  color={PALETA.fabricacionPremarcos}
+                  tope={topePremarcosFabricacion(topes)}
+                  buckets={buckets}
+                  valorDe={(b) => b.preFabPeak}
+                  totalPx={totalPx}
+                />
+              )}
+              {capacidadAbierta && hayInstPremarcos && (
+                <CapacidadRow
+                  nombre="Premarcos · instalación"
+                  color={PALETA.instalacionPremarcos}
+                  tope={topePremarcosInstalacion(topes)}
+                  buckets={buckets}
+                  valorDe={(b) => b.preInstPeak}
+                  totalPx={totalPx}
+                />
+              )}
               {capacidadAbierta && lineasFabrica.map((tipo) => (
                 <CapacidadRow
                   key={`fab-${tipo}`}
@@ -437,7 +485,7 @@ function FilaGantt({
         style={{ width: HEADW, minWidth: HEADW }}
       >
         <span
-          className={cn("mt-0.5 size-2.5 shrink-0 self-start rounded-full", ESTADO_DOT[fila.proyecto.estado].color)}
+          className={cn("size-2.5 shrink-0 self-center rounded-full", ESTADO_DOT[fila.proyecto.estado].color)}
           title={`Estado: ${ESTADO_DOT[fila.proyecto.estado].label}`}
           aria-label={`Estado: ${ESTADO_DOT[fila.proyecto.estado].label}`}
         />

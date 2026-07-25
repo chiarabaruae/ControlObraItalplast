@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Plus, Pencil, KeyRound, Archive, ArchiveRestore, Tags, Trash2 } from "lucide-react";
+import { Plus, Pencil, KeyRound, Archive, ArchiveRestore, Tags, Trash2, Check, X, Lock } from "lucide-react";
 import { useAuth } from "@/context/auth";
 import { ROLE_LABELS, type Role } from "@/lib/roles";
 import { useTablaFiltrable } from "@/lib/tabla-filtros";
@@ -18,6 +18,13 @@ import { toast } from "sonner";
 
 function iniciales(nombre: string) {
   return nombre.split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+}
+
+// El cargo de soporte/desarrollo no se toca desde la interfaz: cualquier cambio
+// sobre TI se hace por código, desde el repositorio.
+const CARGO_SOPORTE_TI = "Soporte / Desarrollo";
+function esCargoProtegido(cargo: string) {
+  return cargo.trim().toLocaleLowerCase() === CARGO_SOPORTE_TI.toLocaleLowerCase();
 }
 
 interface FormularioUsuario {
@@ -48,6 +55,8 @@ export default function Usuarios() {
   const [cargos, setCargos] = useState<string[]>(() => obtenerCargos());
   const [gestorCargosAbierto, setGestorCargosAbierto] = useState(false);
   const [nuevoCargo, setNuevoCargo] = useState("");
+  const [cargoEnEdicion, setCargoEnEdicion] = useState<string | null>(null);
+  const [cargoBorrador, setCargoBorrador] = useState("");
   const tabla = useTablaFiltrable(lista, {
     usuario: (u) => u.displayName,
     cargo: (u) => u.positionTitle,
@@ -154,6 +163,10 @@ export default function Usuarios() {
   };
 
   const quitarCargo = (cargo: string) => {
+    if (esCargoProtegido(cargo)) {
+      toast("Cargo protegido", { description: "El cargo de Soporte TI solo se cambia por código, desde el repositorio." });
+      return;
+    }
     if (lista.some((u) => u.positionTitle === cargo)) {
       toast("Cargo en uso", { description: `"${cargo}" está asignado a alguien. Cambiá ese usuario antes de quitarlo.` });
       return;
@@ -161,6 +174,32 @@ export default function Usuarios() {
     const actualizados = cargos.filter((c) => c !== cargo);
     setCargos(actualizados);
     guardarCargos(actualizados);
+  };
+
+  const comenzarEdicionCargo = (cargo: string) => {
+    if (esCargoProtegido(cargo)) {
+      toast("Cargo protegido", { description: "El cargo de Soporte TI solo se cambia por código, desde el repositorio." });
+      return;
+    }
+    setCargoEnEdicion(cargo);
+    setCargoBorrador(cargo);
+  };
+
+  const guardarEdicionCargo = () => {
+    if (!cargoEnEdicion) return;
+    const nuevo = cargoBorrador.trim();
+    if (!nuevo) return;
+    if (nuevo !== cargoEnEdicion && cargos.some((c) => c.toLocaleLowerCase() === nuevo.toLocaleLowerCase())) {
+      toast("Cargo duplicado", { description: `"${nuevo}" ya existe en la lista.` });
+      return;
+    }
+    const actualizados = cargos.map((c) => (c === cargoEnEdicion ? nuevo : c)).sort((a, b) => a.localeCompare(b));
+    setCargos(actualizados);
+    guardarCargos(actualizados);
+    // El cambio de nombre se propaga a las personas que tenían ese cargo.
+    setLista((prev) => prev.map((u) => (u.positionTitle === cargoEnEdicion ? { ...u, positionTitle: nuevo } : u)));
+    setCargoEnEdicion(null);
+    toast("Cargo actualizado", { description: nuevo });
   };
 
   // Garantiza que el cargo actual del formulario siempre sea seleccionable.
@@ -226,17 +265,25 @@ export default function Usuarios() {
                   <TableCell className="text-sm text-muted-foreground">{u.department}</TableCell>
                   <TableCell className="text-sm">{ROLE_LABELS[u.role]}</TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="icon" className="size-8" aria-label={`Editar a ${u.displayName}`} onClick={() => abrirEdicion(u)}>
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="size-8" aria-label={`Cambiar contraseña de ${u.displayName}`} onClick={() => solicitarCambioContrasena(u)}>
-                        <KeyRound className="size-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="size-8" aria-label={u.isActive ? `Archivar a ${u.displayName}` : `Reactivar a ${u.displayName}`} onClick={() => alternarActivo(u)}>
-                        {u.isActive ? <Archive className="size-3.5" /> : <ArchiveRestore className="size-3.5" />}
-                      </Button>
-                    </div>
+                    {/* El usuario de Soporte TI no se toca desde la interfaz: se
+                        modifica por código, desde el repositorio. */}
+                    {u.role === "ti" ? (
+                      <div className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground" title="Solo se modifica por código, desde el repositorio">
+                        <Lock className="size-3.5" /> Protegido
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1">
+                        <Button variant="ghost" size="icon" className="size-8" aria-label={`Editar a ${u.displayName}`} onClick={() => abrirEdicion(u)}>
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-8" aria-label={`Cambiar contraseña de ${u.displayName}`} onClick={() => solicitarCambioContrasena(u)}>
+                          <KeyRound className="size-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-8" aria-label={u.isActive ? `Archivar a ${u.displayName}` : `Reactivar a ${u.displayName}`} onClick={() => alternarActivo(u)}>
+                          {u.isActive ? <Archive className="size-3.5" /> : <ArchiveRestore className="size-3.5" />}
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -394,21 +441,68 @@ export default function Usuarios() {
               </Button>
             </div>
             <ul className="divide-y rounded-xl border">
-              {opcionesCargo.map((cargo) => (
-                <li key={cargo} className="flex items-center gap-2 px-3 py-2">
-                  <span className="flex-1 text-sm">{cargo}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 text-muted-foreground hover:text-destructive"
-                    aria-label={`Quitar ${cargo}`}
-                    onClick={() => quitarCargo(cargo)}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
+              {opcionesCargo.map((cargo) => {
+                const protegido = esCargoProtegido(cargo);
+                return (
+                  <li key={cargo} className="flex items-center gap-2 px-3 py-2">
+                    {cargoEnEdicion === cargo ? (
+                      <>
+                        <Input
+                          value={cargoBorrador}
+                          onChange={(evento) => setCargoBorrador(evento.target.value)}
+                          onKeyDown={(evento) => {
+                            if (evento.key === "Enter") {
+                              evento.preventDefault();
+                              guardarEdicionCargo();
+                            }
+                            if (evento.key === "Escape") setCargoEnEdicion(null);
+                          }}
+                          aria-label={`Nuevo nombre de ${cargo}`}
+                          autoFocus
+                        />
+                        <Button type="button" variant="ghost" size="icon" className="size-8 text-primary" aria-label={`Guardar ${cargo}`} onClick={guardarEdicionCargo}>
+                          <Check className="size-3.5" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" className="size-8 text-muted-foreground" aria-label="Cancelar edición" onClick={() => setCargoEnEdicion(null)}>
+                          <X className="size-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm">{cargo}</span>
+                        {protegido ? (
+                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground" title="Solo se cambia por código, desde el repositorio">
+                            <Lock className="size-3.5" /> Protegido
+                          </span>
+                        ) : (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-muted-foreground hover:text-foreground"
+                              aria-label={`Editar ${cargo}`}
+                              onClick={() => comenzarEdicionCargo(cargo)}
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-muted-foreground hover:text-destructive"
+                              aria-label={`Quitar ${cargo}`}
+                              onClick={() => quitarCargo(cargo)}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </li>
+                );
+              })}
               {opcionesCargo.length === 0 && (
                 <li className="px-3 py-6 text-center text-sm text-muted-foreground">No hay cargos. Agregá el primero.</li>
               )}

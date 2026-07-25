@@ -87,10 +87,14 @@ export function DialogoCompletarTarea({
   // Solo las tareas generales del proyecto admiten documentos y enlaces (D-031);
   // las tareas de etapas de fabricación/instalación exigen fotografía.
   const admiteMultiformato = tarea?.grupo === "generales";
+  // Excepción de fábrica: sus tareas se marcan como listas solo con el check,
+  // sin exigir fotografía. La evidencia sigue siendo obligatoria en obra.
+  const esFabrica = tarea?.grupo === "fabrica" || tarea?.grupo === "fabricacion_premarcos";
   const hayEvidencia = Boolean(archivo || (admiteMultiformato && enlace.trim()) || tarea?.evidencia);
+  const puedeCompletar = esFabrica || hayEvidencia;
 
   const completar = async () => {
-    if (!tarea || !hayEvidencia) return;
+    if (!tarea || !puedeCompletar) return;
     // Observaciones opcionales, pero si se escriben deben justificar (D-031).
     if (observaciones.trim() && !justificacionValida(observaciones)) {
       toast("Observación demasiado corta", { description: descripcionJustificacion(observaciones) });
@@ -103,7 +107,7 @@ export function DialogoCompletarTarea({
         : admiteMultiformato && enlace.trim()
           ? crearEvidenciaEnlace(enlace)
           : tarea.evidencia;
-      if (!evidencia) return;
+      if (!evidencia && !esFabrica) return;
       alGuardar(registrarModificacionTarea({
         ...tarea,
         completada: true,
@@ -111,8 +115,8 @@ export function DialogoCompletarTarea({
         observaciones: observaciones.trim(),
         completadaEn: new Date().toISOString(),
         completadaPorId: usuarioId
-      }, usuarioId, "Completó la tarea con evidencia"));
-      toast("Tarea completada", { description: `${etiqueta} · evidencia guardada.` });
+      }, usuarioId, evidencia ? "Completó la tarea con evidencia" : "Marcó la tarea como lista"));
+      toast("Tarea completada", { description: evidencia ? `${etiqueta} · evidencia guardada.` : etiqueta });
       alCerrar();
     } catch (error) {
       toast("No se pudo guardar la evidencia", {
@@ -180,7 +184,9 @@ export function DialogoCompletarTarea({
         ) : (
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="evidencia-tarea">{admiteMultiformato ? "Evidencia *" : "Evidencia fotográfica *"}</Label>
+              <Label htmlFor="evidencia-tarea">
+                {esFabrica ? "Evidencia fotográfica (opcional)" : admiteMultiformato ? "Evidencia *" : "Evidencia fotográfica *"}
+              </Label>
               <Input
                 id="evidencia-tarea"
                 type="file"
@@ -188,9 +194,11 @@ export function DialogoCompletarTarea({
                 onChange={(evento) => setArchivo(evento.target.files?.[0])}
               />
               <p className="text-xs text-muted-foreground">
-                {admiteMultiformato
-                  ? "Imagen, PDF, Word, Excel, CSV o texto. Las imágenes se comprimen (máx. 12 MB); los documentos hasta 4 MB."
-                  : "Se comprime localmente antes de guardarse. Máximo 12 MB."}
+                {esFabrica
+                  ? "En fábrica alcanza con marcar la tarea como lista; la foto es opcional."
+                  : admiteMultiformato
+                    ? "Imagen, PDF, Word, Excel, CSV o texto. Las imágenes se comprimen (máx. 12 MB); los documentos hasta 4 MB."
+                    : "Se comprime localmente antes de guardarse. Máximo 12 MB."}
               </p>
             </div>
             {admiteMultiformato && (
@@ -241,7 +249,7 @@ export function DialogoCompletarTarea({
             <Button
               className="gap-2"
               onClick={() => void completar()}
-              disabled={guardando || !hayEvidencia}
+              disabled={guardando || !puedeCompletar}
             >
               <Check className="size-4" /> {guardando ? "Guardando…" : "Marcar como lista"}
             </Button>

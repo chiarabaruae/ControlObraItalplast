@@ -10,10 +10,16 @@ export interface TopesCapacidad {
   fabrica: Record<string, number>;
   /** aberturas/día que las cuadrillas pueden instalar (global, sin distinguir producto). */
   instalacion: number;
+  /** aberturas/día de fabricación de premarcos (carga operativa propia). */
+  premarcosFabricacion?: number;
+  /** aberturas/día de instalación de premarcos. */
+  premarcosInstalacion?: number;
 }
 
 export const TOPE_FABRICA_PREDETERMINADO = 6;
 export const TOPE_INSTALACION_PREDETERMINADO = 10;
+export const TOPE_PREMARCOS_FABRICACION_PREDETERMINADO = 8;
+export const TOPE_PREMARCOS_INSTALACION_PREDETERMINADO = 12;
 
 const CAPACIDAD_STORAGE_KEY = "control-obras-capacidad";
 
@@ -29,7 +35,9 @@ export function obtenerTopesCapacidad(): TopesCapacidad {
     if (!parsed) return TOPES_PREDETERMINADOS;
     return {
       fabrica: parsed.fabrica ?? {},
-      instalacion: typeof parsed.instalacion === "number" ? parsed.instalacion : TOPE_INSTALACION_PREDETERMINADO
+      instalacion: typeof parsed.instalacion === "number" ? parsed.instalacion : TOPE_INSTALACION_PREDETERMINADO,
+      premarcosFabricacion: parsed.premarcosFabricacion,
+      premarcosInstalacion: parsed.premarcosInstalacion
     };
   } catch {
     return TOPES_PREDETERMINADOS;
@@ -49,4 +57,16 @@ export function topeFabrica(tipo: TipoProducto, topes: TopesCapacidad = obtenerT
 /** Tope diario de instalación (global). */
 export function topeInstalacion(topes: TopesCapacidad = obtenerTopesCapacidad()): number {
   return topes.instalacion > 0 ? topes.instalacion : TOPE_INSTALACION_PREDETERMINADO;
+}
+
+/** Tope diario de fabricación de premarcos. */
+export function topePremarcosFabricacion(topes: TopesCapacidad = obtenerTopesCapacidad()): number {
+  const valor = topes.premarcosFabricacion;
+  return typeof valor === "number" && valor > 0 ? valor : TOPE_PREMARCOS_FABRICACION_PREDETERMINADO;
+}
+
+/** Tope diario de instalación de premarcos. */
+export function topePremarcosInstalacion(topes: TopesCapacidad = obtenerTopesCapacidad()): number {
+  const valor = topes.premarcosInstalacion;
+  return typeof valor === "number" && valor > 0 ? valor : TOPE_PREMARCOS_INSTALACION_PREDETERMINADO;
 }

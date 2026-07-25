@@ -31,6 +31,20 @@ export interface FilaCronograma {
   fabricaPorDia: number;
   /** aberturas/día repartidas linealmente en la ventana de instalación. */
   instalacionPorDia: number;
+  /** aberturas/día en la ventana de fabricación de premarcos. */
+  premarcosFabricacionPorDia: number;
+  /** aberturas/día en la ventana de instalación de premarcos. */
+  premarcosInstalacionPorDia: number;
+}
+
+/** Días que cubre un segmento (inclusive). */
+function diasDeSegmento(segmento?: SegmentoGantt): number {
+  if (!segmento) return 0;
+  const aUTC = (iso: string) => {
+    const [a, m, d] = iso.split("-").map(Number);
+    return Date.UTC(a, m - 1, d);
+  };
+  return Math.round((aUTC(segmento.fin) - aUTC(segmento.inicio)) / 86400000) + 1;
 }
 
 /** Productos del proyecto, con compatibilidad para el modelo legado `tipoProducto`. */
@@ -81,6 +95,10 @@ export function filaCronograma(proyecto: Proyecto, producto: ConfiguracionProduc
   const total = totalAberturasProducto(proyecto, producto.tipo);
   const diasFabrica = producto.planificacion?.diasFabrica ?? 0;
   const diasInstalacion = producto.planificacion?.diasInstalacion ?? 0;
+  // Los premarcos también ocupan capacidad operativa: se reparte el total de
+  // aberturas entre los días de cada ventana de premarcos.
+  const diasFabPremarcos = diasDeSegmento(segmentos.find((s) => s.tipo === "fabricacion_premarcos"));
+  const diasInstPremarcos = diasDeSegmento(segmentos.find((s) => s.tipo === "instalacion_premarcos"));
 
   return {
     proyecto,
@@ -90,7 +108,9 @@ export function filaCronograma(proyecto: Proyecto, producto: ConfiguracionProduc
     hitos,
     firma: fechas.firmaAbaco,
     fabricaPorDia: diasFabrica > 0 ? Math.ceil(total / diasFabrica) : 0,
-    instalacionPorDia: diasInstalacion > 0 ? Math.ceil(total / diasInstalacion) : 0
+    instalacionPorDia: diasInstalacion > 0 ? Math.ceil(total / diasInstalacion) : 0,
+    premarcosFabricacionPorDia: diasFabPremarcos > 0 ? Math.ceil(total / diasFabPremarcos) : 0,
+    premarcosInstalacionPorDia: diasInstPremarcos > 0 ? Math.ceil(total / diasInstPremarcos) : 0
   };
 }
 
@@ -144,18 +164,30 @@ export function firmaPresupuestoProyecto(productos: ConfiguracionProductoProyect
 }
 
 /** Demanda de aberturas/día en una fecha: por línea de producto en fábrica y total en instalación. */
-export function demandaDiaria(filas: FilaCronograma[], fechaISO: string): { fabrica: Record<string, number>; instalacion: number } {
+export function demandaDiaria(
+  filas: FilaCronograma[],
+  fechaISO: string
+): {
+  fabrica: Record<string, number>;
+  instalacion: number;
+  premarcosFabricacion: number;
+  premarcosInstalacion: number;
+} {
   const fabrica: Record<string, number> = {};
   let instalacion = 0;
+  let premarcosFabricacion = 0;
+  let premarcosInstalacion = 0;
+  const dentro = (fila: FilaCronograma, tipo: SegmentoGantt["tipo"]) => {
+    const seg = fila.segmentos.find((s) => s.tipo === tipo);
+    return Boolean(seg && fechaISO >= seg.inicio && fechaISO <= seg.fin);
+  };
   for (const fila of filas) {
-    const enFabrica = fila.segmentos.find((seg) => seg.tipo === "fabrica");
-    if (enFabrica && fechaISO >= enFabrica.inicio && fechaISO <= enFabrica.fin) {
+    if (dentro(fila, "fabrica")) {
       fabrica[String(fila.tipoProducto)] = (fabrica[String(fila.tipoProducto)] ?? 0) + fila.fabricaPorDia;
     }
-    const enInstalacion = fila.segmentos.find((seg) => seg.tipo === "instalacion");
-    if (enInstalacion && fechaISO >= enInstalacion.inicio && fechaISO <= enInstalacion.fin) {
-      instalacion += fila.instalacionPorDia;
-    }
+    if (dentro(fila, "instalacion")) instalacion += fila.instalacionPorDia;
+    if (dentro(fila, "fabricacion_premarcos")) premarcosFabricacion += fila.premarcosFabricacionPorDia;
+    if (dentro(fila, "instalacion_premarcos")) premarcosInstalacion += fila.premarcosInstalacionPorDia;
   }
-  return { fabrica, instalacion };
+  return { fabrica, instalacion, premarcosFabricacion, premarcosInstalacion };
 }

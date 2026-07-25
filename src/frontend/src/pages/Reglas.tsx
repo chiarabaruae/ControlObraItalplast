@@ -16,7 +16,9 @@ import {
   guardarTopesCapacidad,
   obtenerTopesCapacidad,
   TOPE_FABRICA_PREDETERMINADO,
-  TOPE_INSTALACION_PREDETERMINADO
+  TOPE_INSTALACION_PREDETERMINADO,
+  TOPE_PREMARCOS_FABRICACION_PREDETERMINADO,
+  TOPE_PREMARCOS_INSTALACION_PREDETERMINADO
 } from "@/lib/capacidad";
 import { nombreTipoProducto, obtenerCatalogoActivo } from "@/mocks/data";
 import { cn } from "@/lib/utils";
@@ -426,6 +428,14 @@ function SeccionCapacidad() {
     return inicial;
   });
   const [instalacion, setInstalacion] = useState(() => String(obtenerTopesCapacidad().instalacion));
+  const [preFabricacion, setPreFabricacion] = useState(() => {
+    const valor = obtenerTopesCapacidad().premarcosFabricacion;
+    return valor ? String(valor) : "";
+  });
+  const [preInstalacion, setPreInstalacion] = useState(() => {
+    const valor = obtenerTopesCapacidad().premarcosInstalacion;
+    return valor ? String(valor) : "";
+  });
 
   const guardar = () => {
     const fab: Record<string, number> = {};
@@ -444,7 +454,27 @@ function SeccionCapacidad() {
       toast("Revisá la capacidad", { description: "El tope de instalación necesita un número entero mayor a 0." });
       return;
     }
-    guardarTopesCapacidad({ fabrica: fab, instalacion: inst });
+    const opcional = (bruto: string, etiqueta: string): number | undefined | null => {
+      const limpio = bruto.trim();
+      if (!limpio) return undefined;
+      const numero = Number(limpio);
+      if (!Number.isInteger(numero) || numero <= 0) {
+        toast("Revisá la capacidad", { description: `El tope de ${etiqueta} necesita un número entero mayor a 0.` });
+        return null;
+      }
+      return numero;
+    };
+    const preFab = opcional(preFabricacion, "fabricación de premarcos");
+    if (preFab === null) return;
+    const preInst = opcional(preInstalacion, "instalación de premarcos");
+    if (preInst === null) return;
+
+    guardarTopesCapacidad({
+      fabrica: fab,
+      instalacion: inst,
+      premarcosFabricacion: preFab,
+      premarcosInstalacion: preInst
+    });
     toast("Capacidad guardada", { description: "El cronograma general marcará las semanas que superen estos topes." });
   };
 
@@ -486,6 +516,41 @@ function SeccionCapacidad() {
                 <span className="w-16 text-sm text-muted-foreground">ab./día</span>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="font-heading text-sm font-semibold">Premarcos</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">Los premarcos también ocupan capacidad operativa propia.</p>
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-3 rounded-xl border p-3">
+              <Label htmlFor="cap-pre-fab" className="flex-1 text-sm font-medium">Fabricación de premarcos</Label>
+              <Input
+                id="cap-pre-fab"
+                type="number"
+                min={1}
+                step={1}
+                value={preFabricacion}
+                onChange={(evento) => setPreFabricacion(evento.target.value)}
+                placeholder={`Predet. ${TOPE_PREMARCOS_FABRICACION_PREDETERMINADO}`}
+                className="w-28 text-right"
+              />
+              <span className="w-16 text-sm text-muted-foreground">ab./día</span>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl border p-3">
+              <Label htmlFor="cap-pre-inst" className="flex-1 text-sm font-medium">Instalación de premarcos</Label>
+              <Input
+                id="cap-pre-inst"
+                type="number"
+                min={1}
+                step={1}
+                value={preInstalacion}
+                onChange={(evento) => setPreInstalacion(evento.target.value)}
+                placeholder={`Predet. ${TOPE_PREMARCOS_INSTALACION_PREDETERMINADO}`}
+                className="w-28 text-right"
+              />
+              <span className="w-16 text-sm text-muted-foreground">ab./día</span>
+            </div>
           </div>
         </div>
 
